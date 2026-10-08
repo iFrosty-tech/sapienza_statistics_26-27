@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  clipLineToRange,
   renderHistogram,
   renderZStrip,
   renderCollisionCurve,
@@ -17,6 +18,20 @@ import { modelFromSample } from '../src/lib/normal.js';
 import { renderProbabilityPlotSVG, plotTitle, plotDescription } from '../src/lib/probability-plot.js';
 
 const count = (html, needle) => html.split(needle).length - 1;
+
+test('reference lines are cut to the panel rectangle', () => {
+  // y = x on [0, 10] × [0, 10]: untouched.
+  assert.deepEqual(clipLineToRange(1, 0, [0, 10], [0, 10]), [0, 0, 10, 10]);
+  // y = x − 1 (n/2 in log₂ axes) on [0, 10] × [0, 4]: leaves the frame at x = 5.
+  assert.deepEqual(clipLineToRange(1, -1, [0, 10], [0, 4]), [1, 0, 5, 4]);
+  // y = x/2 on [0, 10] × [0, 10]: ends at the right edge below the top.
+  assert.deepEqual(clipLineToRange(0.5, 0, [0, 10], [0, 10]), [0, 0, 10, 5]);
+  // A horizontal line outside the range is dropped, one inside is kept whole.
+  assert.equal(clipLineToRange(0, 12, [0, 10], [0, 10]), null);
+  assert.deepEqual(clipLineToRange(0, 3, [0, 10], [0, 10]), [0, 3, 10, 3]);
+  // A line that misses the rectangle entirely is dropped.
+  assert.equal(clipLineToRange(1, 20, [0, 10], [0, 10]), null);
+});
 
 test('histogram draws one bar per bin, an expected step line and the axis titles', () => {
   const bins = [1, 2, 3, 4, 5].map((k) => ({ label: String(k), observed: k * 2, expected: k * 2 + 0.5 }));

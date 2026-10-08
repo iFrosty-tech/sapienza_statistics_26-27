@@ -1030,7 +1030,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </p>
 
             <div class="data-table--scroll">
-              <table class="data-table">
+              <table class="data-table data-table--compact">
                 <caption>Table 3. Replication on six fresh pools of {{fig.params.replicationN}} messages (seeds {{fig.params.replicationSeeds}}): p-value of the binned chi-square test of the Hamming weights, and colliding pairs among the digests truncated to 12 and 16 bits, expected {{fig.replication.expected12}} ± {{fig.replication.sd12}} and {{fig.replication.expected16}} ± {{fig.replication.sd16}}.</caption>
                 <thead>
                   <tr>
@@ -1214,7 +1214,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   <span class="pplot__fig-no">Figure 12.</span>Probability that an attacker overtakes the honest chain
                 </p>
                 <p>
-                  Each curve is equation (3) for an attacker holding the fraction <span data-tex>q</span> of the
+                  Each curve is equation (4) for an attacker holding the fraction <span data-tex>q</span> of the
                   hash rate, against the number of confirmations <span data-tex>z</span>, on a logarithmic
                   probability scale; the dotted ruling marks <span data-tex>z</span> = {{fig.nakamoto.markZ}}. At one
                   confirmation the probabilities are {{fig.nakamoto.q10z1}}, {{fig.nakamoto.q20z1}},

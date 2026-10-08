@@ -613,6 +613,24 @@
 
 .data-table--scroll {
   overflow-x: auto;
+  container-type: inline-size;
+}
+
+/* A caption wraps within the reading measure even when its table is wider and scrolls. */
+.data-table--scroll .data-table caption {
+  max-width: 100cqi;
+}
+
+/* Ten-column tables (Table 3) fit the reading measure at a tighter setting. */
+.data-table--compact th,
+.data-table--compact td {
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.data-table--compact thead th {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
 }
 
 /* The assignment, quoted verbatim in §1: a ruled margin, as a quotation on a form */

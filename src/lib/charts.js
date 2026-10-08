@@ -316,6 +316,25 @@ function log2Ticks(min, max, target) {
   return values;
 }
 
+/**
+ * The part of the line y = f + exponent · x that lies inside xRange × yRange, as
+ * [xa, ya, xb, yb] in data coordinates, or null when the line misses the rectangle.
+ */
+export function clipLineToRange(exponent, f, xRange, yRange) {
+  let xa = xRange[0];
+  let xb = xRange[1];
+  if (exponent === 0) {
+    if (f < yRange[0] || f > yRange[1]) return null;
+  } else {
+    const atY0 = (yRange[0] - f) / exponent;
+    const atY1 = (yRange[1] - f) / exponent;
+    xa = Math.max(xa, Math.min(atY0, atY1));
+    xb = Math.min(xb, Math.max(atY0, atY1));
+  }
+  if (!(xa < xb)) return null;
+  return [xa, f + exponent * xa, xb, f + exponent * xb];
+}
+
 function logPanel({ g, series, references, marks, xRange, yRange, label, showSeriesLabels, dense }) {
   const lx = (v) => Math.log2(v);
   const x = linear(xRange[0], xRange[1], g.left, g.right);
@@ -331,14 +350,16 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
   out.push('<g class="chart__references" aria-hidden="true">');
   for (const ref of references) {
     const f = Math.log2(ref.factor ?? 1);
-    const y0 = f + ref.exponent * xRange[0];
-    const y1 = f + ref.exponent * xRange[1];
+    // The reference line log2 y = f + exponent · log2 x is cut to the panel so that a steep
+    // law (n/2 in the measured panel) does not run past the frame into the caption.
+    const segment = clipLineToRange(ref.exponent, f, xRange, yRange);
+    if (!segment) continue;
+    const [xa, ya, xb, yb] = segment;
     out.push(
-      `<line class="chart__reference" x1="${round(x(xRange[0]))}" y1="${round(y(y0))}" x2="${round(x(xRange[1]))}" y2="${round(y(y1))}"/>`,
+      `<line class="chart__reference" x1="${round(x(xa))}" y1="${round(y(ya))}" x2="${round(x(xb))}" y2="${round(y(yb))}"/>`,
     );
-    const ly = Math.min(Math.max(y1, yRange[0]), yRange[1]);
     out.push(
-      `<text class="chart__annotation" x="${round(x(xRange[1]) - 4)}" y="${round(y(ly) - 5)}" text-anchor="end">${escapeXml(ref.label)}</text>`,
+      `<text class="chart__annotation" x="${round(x(xb) - 4)}" y="${round(y(yb) - 5)}" text-anchor="end">${escapeXml(ref.label)}</text>`,
     );
   }
   out.push('</g>');
