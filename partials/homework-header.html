@@ -1,0 +1,33 @@
+<div class="sheet-head sheet-head--compact">
+        <p class="sheet-head__form">{{site.course}} &middot; {{site.university}} &middot; Academic year <span class="field__figure">{{site.academicYear}}</span></p>
+        <!-- @include partials/identity-block.html -->
+      </div>
+
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="{{base}}#register">Homework register</a></li>
+          <li><span aria-current="page">Homework&nbsp;<span class="field__figure">{{hw.no}}</span></span></li>
+        </ol>
+      </nav>
+
+      <header class="hw-head">
+        <h1 class="hw-head__title">
+          <span class="hw-head__no"><span class="visually-hidden">Homework </span><span class="field__figure">{{hw.no}}</span></span>
+          <span class="hw-head__text">{{hw.title}}</span>
+        </h1>
+        <dl class="hw-head__meta">
+          <div>
+            <dt>Date</dt>
+            <dd><time datetime="{{hw.published}}">{{hw.publishedLabel}}</time></dd>
+          </div>
+          <div>
+            <dt>Topics</dt>
+            <dd>{{hw.topics}}</dd>
+          </div>
+          <div>
+            <dt>Author</dt>
+            <dd>{{site.author}}</dd>
+          </div>
+        </dl>
+        <p class="hw-head__abstract"><span class="hw-head__abstract-label">Abstract.</span> {{hw.abstract}}</p>
+      </header>

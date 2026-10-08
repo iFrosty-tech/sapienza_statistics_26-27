@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--
+      Homework page template (served in development only, never built).
+      To publish homework NN:
+        1. Copy this folder to homework/NN/ (two digits, e.g. homework/03/).
+        2. Add an entry with number NN to src/data/homeworks.js; the title, date,
+           topics and abstract in the page header come from that entry.
+        3. Replace every placeholder section below. Inline TeX goes in a span with the
+           data-tex attribute, display TeX in a div with data-tex-display; both are
+           rendered with KaTeX at build time.
+        4. Interactive figures use an @plot marker comment inside a figure with data-pplot,
+           as in section 3 below; src/lib/probability-plot.js documents the markup contract.
+    -->
+    <!-- @include partials/head-meta.html -->
+    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/homework.js"></script>
+  </head>
+  <body class="page page--homework"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Method</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Demonstration</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Results and discussion</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Conclusion</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>
+              Section placeholder. State the question set by the assignment in your own words, define the
+              population and the variables involved, and say what a satisfactory answer must establish.
+            </p>
+            <p>
+              Paragraph placeholder. Inline notation is written as TeX, for example a sample
+              <span data-tex>X_1, \dots, X_n</span> of independent observations with mean
+              <span data-tex>\mu</span> and variance <span data-tex>\sigma^2</span>.
+            </p>
+          </section>
+
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Method</h2>
+            <p>
+              Section placeholder. Describe the method and justify each assumption. Display equations are numbered
+              on the right; the example below is the standardised sample mean, with
+              <span data-tex>\bar{X}_n = n^{-1} \sum_{i=1}^{n} X_i</span>, included only to show the typesetting.
+            </p>
+            <div class="equation" id="eq-1">
+              <div data-tex-display>
+                Z_n = \frac{\bar{X}_n - \mu}{\sigma / \sqrt{n}} \xrightarrow{\;d\;} \mathcal{N}(0, 1)
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              Paragraph placeholder. Refer to equations by number, as in equation (1), and to sections by their
+              anchors, as in <a href="#s3">§3</a>.
+            </p>
+          </section>
+
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Demonstration</h2>
+            <p>
+              Section placeholder. Introduce the interactive figure and state what the reader should observe. The
+              figure below is a reusable component: a normal probability plot of a simulated sample.
+            </p>
+
+            <figure class="pplot pplot--inline" data-pplot aria-labelledby="fig1-caption-title">
+              <!-- @plot id=fig1 n=40 seed=2026 dist=normal -->
+              <div class="pplot__controls" data-pplot-controls hidden>
+                <fieldset class="choice">
+                  <legend>Sample size</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig1-n-10" name="fig1-n" value="10" data-pplot-n />
+                      <label for="fig1-n-10"><span class="tabular">n = 10</span></label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig1-n-40" name="fig1-n" value="40" data-pplot-n checked />
+                      <label for="fig1-n-40"><span class="tabular">n = 40</span></label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig1-n-160" name="fig1-n" value="160" data-pplot-n />
+                      <label for="fig1-n-160"><span class="tabular">n = 160</span></label>
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset class="choice">
+                  <legend>Population</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig1-dist-normal" name="fig1-dist" value="normal" data-pplot-dist checked />
+                      <label for="fig1-dist-normal">Normal</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig1-dist-lognormal" name="fig1-dist" value="lognormal" data-pplot-dist />
+                      <label for="fig1-dist-lognormal">Right-skewed</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-pplot-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-caption-title">
+                  <span class="pplot__fig-no">Figure 1.</span>Figure caption placeholder
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Caption placeholder: describe what is plotted and how it was generated. Sample of
+                  <span class="tabular" data-pplot-stat="n">{{plot.fig1.n}}</span> observations from
+                  <span data-pplot-stat="population">{{plot.fig1.population}}</span>; mean
+                  <span class="tabular" data-pplot-stat="mean">{{plot.fig1.mean}}</span>, standard deviation
+                  <span class="tabular" data-pplot-stat="sd">{{plot.fig1.sd}}</span>, probability-plot correlation
+                  <span class="tabular" data-pplot-stat="r">{{plot.fig1.r}}</span>, seed
+                  <span class="tabular" data-pplot-stat="seed">{{plot.fig1.seed}}</span>.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-pplot-status aria-live="polite"></p>
+            </figure>
+          </section>
+
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Results and discussion</h2>
+            <p>
+              Section placeholder. Report the results with their uncertainty, interpret them in the terms of the
+              original question, and discuss the limitations of the method.
+            </p>
+            <h3>Subsection placeholder</h3>
+            <ul>
+              <li>List item placeholder.</li>
+              <li>List item placeholder.</li>
+            </ul>
+          </section>
+
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Conclusion</h2>
+            <p>Section placeholder. Answer the question stated in §1 in two or three sentences.</p>
+          </section>
+
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <ol>
+              <li>Reference placeholder: Author, A. (Year). <cite>Title of the work</cite>. Publisher.</li>
+              <li>Reference placeholder: Author, B. and Author, C. (Year). Title of the article. <cite>Journal</cite>, volume(issue), pages.</li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
