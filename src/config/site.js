@@ -5,9 +5,8 @@
  */
 export default {
   author: 'Marco Verri',
-  // TODO: replace with the real student ID (matricola). While it is all zeros the
-  // build marks the field as pending so the placeholder is never mistaken for data.
-  studentId: '0000000',
+  // Student ID (matricola). An all-zeros value is treated as a pending placeholder.
+  studentId: '2339817',
   degree: 'MSc in Cybersecurity',
   degreeNative: 'Laurea Magistrale',
   course: 'Statistics',
