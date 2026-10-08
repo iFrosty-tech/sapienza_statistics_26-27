@@ -615,6 +615,26 @@
   overflow-x: auto;
 }
 
+/* The assignment, quoted verbatim in §1: a ruled margin, as a quotation on a form */
+.prose blockquote.assignment {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-4);
+  border-left: var(--rule) solid var(--ruling-ink);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.prose blockquote.assignment p {
+  margin: 0;
+}
+
+/* Acronyms expanded on first use carry the printed-form dotted rule, never a tooltip cursor */
+.prose abbr[title] {
+  text-decoration: underline dotted var(--ruling-ink);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
 /* Worked-example and source listings */
 .worked {
   display: grid;
@@ -638,8 +658,22 @@
   overflow-wrap: anywhere;
 }
 
+/* Reference list: the address is the link text, so printing must not repeat it */
+.references__note {
+  font-size: var(--text-small);
+  color: var(--ink-soft);
+}
+
+.references .ref-link {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Print ---------- */
 @media print {
+  .references a.ref-link::after {
+    content: none;
+  }
+
   .chart-figure__controls,
   [data-fig-controls],
   [data-fig-status],

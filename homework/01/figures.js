@@ -13,11 +13,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { encodePng, pngDataUrl } from '../../src/lib/png.js';
 import { sha256Hex } from '../../src/lib/sha256.js';
-import { utf8Bytes } from '../../src/lib/bytes.js';
+import { hammingWeight, utf8Bytes } from '../../src/lib/bytes.js';
 import { formatNumber } from '../../src/lib/probability-plot.js';
-import { attackerSuccessProbability } from '../../src/lib/stats.js';
+import { attackerSuccessProbability, binnedBinomialChiSquare } from '../../src/lib/stats.js';
 import * as study from '../../src/lib/ec-hash-study.js';
-import { SERIES, SERIES_KINDS, renderChart, renderSeries, renderStatsScript, statsOf } from '../../src/hw01/render.js';
+import { SERIES, SERIES_KINDS, formatP, renderChart, renderSeries, renderStatsScript, statsOf } from '../../src/hw01/render.js';
 import { PRESET, construct, describe, renderGroupLawSVG } from '../../src/hw01/group-law.js';
 import { computeDemo, renderDemoOutput } from '../../src/hw01/demo.js';
 
@@ -31,6 +31,7 @@ export const PARAMS = Object.freeze({
   collisionBits: [12, 16, 20, 24],
   curveBits: 16,
   subsets: 400, // random subsets per sample size on the collision curve
+  replicationSeeds: [1, 2, 3, 4, 5, 6], // fresh pools of n messages for Table 3
   smallCurvePrime: 199,
   ecdlpExponents: [7, 8, 9, 10, 11, 12, 13, 14],
   challenges: 5,
@@ -94,6 +95,43 @@ function measureSpeed() {
   return speed;
 }
 
+/* The leading t bits of a digest as a number, as in the collision test of the study. */
+function leadingBits(digest, t) {
+  const word = ((digest[0] << 24) | (digest[1] << 16) | (digest[2] << 8) | digest[3]) >>> 0;
+  return word >>> (32 - t);
+}
+
+/**
+ * Table 3: the Hamming-weight test and the colliding-pair counts repeated on
+ * fresh pools, one per replication seed, for every hash function. A single
+ * small p-value in Table 2 is judged by whether it recurs here.
+ */
+function computeReplication() {
+  const replication = {};
+  for (const variant of SERIES) {
+    const h = study.hashFunction(variant);
+    replication[variant] = PARAMS.replicationSeeds.map((seed) => {
+      const digests = study.randomMessages({ n: PARAMS.n, seed }).map(h);
+      const counts = new Array(257).fill(0);
+      for (const d of digests) counts[hammingWeight(d)] += 1;
+      const fit = binnedBinomialChiSquare(counts, 256, 0.5);
+      const pairs = {};
+      for (const t of [12, 16]) {
+        const buckets = new Map();
+        for (const d of digests) {
+          const key = leadingBits(d, t);
+          buckets.set(key, (buckets.get(key) ?? 0) + 1);
+        }
+        let colliding = 0;
+        for (const c of buckets.values()) colliding += (c * (c - 1)) / 2;
+        pairs[t] = colliding;
+      }
+      return { seed, hwP: fit.p, t12: pairs[12], t16: pairs[16] };
+    });
+  }
+  return replication;
+}
+
 function computeAll() {
   const series = {};
   for (const variant of SERIES) {
@@ -102,7 +140,7 @@ function computeAll() {
   }
   const primes = PARAMS.ecdlpExponents.map((k) => BigInt(nextPrime(2 ** k)));
   const ecdlp = study.ecdlpCostGrowth({ primes, challenges: PARAMS.challenges, seed: PARAMS.seeds.ecdlp });
-  return { series, ecdlp, speed: measureSpeed() };
+  return { series, ecdlp, replication: computeReplication(), speed: measureSpeed() };
 }
 
 let memo = null;
@@ -171,6 +209,30 @@ export default async function provide({ root }) {
   token('params.computedAt', computedAt.slice(0, 10));
   for (const name of SERIES) token(`speed.${name}`, results.speed[name].toLocaleString('en-GB'));
   token('speed.ratio', Math.round(results.speed.sha256 / results.speed.scalar));
+
+  // Table 3: replication of the Hamming-weight test and the collision counts on fresh pools.
+  token('params.replicationN', PARAMS.n);
+  token('params.replicationSeeds', PARAMS.replicationSeeds.join(', '));
+  for (const t of [12, 16]) {
+    const expected = (PARAMS.n * (PARAMS.n - 1)) / 2 / 2 ** t;
+    token(`replication.expected${t}`, formatNumber(expected, 1));
+    token(`replication.sd${t}`, formatNumber(Math.sqrt(expected * (1 - 2 ** -t)), 1));
+  }
+  for (const name of SERIES) {
+    const rows = results.replication[name];
+    rows.forEach((r, i) => {
+      token(`replication.${name}.s${i + 1}.hwP`, formatP(r.hwP));
+      token(`replication.${name}.s${i + 1}.t12`, r.t12);
+      token(`replication.${name}.s${i + 1}.t16`, r.t16);
+    });
+    const ps = rows.map((r) => r.hwP);
+    token(`replication.${name}.hwPMin`, formatP(Math.min(...ps)));
+    token(`replication.${name}.hwPMax`, formatP(Math.max(...ps)));
+    for (const t of ['t12', 't16']) {
+      token(`replication.${name}.${t}Min`, Math.min(...rows.map((r) => r[t])));
+      token(`replication.${name}.${t}Max`, Math.max(...rows.map((r) => r[t])));
+    }
+  }
 
   // E8: the cost of the discrete logarithm.
   const rows = results.ecdlp;

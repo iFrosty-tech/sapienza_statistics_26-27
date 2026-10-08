@@ -56,6 +56,22 @@ function binomialBins(counts, { from, to, total, n = 256, p = 0.5 }) {
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
+/**
+ * Probability that a Bin(trials, ½) count lies more than `threshold` standard
+ * deviations from its mean. The cell counts of the strict-avalanche matrix are
+ * discrete, so this exact tail, not the normal 5%, is the expected proportion
+ * of cells flagged as "|z| > 1.96" (5.95% for 48 trials, 7.03% for 8).
+ * @param {number} trials
+ * @param {number} threshold in standard deviations
+ */
+export function exactTwoSidedTail(trials, threshold = 1.96) {
+  const pmf = binomialPmfTable(trials, 0.5);
+  const sd = Math.sqrt(trials / 4);
+  let tail = 0;
+  for (let k = 0; k <= trials; k += 1) if (Math.abs(k - trials / 2) / sd > threshold) tail += pmf[k];
+  return tail;
+}
+
 /* ------------------------------------------------------------- charts */
 
 /**
@@ -305,6 +321,7 @@ export function statsOf(kind, data) {
         max: fmt(data.max, 3),
         maxAbsZ: fmt(data.maxAbsZ, 2),
         beyondTwoSigma: fmt(100 * data.fractionBeyondTwoSigma, 1),
+        expectedBeyondTwoSigma: fmt(100 * exactTwoSidedTail(data.trials, 1.96), 2),
       };
     case 'runs': {
       const a = data.adjacent;
