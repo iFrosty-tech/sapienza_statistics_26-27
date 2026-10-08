@@ -1,0 +1,18 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Local tooling (not part of the site)
+AGENTS.md
+PRODUCT.md
+DESIGN.md
+odd/
+.impeccable/
+.atl/
+.gga
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
