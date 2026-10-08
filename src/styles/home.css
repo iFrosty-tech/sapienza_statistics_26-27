@@ -43,6 +43,12 @@
   .sheet-head {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* Keep the hierarchy title > subtitle > lead once the title shrinks. */
+  .sheet-head__subtitle {
+    font-size: max(var(--text-lead), 0.34em);
+    font-weight: 400;
+  }
 }
 
 /* The hero sheet sizes itself so the register begins at the fold. */
@@ -58,6 +64,43 @@
 @media (max-width: 60rem) {
   .hero .pplot__canvas {
     height: clamp(320px, 62vh, 480px);
+  }
+}
+
+/*
+ * Laptop heights (1366x768, 1440x800): the title block tightens, the controls
+ * move under the sheet, and the plot takes what is left, so the register still
+ * begins inside the first viewport and the caption column ends above the
+ * plot's lower edge.
+ */
+@media (min-width: 60rem) and (max-height: 53rem) {
+  .page--home .sheet {
+    padding-top: var(--space-4);
+  }
+
+  .sheet-head {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 34rem);
+    row-gap: var(--space-4);
+  }
+
+  .sheet-head__title {
+    font-size: min(var(--text-h1), 4.5rem);
+  }
+
+  .sheet-head__lead {
+    max-width: 56ch;
+  }
+
+  .hero {
+    margin-top: var(--space-4);
+  }
+
+  .hero .pplot__canvas {
+    height: clamp(260px, calc(100svh - 29rem), 460px);
+  }
+
+  .register-section {
+    margin-top: var(--space-5);
   }
 }
 

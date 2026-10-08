@@ -70,7 +70,7 @@
 /* ---------- Title block fields ---------- */
 .title-block__fields {
   display: grid;
-  grid-template-columns: 1.1fr 1.15fr 2fr 0.9fr 0.9fr 1.7fr;
+  grid-template-columns: 1fr 1.4fr 2.7fr 0.8fr 1fr 2fr;
   gap: var(--hair);
   background: var(--ruling);
   border: var(--rule) solid var(--ink);
@@ -114,7 +114,20 @@
 
 .field[data-state='pending'] .field__pending-note {
   display: inline;
-  color: var(--ink);
+  margin-left: 0.4em;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* The ID cell keeps its caption on one line at every multi-column width. */
+.field--id {
+  min-width: 13.25rem;
+}
+
+.field--id .field__caption {
+  white-space: nowrap;
 }
 
 @media (max-width: 72rem) {
@@ -131,6 +144,10 @@
   .field--degree,
   .field--university {
     grid-column: span 2;
+  }
+
+  .field--id {
+    min-width: 0;
   }
 }
 
@@ -205,6 +222,14 @@
   position: relative;
   flex: 1 1 auto;
   display: flex;
+}
+
+/* Narrow sheets: one option per line, so no option is left alone on a row. */
+@media (max-width: 36rem) {
+  .choice__options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .choice__option input {
@@ -286,10 +311,33 @@
 }
 
 /* ---------- Register ---------- */
+/* Fixed layout: column widths come from the colgroup, so the register keeps the
+   same ruling whether it is empty or filled. */
 .register {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-family: var(--font-form);
+}
+
+.register__col--line {
+  width: 2.75rem;
+}
+
+.register__col--no {
+  width: 4.5rem;
+}
+
+.register__col--title {
+  width: 46%;
+}
+
+.register__col--date {
+  width: 8rem;
+}
+
+.register__col--status {
+  width: 8.5rem;
 }
 
 .register thead th {
@@ -332,10 +380,6 @@
   font-size: 1.375rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-}
-
-.register__title {
-  width: 46%;
 }
 
 .register__link {
@@ -416,6 +460,10 @@
   .register td,
   .register th {
     display: block;
+  }
+
+  .register colgroup {
+    display: none;
   }
 
   .register thead {

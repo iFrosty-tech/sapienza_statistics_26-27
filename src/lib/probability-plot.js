@@ -19,11 +19,11 @@
 import { invNorm, simulateProbabilityPlot, freshSeed } from './normal.js';
 
 /* Cumulative probabilities (in percent) printed on the paper. */
-const MAJOR_P = [
+export const MAJOR_P = [
   0.01, 0.1, 0.5, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.5,
   99.9, 99.99,
 ];
-const MINOR_P = [
+export const MINOR_P = [
   0.02, 0.05, 0.2, 3, 4, 15, 25, 35, 45, 55, 65, 75, 85, 96, 97, 99.8, 99.95,
   99.98,
 ];

@@ -7,6 +7,8 @@
  *   <!-- @plot id=fig1 n=40 seed=7 dist=normal -->
  *                                            renders a probability plot canvas with a static SVG;
  *                                            its statistics are exposed as {{plot.fig1.mean}} etc.
+ *   <!-- @phi-strip -->                      renders a strip of the paper's probability scale,
+ *                                            ruled at Φ⁻¹(p) from 0.01% to 99.99%
  *   <span data-tex>…</span>                  inline TeX rendered with KaTeX
  *   <div data-tex-display>…</div>            display TeX rendered with KaTeX
  *   {{site.author}}, {{hw.title}}, {{base}}  tokens from src/config/site.js and the register
@@ -18,8 +20,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import katex from 'katex';
-import { simulateProbabilityPlot } from '../lib/normal.js';
-import { formatNumber, renderProbabilityPlotSVG } from '../lib/probability-plot.js';
+import { invNorm, simulateProbabilityPlot } from '../lib/normal.js';
+import { MAJOR_P, MINOR_P, formatNumber, renderProbabilityPlotSVG } from '../lib/probability-plot.js';
 
 const HOMEWORK_DIR = 'homework';
 const TEMPLATE_PLACEHOLDERS = {
@@ -163,6 +165,9 @@ function renderRegister(registry, base) {
   return (
     `<table class="register" data-count="${entries.length}">` +
     `<caption class="visually-hidden">Register of homework assignments, ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}</caption>` +
+    // Fixed column widths (with table-layout: fixed) keep empty and filled states on the same ruling.
+    `<colgroup><col class="register__col--line"><col class="register__col--no"><col class="register__col--title">` +
+    `<col class="register__col--topics"><col class="register__col--date"><col class="register__col--status"></colgroup>` +
     `<thead><tr><td class="register__line" aria-hidden="true"></td>` +
     `<th scope="col">No.</th><th scope="col">Title</th><th scope="col">Topics</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>` +
     `<tbody>${rows.join('')}</tbody></table>`
@@ -186,6 +191,33 @@ function renderPlotMarker(source, models) {
   const svg = renderProbabilityPlotSVG(model, { width: 960, height: 520, id, xLabel: a.xlabel });
   const xLabelAttr = a.xlabel ? ` data-x-label="${escapeHtml(a.xlabel)}"` : '';
   return `<div class="pplot__canvas" data-pplot-canvas data-id="${escapeHtml(id)}" data-n="${n}" data-seed="${seed}" data-dist="${escapeHtml(dist)}"${xLabelAttr}>${svg}</div>`;
+}
+
+/**
+ * A strip of the probability scale, the signature of the paper, for pages that
+ * do not carry a full plot in their first viewport. Rulings sit at Φ⁻¹(p), so
+ * they crowd towards the tails exactly as on the full sheet.
+ */
+function renderPhiStrip() {
+  const zMin = invNorm(0.0001);
+  const zMax = invNorm(0.9999);
+  const pos = (p) => ((invNorm(p / 100) - zMin) / (zMax - zMin)) * 100;
+  const fmt = (x) => x.toFixed(3);
+  const line = (p, cls, y1) =>
+    `<line class="phi-strip__ruling ${cls}" x1="${fmt(pos(p) * 10)}" x2="${fmt(pos(p) * 10)}" y1="${y1}" y2="16" vector-effect="non-scaling-stroke"/>`;
+  const rulings = [
+    ...MINOR_P.map((p) => line(p, 'is-minor', 8)),
+    ...MAJOR_P.map((p) => line(p, p === 50 ? 'is-median' : 'is-major', 2)),
+  ].join('');
+  const labels = [1, 10, 50, 90, 99]
+    .map((p) => `<span class="phi-strip__label" style="left:${pos(p).toFixed(2)}%">${p}</span>`)
+    .join('');
+  return (
+    `<div class="phi-strip" aria-hidden="true">` +
+    `<svg class="phi-strip__svg" viewBox="0 0 1000 16" preserveAspectRatio="none" focusable="false">${rulings}` +
+    `<line class="phi-strip__base" x1="0" x2="1000" y1="16" y2="16" vector-effect="non-scaling-stroke"/></svg>` +
+    `<div class="phi-strip__labels">${labels}</div></div>`
+  );
 }
 
 function renderTex(html, file, stash) {
@@ -261,6 +293,7 @@ export function sitePlugin({ root }) {
         const mathStash = [];
         out = renderTex(out, rel, mathStash);
         out = out.replace(/<!--\s*@homework-register\s*-->/g, () => renderRegister(registry, base));
+        out = out.replace(/<!--\s*@phi-strip\s*-->/g, () => renderPhiStrip());
         const plotModels = new Map();
         out = out.replace(/<!--\s*@plot\s+([^>]*?)\s*-->/g, (_, attrs) => renderPlotMarker(attrs, plotModels));
 

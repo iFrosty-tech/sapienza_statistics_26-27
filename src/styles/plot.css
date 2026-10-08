@@ -195,6 +195,32 @@
   grid-area: caption;
 }
 
+/* Short laptop screens: the controls sit in one row under the sheet. */
+@media (min-width: 60rem) and (max-height: 53rem) {
+  .pplot--hero {
+    grid-template-areas:
+      'canvas caption'
+      'controls caption';
+    grid-template-rows: auto 1fr;
+    row-gap: var(--space-3);
+  }
+
+  .pplot--hero .pplot__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3) var(--space-5);
+  }
+
+  .pplot--hero .pplot__controls[hidden] {
+    display: none;
+  }
+
+  .pplot--hero .pplot__controls .choice {
+    flex: 0 1 26rem;
+  }
+}
+
 @media (max-width: 60rem) {
   .pplot--hero {
     grid-template-columns: minmax(0, 1fr);
