@@ -1,0 +1,18 @@
+<footer class="colophon">
+      <div class="colophon__inner">
+        <p class="colophon__identity">
+          <span>{{site.author}}</span>
+          <span class="colophon__sep" aria-hidden="true">/</span>
+          <span data-state="{{site.studentIdState}}" class="colophon__id">Student ID <span class="field__figure">{{site.studentId}}</span></span>
+          <span class="colophon__sep" aria-hidden="true">/</span>
+          <span>{{site.degree}}</span>
+        </p>
+        <p class="colophon__course">{{site.course}}, {{site.university}}, academic year {{site.academicYear}}. Individual work.</p>
+        <p class="colophon__note">Figures labelled <em>simulated</em> are generated from seeded pseudo-random samples; they are illustrations, not empirical data.</p>
+        <p class="colophon__meta">
+          Sheet printed <time datetime="{{site.buildDate}}">{{site.buildDate}}</time>
+          <span class="colophon__sep" aria-hidden="true">/</span>
+          <a href="{{site.repoUrl}}">Source repository</a>
+        </p>
+      </div>
+    </footer>

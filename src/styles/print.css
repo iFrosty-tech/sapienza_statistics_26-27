@@ -1,0 +1,97 @@
+/* Print: archival copies for evaluation. White paper, faint rulings, no controls. */
+
+@media print {
+  @page {
+    margin: 16mm 15mm 18mm;
+  }
+
+  :root {
+    --paper: #fff;
+    --paper-deep: #fff;
+    --ruling: #c5dacd;
+    --ruling-minor: #e6efe9;
+  }
+
+  html {
+    font-size: 10.5pt;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .skip-link,
+  .masthead__nav,
+  .pplot__controls,
+  [data-pplot-controls],
+  [data-pplot-status],
+  .toc {
+    display: none !important;
+  }
+
+  .sheet,
+  .masthead__inner,
+  .colophon__inner {
+    width: 100%;
+  }
+
+  .read-layout {
+    display: block;
+    margin-top: 1.5rem;
+  }
+
+  .hw-section + .hw-section {
+    margin-top: 1.75rem;
+  }
+
+  .pplot--hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'canvas'
+      'caption';
+  }
+
+  .pplot__canvas,
+  .hero .pplot__canvas,
+  .pplot--inline .pplot__canvas {
+    height: 8.5cm;
+  }
+
+  figure,
+  .pplot,
+  table,
+  .equation,
+  .hw-head,
+  .sheet-head {
+    break-inside: avoid;
+  }
+
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  /* Print the destination of every link that leaves the page. */
+  main a[href]:not([href^='#']):not(.section-anchor)::after,
+  .colophon a[href]::after {
+    content: ' <' attr(href) '>';
+    font-family: var(--font-form);
+    font-size: 0.8em;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+
+  .breadcrumb {
+    display: none;
+  }
+
+  .colophon {
+    margin-top: 2rem;
+    background: #fff;
+  }
+
+  .register__row--blank {
+    display: none;
+  }
+}

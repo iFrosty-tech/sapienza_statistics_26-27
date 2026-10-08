@@ -1,0 +1,66 @@
+/*
+ * Design tokens: Normal Probability Paper.
+ * Restrained palette: paper ground, ink text, green rulings, plot red reserved
+ * for data marks and the single focus/active accent.
+ * A dark scene could be added later by redefining these tokens under
+ * :root[data-theme="dark"]; components read tokens only.
+ */
+:root {
+  color-scheme: light;
+
+  /* Paper and ink */
+  --paper: #f7faf8;
+  --paper-deep: #edf3ef;      /* second neutral layer: table heads, margins */
+  --paper-press: #e3ece6;     /* pressed form controls */
+  --ink: #1b2420;
+  --ink-soft: #46524c;        /* secondary text, 7.6:1 on paper */
+  --ink-faint: #5d6a63;       /* captions, 5.4:1 on paper */
+
+  /* Rulings */
+  --ruling: #9cc3ae;
+  --ruling-minor: #d3e6da;
+  --ruling-ink: #3a6b54;      /* printed green labels, 5.9:1 on paper */
+
+  /* Data */
+  --plot: #d0462f;
+  --plot-deep: #a8361f;
+  --focus: var(--plot);
+
+  /* Type */
+  --font-form: 'Libre Franklin Variable', 'Libre Franklin', 'Franklin Gothic Medium', 'Arial Narrow', sans-serif;
+  --font-text: 'Source Serif 4 Variable', 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
+  --font-code: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+
+  --text-caption: 0.6875rem;   /* 11px printed captions */
+  --text-small: 0.875rem;
+  --text-body: 1.125rem;
+  --text-lead: 1.3125rem;
+  --text-h3: 1.25rem;
+  --text-h2: clamp(1.5rem, 1.2rem + 1.1vw, 2rem);
+  --text-h1: clamp(2.75rem, 1.6rem + 5vw, 5.5rem);
+
+  --tracking-caps: 0.12em;
+  --measure: 68ch;
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 6rem;
+  --gutter: clamp(1rem, 0.6rem + 2vw, 2.5rem);
+  --sheet-max: 78rem;
+
+  /* Lines */
+  --hair: 1px;
+  --rule: 1.5px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-feedback: 120ms;
+  --dur-state: 200ms;
+}

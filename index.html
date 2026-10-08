@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{site.course}} {{site.academicYear}}: Homework Portfolio of {{site.author}}</title>
+    <meta
+      name="description"
+      content="Homework portfolio of {{site.author}} for the {{site.course}} course, {{site.university}}, academic year {{site.academicYear}}."
+    />
+    <script type="module" src="/src/home.js"></script>
+  </head>
+  <body class="page page--home"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet">
+      <section class="sheet-head" aria-labelledby="page-title">
+        <h1 id="page-title" class="sheet-head__title">
+          {{site.course}}
+          <span class="sheet-head__subtitle">Homework portfolio, academic year <span class="field__figure">{{site.academicYear}}</span></span>
+        </h1>
+        <p class="sheet-head__lead">
+          Individual homework for the {{site.course}} course at {{site.university}}. Each assignment is a
+          self-contained web document, with its argument, its derivations and its simulations, published at a
+          permanent address.
+        </p>
+        <!-- @include partials/identity-block.html -->
+      </section>
+
+      <figure class="pplot pplot--hero hero" data-pplot data-pplot-intro aria-labelledby="hero-caption-title">
+        <!-- @plot id=hero n=40 seed=79388813 dist=normal -->
+
+        <div class="pplot__controls" data-pplot-controls hidden>
+          <button type="button" class="form-button" data-pplot-resample>
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+              <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+              <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+              <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+            </svg>
+            Draw new sample
+          </button>
+          <fieldset class="choice">
+            <legend>Population</legend>
+            <div class="choice__options">
+              <div class="choice__option">
+                <input type="radio" id="hero-dist-normal" name="hero-dist" value="normal" data-pplot-dist checked />
+                <label for="hero-dist-normal">Normal</label>
+              </div>
+              <div class="choice__option">
+                <input type="radio" id="hero-dist-lognormal" name="hero-dist" value="lognormal" data-pplot-dist />
+                <label for="hero-dist-lognormal">Right-skewed</label>
+              </div>
+              <div class="choice__option">
+                <input type="radio" id="hero-dist-uniform" name="hero-dist" value="uniform" data-pplot-dist />
+                <label for="hero-dist-uniform">Light-tailed</label>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        <figcaption class="pplot__caption">
+          <p class="pplot__caption-title" id="hero-caption-title">
+            <span class="pplot__fig-no">Fig. 1</span>A sample on normal probability paper
+            <span class="pplot__simulated">Simulated</span>
+          </p>
+          <p>
+            The probability scale is ruled by the inverse normal distribution function, so a normal sample falls
+            close to a straight line. Points are ordered observations at Blom plotting positions
+            <span data-tex>(i - 0.375)/(n + 0.25)</span>; the line is their least-squares fit on the normal scores.
+          </p>
+          <dl class="pplot__stats">
+            <div>
+              <dt>n</dt>
+              <dd data-pplot-stat="n">{{plot.hero.n}}</dd>
+            </div>
+            <div>
+              <dt>Mean</dt>
+              <dd data-pplot-stat="mean">{{plot.hero.mean}}</dd>
+            </div>
+            <div>
+              <dt>SD</dt>
+              <dd data-pplot-stat="sd">{{plot.hero.sd}}</dd>
+            </div>
+            <div>
+              <dt>Plot r</dt>
+              <dd data-pplot-stat="r">{{plot.hero.r}}</dd>
+            </div>
+          </dl>
+          <p class="pplot__seed">
+            Population <span data-pplot-stat="population">{{plot.hero.population}}</span>, seed
+            <span class="tabular" data-pplot-stat="seed">{{plot.hero.seed}}</span>
+          </p>
+        </figcaption>
+        <p class="visually-hidden" data-pplot-status aria-live="polite"></p>
+      </figure>
+
+      <section class="register-section" id="register" aria-labelledby="register-title">
+        <div class="section-head">
+          <h2 id="register-title">Homework register</h2>
+          <p>
+            Assignments are entered in order of publication. Each title opens the homework's own page, whose address
+            does not change once published.
+          </p>
+        </div>
+        <!-- @homework-register -->
+        <ul class="register-legend" aria-label="Status marks">
+          <li>
+            <span class="status" data-status="published"><svg class="status__mark" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="4.25" /></svg>Published</span>
+            page available
+          </li>
+          <li>
+            <span class="status" data-status="upcoming"><svg class="status__mark" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="4.25" /></svg>Upcoming</span>
+            announced, page not yet available
+          </li>
+        </ul>
+      </section>
+
+      <section class="paper-note" aria-labelledby="paper-title">
+        <h2 id="paper-title">About this sheet</h2>
+        <div class="paper-note__body">
+          <p>
+            Normal probability paper rescales the cumulative-probability axis by the standard normal quantile
+            function <span data-tex>\Phi^{-1}</span>, so its rulings crowd together towards the tails and open out
+            around 50%. If <span data-tex>X \sim \mathcal{N}(\mu, \sigma^2)</span>, its quantiles satisfy
+            <span data-tex>x_p = \mu + \sigma\,\Phi^{-1}(p)</span>: on this scale a normal population is a straight
+            line with intercept <span data-tex>\mu</span> and slope <span data-tex>\sigma</span>.
+          </p>
+          <p>
+            Ordered observations that bend away from a straight line therefore signal a departure from normality:
+            a convex curve points to right skew, a flattened S to tails lighter than the normal. The rulings on this
+            page are computed rather than drawn by eye, using Acklam's rational approximation to
+            <span data-tex>\Phi^{-1}</span>.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

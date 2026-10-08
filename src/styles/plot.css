@@ -1,0 +1,253 @@
+/* Probability-plot figures: the sheet of normal probability paper. */
+
+.pplot {
+  display: grid;
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+
+.pplot__canvas {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 56vh, 560px);
+  min-width: 0;
+}
+
+.pplot__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-family: var(--font-form);
+}
+
+/* Rulings */
+.pplot__vline {
+  stroke: var(--ruling-minor);
+  stroke-width: 1;
+}
+
+.pplot__vline.is-major {
+  stroke: var(--ruling);
+}
+
+.pplot__ruling {
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pplot__ruling.is-major {
+  stroke: var(--ruling);
+}
+
+.pplot__ruling.is-minor {
+  stroke: var(--ruling-minor);
+}
+
+.pplot__ruling.is-median {
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.pplot__frame {
+  fill: none;
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+/* Printed margin labels */
+.pplot__plabel {
+  fill: var(--ruling-ink);
+  font-size: 11px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.pplot__plabel.is-complement {
+  font-weight: 400;
+}
+
+.pplot__xlabel {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.pplot__axis-title {
+  fill: var(--ruling-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Data */
+.pplot__fit {
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.pplot__point {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Caption, statistics and controls */
+.pplot__caption {
+  display: grid;
+  gap: var(--space-3);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.pplot__caption-title {
+  font-family: var(--font-form);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.pplot__fig-no {
+  margin-right: 0.35em;
+  font-weight: 800;
+}
+
+.pplot__simulated {
+  display: inline-block;
+  margin-left: 0.35em;
+  padding: 0 0.4em;
+  border: var(--hair) solid var(--ruling-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+  vertical-align: 0.15em;
+}
+
+.pplot__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--hair);
+  background: var(--ruling);
+  border: var(--hair) solid var(--ruling-ink);
+}
+
+.pplot__stats > div {
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.pplot__stats dd {
+  font-family: var(--font-form);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+  overflow-wrap: anywhere;
+}
+
+.pplot__stats .is-wide {
+  grid-column: span 2;
+}
+
+.pplot__seed {
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  color: var(--ink-faint);
+}
+
+.pplot__controls {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.pplot__controls[hidden] {
+  display: none;
+}
+
+/* Hero variant: plot on the left, margin column on the right. */
+.pplot--hero {
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  grid-template-areas:
+    'canvas controls'
+    'canvas caption';
+  grid-template-rows: auto 1fr;
+}
+
+.pplot--hero .pplot__canvas {
+  grid-area: canvas;
+}
+
+.pplot--hero .pplot__controls {
+  grid-area: controls;
+}
+
+.pplot--hero .pplot__caption {
+  grid-area: caption;
+}
+
+/* Short laptop screens: the controls sit in one row under the sheet. */
+@media (min-width: 60rem) and (max-height: 53rem) {
+  .pplot--hero {
+    grid-template-areas:
+      'canvas caption'
+      'controls caption';
+    grid-template-rows: auto 1fr;
+    row-gap: var(--space-3);
+  }
+
+  .pplot--hero .pplot__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3) var(--space-5);
+  }
+
+  .pplot--hero .pplot__controls[hidden] {
+    display: none;
+  }
+
+  .pplot--hero .pplot__controls .choice {
+    flex: 0 1 26rem;
+  }
+}
+
+@media (max-width: 60rem) {
+  .pplot--hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'canvas'
+      'controls'
+      'caption';
+    grid-template-rows: auto;
+  }
+
+  .pplot--hero .pplot__canvas {
+    height: clamp(320px, 62vh, 480px);
+  }
+}
+
+/* Inline variant inside a homework: full measure, controls under the sheet. */
+.pplot--inline {
+  margin-block: var(--space-6);
+  padding: var(--space-4) 0 0;
+  border-top: var(--rule) solid var(--ink);
+}
+
+.pplot--inline .pplot__canvas {
+  height: clamp(300px, 44vw, 440px);
+}
+
+.pplot--inline .pplot__controls {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  align-items: end;
+}
