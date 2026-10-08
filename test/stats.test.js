@@ -130,3 +130,24 @@ test("Nakamoto's attacker catch-up probability reproduces the whitepaper table",
   assert.ok(Math.abs(attackerSuccessProbability(0.3, 50) - 0.0000006) < 1e-7);
   assert.equal(attackerSuccessProbability(0.5, 20), 1, 'an attacker with half the hash rate always catches up');
 });
+
+test('exact null distribution of the runs-test p-value for short strings', async () => {
+  const { runsCount, runsTestPValueDistribution, binomialPmf } = await import('../src/lib/stats.js');
+  // Strings of length n with r runs number 2·C(n − 1, r − 1), summed over the number of ones.
+  for (const n of [8, 31]) {
+    for (let r = 1; r <= n; r += 1) {
+      let total = 0;
+      for (let k = 0; k <= n; k += 1) total += runsCount(n, k, r);
+      assert.ok(Math.abs(total - 2 * Math.exp(lnChoose(n - 1, r - 1))) < 1e-6 * total + 1e-9, `n = ${n}, r = ${r}`);
+    }
+  }
+  const d = runsTestPValueDistribution(256, { bins: 10 });
+  assert.equal(d.bins.length, 10);
+  assert.ok(Math.abs(d.bins.reduce((a, b) => a + b, 0) - 1) < 1e-9);
+  // The inapplicable mass is the binomial tail |k/n − ½| ≥ 2/√n.
+  let tail = 0;
+  for (let k = 0; k <= 256; k += 1) if (Math.abs(k / 256 - 0.5) >= 2 / 16) tail += binomialPmf(256, k, 0.5);
+  assert.ok(Math.abs(d.inapplicable - tail) < 1e-9);
+  // Discreteness: the deciles are visibly unequal for 256-bit strings.
+  assert.ok(Math.max(...d.bins) - Math.min(...d.bins) > 0.01);
+});

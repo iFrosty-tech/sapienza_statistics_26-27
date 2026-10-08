@@ -173,6 +173,56 @@ export function runsTestP(bits) {
   return { p, runs, pi, applicable: true };
 }
 
+/* C(a, b) as a double, zero outside 0 ≤ b ≤ a. */
+function choose(a, b) {
+  if (b < 0 || a < 0 || b > a) return 0;
+  return Math.exp(lnChoose(a, b));
+}
+
+/**
+ * Number of binary strings of length n with k ones and exactly r runs.
+ * With m = ⌊r/2⌋: an even number of runs 2m splits the ones into m blocks
+ * and the zeros into m blocks, starting with either symbol; an odd number
+ * 2m + 1 starts and ends with the same symbol, which has one block more.
+ */
+export function runsCount(n, k, r) {
+  if (k === 0 || k === n) return r === 1 ? 1 : 0;
+  const m = Math.floor(r / 2);
+  if (r % 2 === 0) return 2 * choose(k - 1, m - 1) * choose(n - k - 1, m - 1);
+  return choose(k - 1, m) * choose(n - k - 1, m - 1) + choose(k - 1, m - 1) * choose(n - k - 1, m);
+}
+
+/**
+ * Exact null distribution of the runs-test p-value for strings of n
+ * independent fair bits, as probabilities over `bins` equal intervals of
+ * [0, 1]. For short strings the statistic takes few values, so the
+ * p-value is far from uniform even under the null hypothesis, and a
+ * histogram of p-values must be compared with this distribution rather
+ * than with a flat one. Strings failing the frequency precondition
+ * (p-value 0, "not applicable" in SP 800-22) are excluded and their total
+ * probability returned as `inapplicable`.
+ */
+export function runsTestPValueDistribution(n, { bins = 10 } = {}) {
+  const probs = new Array(bins).fill(0);
+  let applicable = 0;
+  const scale = -n * Math.LN2;
+  for (let k = 0; k <= n; k += 1) {
+    const pi = k / n;
+    if (Math.abs(pi - 0.5) >= 2 / Math.sqrt(n)) continue;
+    const expected = 2 * n * pi * (1 - pi);
+    const denominator = 2 * Math.sqrt(2 * n) * pi * (1 - pi);
+    for (let r = 1; r <= n; r += 1) {
+      const count = runsCount(n, k, r);
+      if (count === 0) continue;
+      const probability = Math.exp(Math.log(count) + scale);
+      const p = erfc(Math.abs(r - expected) / denominator);
+      probs[Math.min(bins - 1, Math.floor(p * bins))] += probability;
+      applicable += probability;
+    }
+  }
+  return { bins: probs.map((v) => v / applicable), applicable, inapplicable: 1 - applicable };
+}
+
 /* ------------------------------------------------------------------------ */
 /* Goodness of fit                                                           */
 /* ------------------------------------------------------------------------ */

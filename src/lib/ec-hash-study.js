@@ -27,6 +27,7 @@ import {
   expectedCollidingPairs,
   monobitFromCounts,
   runsTestP,
+  runsTestPValueDistribution,
   zScore,
 } from './stats.js';
 
@@ -350,12 +351,16 @@ export function birthdayCollisions({
 
 /**
  * E7. Dependence within a digest. (a) The NIST runs test on each 256-bit
- * digest; under H0 the resulting p-values are uniform on [0, 1], which is
- * checked with a chi-square test on ten bins, and the proportion of digests
- * with p ≥ 0.01 should be about 0.99. (b) The 2 × 2 table of adjacent bit
- * pairs (b_j, b_{j+1}) pooled over all digests, tested for independence with
- * a chi-square statistic on one degree of freedom, with the lag-1
- * correlation (phi coefficient) as effect size.
+ * digest. The number of runs of a 256-bit string takes few distinct values,
+ * so under H0 the p-values are not uniform on [0, 1] but follow a discrete
+ * law that is computed exactly by enumerating the strings by their numbers
+ * of ones and runs (see runsTestPValueDistribution); the histogram of
+ * p-values over ten bins is compared with that law by a chi-square test,
+ * and the proportion of digests with p ≥ 0.01 is reported with the interval
+ * used by the NIST suite. (b) The 2 × 2 table of adjacent bit pairs
+ * (b_j, b_{j+1}) pooled over all digests, tested for independence with a
+ * chi-square statistic on one degree of freedom, with the lag-1 correlation
+ * (phi coefficient) as effect size.
  */
 export function runsAndIndependence({ variant, n, seed, length = 32 }) {
   const h = hashFunction(variant);
@@ -377,10 +382,10 @@ export function runsAndIndependence({ variant, n, seed, length = 32 }) {
     if (p > 0) histogram[Math.min(9, Math.floor(p * 10))] += 1;
   }
   // NIST counts a digest as non-applicable (p = 0) when the frequency precondition fails.
+  const reference = runsTestPValueDistribution(8 * length, { bins: 10 });
+  const expectedHistogram = reference.bins.map((p) => p * applicable);
   const uniformity =
-    applicable > 0
-      ? chiSquareGoodnessOfFit(histogram, new Array(10).fill(applicable / 10))
-      : { statistic: 0, df: 9, p: Number.NaN };
+    applicable > 0 ? chiSquareGoodnessOfFit(histogram, expectedHistogram) : { statistic: 0, df: 9, p: Number.NaN };
   const passing = runsPValues.filter((p) => p >= 0.01).length;
   const n00 = table['00'];
   const n01 = table['01'];
@@ -403,7 +408,10 @@ export function runsAndIndependence({ variant, n, seed, length = 32 }) {
     meanRuns: runsTotal / n,
     expectedRuns: 129,
     pValueHistogram: histogram,
+    expectedPValueHistogram: expectedHistogram,
+    expectedInapplicable: n * reference.inapplicable,
     uniformityStatistic: uniformity.statistic,
+    uniformityDf: uniformity.df,
     uniformityP: uniformity.p,
     proportionPassing: passing / n,
     passingInterval: [0.99 - 3 * Math.sqrt((0.01 * 0.99) / n), 0.99 + 3 * Math.sqrt((0.01 * 0.99) / n)],

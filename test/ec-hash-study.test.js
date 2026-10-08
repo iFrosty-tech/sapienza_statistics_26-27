@@ -116,7 +116,9 @@ for (const variant of ['sha256', 'scalar']) {
     assert.equal(r.runsPValues.length, 500);
     assert.equal(r.pValueHistogram.length, 10);
     assert.equal(r.pValueHistogram.reduce((a, b) => a + b, 0), r.applicable);
-    inUnit(r.uniformityP, 'uniformity of p-values');
+    assert.equal(r.expectedPValueHistogram.length, 10);
+    assert.ok(Math.abs(r.expectedPValueHistogram.reduce((a, b) => a + b, 0) - r.applicable) < 1e-6);
+    inUnit(r.uniformityP, 'fit of p-values to the exact law');
     assert.ok(r.proportionPassing > 0.95, `proportion ${r.proportionPassing}`);
     assert.ok(r.meanRuns > 120 && r.meanRuns < 136, `mean runs ${r.meanRuns}`);
     assert.deepEqual(Object.keys(r.adjacent.table).sort(), ['00', '01', '10', '11']);
