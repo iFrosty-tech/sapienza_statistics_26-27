@@ -1,0 +1,660 @@
+/* Homework 01: experiment figures, the group-law construction, the live hash
+   demonstration and the data tables, in the vocabulary of the probability paper. */
+
+/* ---------- Figure frame (inline, like .pplot--inline) ---------- */
+.chart-figure {
+  display: grid;
+  gap: var(--space-5);
+  margin-block: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: var(--rule) solid var(--ink);
+}
+
+.chart-figure__canvas {
+  min-width: 0;
+}
+
+.chart-figure__series[hidden] {
+  display: none;
+}
+
+.chart-figure__panel + .chart-figure__panel {
+  margin-top: var(--space-4);
+}
+
+.chart-figure__controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  align-items: end;
+  gap: var(--space-4);
+}
+
+.chart-figure__controls[hidden] {
+  display: none;
+}
+
+.chart-figure.is-computing .chart-figure__canvas {
+  opacity: 0.6;
+  transition: opacity var(--dur-state) var(--ease-out);
+}
+
+/* ---------- Charts (SVG) ---------- */
+.chart,
+.chart-figure .pplot__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font-form);
+}
+
+.chart__ruling {
+  stroke: var(--ruling-minor);
+  stroke-width: 1;
+}
+
+.chart__ruling.is-major {
+  stroke: var(--ruling);
+}
+
+.chart__frame {
+  fill: none;
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.chart__bar {
+  fill: var(--plot);
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.chart__expected,
+.chart__theory,
+.chart__curve {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart__band {
+  stroke: var(--ruling-ink);
+  stroke-width: 1;
+}
+
+.chart__band--two {
+  stroke-dasharray: 5 3;
+}
+
+.chart__band--three {
+  stroke: var(--ink-soft);
+  stroke-dasharray: 1.5 3;
+}
+
+.chart__zero {
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.chart__lollipop {
+  stroke: var(--plot);
+  stroke-width: 1;
+}
+
+.chart__point {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.chart__point--brute {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.chart__errorbar {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.chart__reference {
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+}
+
+.chart__half,
+.chart__mirror {
+  stroke: var(--ruling-ink);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart__mark {
+  fill: var(--paper);
+  stroke: var(--plot);
+  stroke-width: 2;
+}
+
+.chart__ylabel,
+.chart__xlabel {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.chart__axis-title,
+.chart__panel-title {
+  fill: var(--ruling-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chart__annotation,
+.chart__bandlabel {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.chart__bandlabel {
+  fill: var(--ruling-ink);
+  font-size: 10.5px;
+}
+
+.chart__series-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ---------- Strict-avalanche heat map ---------- */
+.sac {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 52rem) {
+  .sac {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'corner xaxis'
+    'yaxis raster'
+    'legend legend';
+  gap: var(--space-2);
+  font-family: var(--font-form);
+}
+
+.heatmap__corner {
+  grid-area: corner;
+}
+
+.heatmap__xaxis,
+.heatmap__yaxis {
+  position: relative;
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.heatmap__xaxis {
+  grid-area: xaxis;
+  height: 2.25rem;
+}
+
+.heatmap__yaxis {
+  grid-area: yaxis;
+}
+
+.heatmap__axis-title {
+  position: absolute;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+}
+
+.heatmap__xaxis .heatmap__axis-title {
+  left: 0;
+  top: 0;
+}
+
+.heatmap__yaxis .heatmap__axis-title {
+  left: 0;
+  top: 0;
+  transform: rotate(-90deg) translateX(-100%);
+  transform-origin: left top;
+  white-space: nowrap;
+}
+
+.heatmap__tick {
+  position: absolute;
+}
+
+.heatmap__xaxis .heatmap__tick {
+  bottom: 0;
+  left: var(--at);
+  transform: translateX(-50%);
+}
+
+.heatmap__yaxis .heatmap__tick {
+  right: 0.25rem;
+  top: var(--at);
+  transform: translateY(-50%);
+}
+
+.heatmap__raster {
+  grid-area: raster;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 1.25px solid var(--ruling-ink);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.heatmap__legend {
+  grid-area: legend;
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.heatmap__scale {
+  width: 100%;
+  height: 0.625rem;
+  border: var(--hair) solid var(--ruling-ink);
+}
+
+.heatmap__legend-ticks {
+  grid-column: 1;
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.heatmap__legend-title {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+}
+
+/* ---------- Group law (Fig. 1) ---------- */
+.gl {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font-form);
+}
+
+.gl__ruling {
+  stroke: var(--ruling-minor);
+  stroke-width: 1;
+}
+
+.gl__ruling.is-axis {
+  stroke: var(--ruling-ink);
+}
+
+.gl__frame {
+  fill: none;
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.gl__label {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.gl__curve {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.gl__chord {
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.gl__drop {
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+}
+
+.gl__third {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.gl__result circle {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1.25;
+}
+
+.gl__name {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gl__handle-hit {
+  fill: transparent;
+  cursor: grab;
+}
+
+.gl__handle-mark {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1.25;
+  pointer-events: none;
+}
+
+.gl__handle:focus-visible {
+  outline: none;
+}
+
+.gl__handle:focus-visible .gl__handle-mark {
+  stroke: var(--focus);
+  stroke-width: 2.5;
+  r: 7;
+}
+
+.gl__handle:active .gl__handle-hit {
+  cursor: grabbing;
+}
+
+.gl-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.gl-controls[hidden] {
+  display: none;
+}
+
+.form-button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.gl-result {
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- Live demonstration (Fig. 3) ---------- */
+.demo__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.demo__controls[hidden] {
+  display: none;
+}
+
+.demo__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-4);
+  align-items: end;
+}
+
+.text-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.text-field input {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: var(--hair) solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-code);
+  font-size: 0.9375rem;
+}
+
+.text-field input[type='number'] {
+  font-family: var(--font-form);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.text-field__note {
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.demo__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hair);
+  background: var(--ruling);
+  border: var(--rule) solid var(--ink);
+}
+
+.demo__cell {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  background: var(--paper);
+}
+
+.demo__cell--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 36rem) {
+  .demo__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.demo__value {
+  font-family: var(--font-text);
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.demo__value--mono {
+  font-family: var(--font-code);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+.demo__note {
+  font-family: var(--font-text);
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.demo__verdict {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0 0.4em;
+  border: var(--hair) solid var(--ruling-ink);
+  font-family: var(--font-form);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+  vertical-align: 0.15em;
+}
+
+.demo__verdict[data-equal='true'] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* Digest bit grid: 16 × 16 cells, ink for ones; red marks the changed bits. */
+.bitgrid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 1px;
+  width: min(100%, 12rem);
+  margin-top: var(--space-2);
+  padding: 1px;
+  background: var(--ruling);
+  border: var(--hair) solid var(--ink);
+}
+
+.bitgrid__cell {
+  aspect-ratio: 1;
+  background: var(--paper);
+}
+
+.bitgrid__cell[data-bit='1'] {
+  background: var(--ink);
+}
+
+.bitgrid--xor .bitgrid__cell[data-bit='1'] {
+  background: var(--plot);
+}
+
+/* ---------- Data tables ---------- */
+.data-table {
+  width: 100%;
+  margin-block: var(--space-5);
+  border-collapse: collapse;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+}
+
+.data-table caption {
+  margin-bottom: var(--space-2);
+  text-align: left;
+  font-family: var(--font-text);
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: baseline;
+  border-bottom: var(--hair) solid var(--ruling);
+}
+
+.data-table thead th {
+  border-top: var(--rule) solid var(--ink);
+  border-bottom: var(--hair) solid var(--ink);
+  background: var(--paper-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+}
+
+.data-table tbody th {
+  font-weight: 600;
+}
+
+.data-table td.is-number,
+.data-table th.is-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.data-table tbody tr:last-child td,
+.data-table tbody tr:last-child th {
+  border-bottom: var(--rule) solid var(--ink);
+}
+
+.data-table--scroll {
+  overflow-x: auto;
+}
+
+/* Worked-example and source listings */
+.worked {
+  display: grid;
+  gap: var(--hair);
+  margin-block: var(--space-5);
+  background: var(--ruling);
+  border: var(--hair) solid var(--ruling-ink);
+}
+
+.worked > div {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper);
+}
+
+.worked__value {
+  font-family: var(--font-code);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Print ---------- */
+@media print {
+  .chart-figure__controls,
+  [data-fig-controls],
+  [data-fig-status],
+  .gl-controls,
+  [data-gl-status],
+  .demo__controls,
+  [data-demo-status] {
+    display: none !important;
+  }
+
+  .chart-figure.is-computing .chart-figure__canvas {
+    opacity: 1;
+  }
+
+  .sac {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

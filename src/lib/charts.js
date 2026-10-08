@@ -432,16 +432,18 @@ export function renderLogLog({
 
 /* ------------------------------------------------------ curve scatter */
 
-/** All affine points of y² = x³ + 7 over F_p, as a square scatter. */
+/** All affine points of y² = x³ + 7 over F_p, as a square scatter (the SVG is cut to the square). */
 export function renderCurveScatter({ id, title, desc, p, points, width = 960, height }) {
   const h = height ?? Math.min(width, 640);
   const g0 = layout({ width, height: h, margin: { right: 28 } });
   const side = Math.min(g0.plotW, g0.plotH);
   const g = { ...g0, plotW: side, plotH: side, right: g0.left + side, bottom: g0.top + side };
+  const svgWidth = g.left + side + g.margin.right;
+  const svgHeight = g.top + side + g.margin.bottom;
   const ticks = niceTicks(0, p, g.narrow ? 4 : 6).values.filter((v) => v <= p);
   const x = linear(0, p, g.left, g.right);
   const y = linear(0, p, g.bottom, g.top);
-  const out = [svgOpen({ id, width, height: h, title, desc, className: 'chart--scatter' })];
+  const out = [svgOpen({ id, width: svgWidth, height: svgHeight, title, desc, className: 'chart--scatter' })];
   out.push('<g class="chart__rulings" aria-hidden="true">');
   out.push(hRulings(g, ticks.filter((v) => v > 0 && v < p).map((value) => ({ value, y: y(value) })), { major: () => false }));
   out.push(vRulings(g, ticks.filter((v) => v > 0 && v < p).map((value) => ({ value, x: x(value) })), { major: () => false }));
@@ -511,10 +513,11 @@ export function renderNakamoto({
     }
     const d = visible.map((v, k) => `${k === 0 ? 'M' : 'L'}${round(x(v.z))},${round(y(v.p))}`).join('');
     out.push(`<path class="chart__curve chart__curve--${i}" d="${d}"${DASHES[i % DASHES.length] ? ` stroke-dasharray="${DASHES[i % DASHES.length]}"` : ''}/>`);
+    // Curves that leave the sheet through the floor are labelled where they exit, inside the frame.
     const last = visible[visible.length - 1];
     const atFloor = last.p < floor;
     out.push(
-      `<text class="chart__series-label" x="${round(atFloor ? x(last.z) : g.right + 6)}" y="${round(atFloor ? g.bottom + 12 : y(last.p) + 4)}" text-anchor="${atFloor ? 'middle' : 'start'}">${escapeXml(c.label)}</text>`,
+      `<text class="chart__series-label" x="${round(atFloor ? x(last.z) + 6 : g.right + 6)}" y="${round(atFloor ? g.bottom - 8 - 14 * (i % 2) : y(last.p) + 4)}" text-anchor="start">${escapeXml(c.label)}</text>`,
     );
   });
   out.push('</g>');
