@@ -126,6 +126,12 @@ for (const variant of ['sha256', 'scalar']) {
   });
 }
 
+test('E7 survives a sample with no applicable digest', () => {
+  const r = runsAndIndependence({ variant: 'sha256', n: 1, seed: 3 });
+  assert.equal(r.runsPValues.length, 1);
+  assert.ok(Number.isNaN(r.uniformityP) || (r.uniformityP >= 0 && r.uniformityP <= 1));
+});
+
 test('E8 small curves: point enumeration agrees with brute force, logs are found', () => {
   const p = 103n; // 103 ≡ 3 (mod 4)
   const pts = smallCurvePoints(p);

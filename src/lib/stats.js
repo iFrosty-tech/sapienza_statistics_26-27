@@ -219,9 +219,13 @@ export function binnedBinomialChiSquare(counts, n, p, { minExpected = 5 } = {}) 
     }
   }
   if (from <= n) {
-    // Remainder on the right tail: merge it into the last bin.
-    const last = bins.pop();
+    // Remainder on the right tail: merge it into the last bin (or keep it
+    // alone when the sample is too small for any bin to reach the threshold).
+    const last = bins.pop() ?? { from: 0, observed: 0, expected: 0 };
     bins.push({ from: last.from, to: n, observed: last.observed + observed, expected: last.expected + expected });
+  }
+  if (bins.length < 2) {
+    return { statistic: 0, df: 0, p: Number.NaN, bins, note: 'too few observations for a chi-square test' };
   }
   const fit = chiSquareGoodnessOfFit(
     bins.map((b) => b.observed),

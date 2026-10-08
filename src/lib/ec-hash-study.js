@@ -377,7 +377,10 @@ export function runsAndIndependence({ variant, n, seed, length = 32 }) {
     if (p > 0) histogram[Math.min(9, Math.floor(p * 10))] += 1;
   }
   // NIST counts a digest as non-applicable (p = 0) when the frequency precondition fails.
-  const uniformity = chiSquareGoodnessOfFit(histogram, new Array(10).fill(applicable / 10));
+  const uniformity =
+    applicable > 0
+      ? chiSquareGoodnessOfFit(histogram, new Array(10).fill(applicable / 10))
+      : { statistic: 0, df: 9, p: Number.NaN };
   const passing = runsPValues.filter((p) => p >= 0.01).length;
   const n00 = table['00'];
   const n01 = table['01'];

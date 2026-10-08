@@ -102,6 +102,11 @@ test('chi-square goodness of fit and binned binomial fit', () => {
   assert.ok(binned.df >= 1 && binned.df < 17);
   assert.ok(binned.bins.every((b) => b.expected >= 5));
   near(binned.bins.reduce((a, b) => a + b.observed, 0), n, 1e-9);
+
+  // A sample too small for any bin does not crash; it reports an undefined p-value.
+  const tiny = binnedBinomialChiSquare([0, 1, 1, 0, 0], 4, 0.5, { minExpected: 5 });
+  assert.equal(tiny.bins.length, 1);
+  assert.ok(Number.isNaN(tiny.p));
 });
 
 test('z-scores and birthday probabilities', () => {
