@@ -235,6 +235,35 @@ export function binnedBinomialChiSquare(counts, n, p, { minExpected = 5 } = {}) 
 }
 
 /* ------------------------------------------------------------------------ */
+/* Proof-of-work race                                                        */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Nakamoto's estimate of the probability that an attacker holding a fraction
+ * q of the hash rate eventually overtakes the honest chain, given that the
+ * honest chain is z blocks ahead (Bitcoin whitepaper, section 11). The
+ * attacker's progress while the honest miners find z blocks is Poisson with
+ * mean λ = z·q/p, and from a deficit of d blocks the catch-up probability is
+ * (q/p)^d, so
+ *   P = 1 − Σ_{k=0}^{z} (λ^k e^{−λ} / k!) · (1 − (q/p)^{z−k}).
+ * With q ≥ 1/2 the attacker always catches up.
+ */
+export function attackerSuccessProbability(q, z) {
+  if (!(q >= 0 && q < 1)) throw new Error('q must be a probability below 1');
+  const p = 1 - q;
+  if (q >= p) return 1;
+  const lambda = (z * q) / p;
+  const ratio = q / p;
+  let sum = 0;
+  let poisson = Math.exp(-lambda); // λ^0 e^{−λ} / 0!
+  for (let k = 0; k <= z; k += 1) {
+    if (k > 0) poisson *= lambda / k;
+    sum += poisson * (1 - ratio ** (z - k));
+  }
+  return Math.max(0, 1 - sum);
+}
+
+/* ------------------------------------------------------------------------ */
 /* Birthday bound                                                            */
 /* ------------------------------------------------------------------------ */
 

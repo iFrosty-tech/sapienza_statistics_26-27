@@ -117,3 +117,16 @@ test('z-scores and birthday probabilities', () => {
   near(collisionProbability(1, 365), 0, 1e-15);
   assert.ok(collisionProbability(400, 365, { exact: true }) === 1);
 });
+
+test("Nakamoto's attacker catch-up probability reproduces the whitepaper table", async () => {
+  const { attackerSuccessProbability } = await import('../src/lib/stats.js');
+  // Section 11 of the Bitcoin whitepaper, "Calculations": q = 0.1 and q = 0.3 rows.
+  assert.ok(Math.abs(attackerSuccessProbability(0.1, 0) - 1) < 1e-12);
+  assert.ok(Math.abs(attackerSuccessProbability(0.1, 1) - 0.2045873) < 1e-7);
+  assert.ok(Math.abs(attackerSuccessProbability(0.1, 5) - 0.0009137) < 1e-7);
+  assert.ok(Math.abs(attackerSuccessProbability(0.1, 10) - 0.0000012) < 1e-7);
+  assert.ok(Math.abs(attackerSuccessProbability(0.3, 5) - 0.1773523) < 1e-7);
+  assert.ok(Math.abs(attackerSuccessProbability(0.3, 10) - 0.0416605) < 1e-7);
+  assert.ok(Math.abs(attackerSuccessProbability(0.3, 50) - 0.0000006) < 1e-7);
+  assert.equal(attackerSuccessProbability(0.5, 20), 1, 'an attacker with half the hash rate always catches up');
+});

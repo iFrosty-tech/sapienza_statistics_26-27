@@ -240,14 +240,15 @@ export function renderProbabilityPlotSVG(model, { width, height, id, xLabel = 'O
   return out.join('');
 }
 
-/** Accessible title of a plot. */
+/** Accessible title of a plot (a model may carry its own, see `modelFromSample`). */
 export function plotTitle(model) {
-  return `Normal probability plot of ${model.n} simulated observations from ${model.population.label}`;
+  return model.title ?? `Normal probability plot of ${model.n} simulated observations from ${model.population.label}`;
 }
 
 /** Accessible long description of a plot. */
 export function plotDescription(model) {
-  return `${DESCRIPTIONS[model.dist]} Probability-plot correlation r = ${formatNumber(model.fit.r, 3)}; sample mean ${formatNumber(model.mean)}, sample standard deviation ${formatNumber(model.sd)}, seed ${model.seed}.`;
+  const pattern = DESCRIPTIONS[model.dist] ?? model.description ?? '';
+  return `${pattern} Probability-plot correlation r = ${formatNumber(model.fit.r, 3)}; sample mean ${formatNumber(model.mean)}, sample standard deviation ${formatNumber(model.sd)}, seed ${model.seed}.`.trim();
 }
 
 /* ------------------------------------------------------------------ DOM ---- */
