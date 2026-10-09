@@ -350,6 +350,16 @@ export function birthdayCollisions({
 /* ------------------------------------------------------------------------ */
 
 /**
+ * Expected number of runs of n independent fair bits: one run to start, then
+ * each of the n − 1 adjacent pairs ends a run with probability 1/2. This is
+ * the unconditional expectation 1 + (n − 1)/2; the NIST statistic 2nπ(1 − π)
+ * + 1 is the expectation conditional on the observed proportion of ones π.
+ */
+export function expectedRunsOfFairBits(n) {
+  return 1 + (n - 1) / 2;
+}
+
+/**
  * E7. Dependence within a digest. (a) The NIST runs test on each 256-bit
  * digest. The number of runs of a 256-bit string takes few distinct values,
  * so under H0 the p-values are not uniform on [0, 1] but follow a discrete
@@ -406,7 +416,7 @@ export function runsAndIndependence({ variant, n, seed, length = 32 }) {
     runsPValues,
     applicable,
     meanRuns: runsTotal / n,
-    expectedRuns: 129,
+    expectedRuns: expectedRunsOfFairBits(256),
     pValueHistogram: histogram,
     expectedPValueHistogram: expectedHistogram,
     expectedInapplicable: n * reference.inapplicable,

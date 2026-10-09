@@ -14,9 +14,13 @@ const X_MAX = 4;
 const Y_MAX = 9;
 const VIEW = { x0: -3, x1: X_MAX, y0: -Y_MAX, y1: Y_MAX };
 
-/** The positive root y of y² = x³ + 7 (NaN left of X_MIN). */
+/**
+ * The non-negative root y of y² = x³ + 7. At the cusp x = X_MIN the radicand
+ * rounds slightly below zero in floating point, so it is clamped at zero: the
+ * cusp is the point (X_MIN, 0), never NaN.
+ */
 export function curveY(x) {
-  return Math.sqrt(x * x * x + B);
+  return Math.sqrt(Math.max(0, x * x * x + B));
 }
 
 /** A point on the curve at abscissa x, on the upper (sign > 0) or lower branch. */
@@ -102,7 +106,8 @@ export function renderGroupLawSVG({ P, Q, mode = 'add', width = 960, height = 52
   const upper = [];
   const lower = [];
   for (let i = 0; i <= steps; i += 1) {
-    // Denser sampling near the cusp at X_MIN, where the branches meet vertically.
+    // Denser sampling near the cusp at X_MIN, where the branches meet vertically;
+    // the first sample (t = 0) is the cusp itself, (X_MIN, 0).
     const t = i / steps;
     const x = X_MIN + (X_MAX - X_MIN) * t * t;
     const y = curveY(x);

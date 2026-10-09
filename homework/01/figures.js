@@ -104,7 +104,11 @@ function leadingBits(digest, t) {
 /**
  * Table 3: the Hamming-weight test and the colliding-pair counts repeated on
  * fresh pools, one per replication seed, for every hash function. A single
- * small p-value in Table 2 is judged by whether it recurs here.
+ * small p-value in Table 2 is judged by whether it recurs here. This is a post
+ * hoc check: it was designed after the Pedersen Hamming-weight p-value of
+ * Table 2 had been observed, so it tests that single result and is not one of
+ * the pre-planned tests. Its seeds (1 to 6) were chosen before it was run and
+ * none was changed afterwards.
  */
 function computeReplication() {
   const replication = {};
@@ -237,7 +241,11 @@ export default async function provide({ root }) {
   // E8: the cost of the discrete logarithm.
   const rows = results.ecdlp;
   const marks = [
-    { x: 2 ** 112, y: 2 ** 56, label: '112-bit record (2009)' },
+    // The two records are two bits apart on an axis of 256 bits, so their marks nearly coincide
+    // and a label to the left of each would be printed on top of the other: one shared label,
+    // the details (generic curve 2009, Barreto–Naehrig curve 2017) are in the caption.
+    { x: 2 ** 112, y: 2 ** 56, label: '' },
+    { x: 2 ** 114, y: 2 ** 57, label: '112- and 114-bit records' },
     { x: 2 ** 256, y: 2 ** 128, label: 'secp256k1: √n ≈ 2^128' },
   ];
   html.ecdlp = renderChart('ecdlp', { rows, marks }, { id: 'ecdlp' });

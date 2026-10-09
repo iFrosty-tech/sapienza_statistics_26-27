@@ -46,7 +46,7 @@ export function computeDemo({ text, variant = 'scalar', flipIndex = 0 }) {
   if (point) {
     result.point = { xHex: hex256(point.x), yHex: hex256(point.y), compressedHex: bytesToHex(compress(point)) };
   } else if (variant !== 'sha256') {
-    result.point = null; // the all-zero message maps to the point at infinity
+    result.point = null; // the all-zero message (and, in the scalar variant, any multiple of n) maps to the point at infinity
   }
 
   const maxBit = 8 * bytes.length - 1;
@@ -110,7 +110,7 @@ export function renderDemoOutput(r) {
       parts.push(cell('Point y', escape(r.point.yHex), { wide: true }));
       parts.push(cell('Compressed point (SEC 1)', escape(r.point.compressedHex), { wide: true }));
     } else {
-      parts.push(cell('Point', 'O, the point at infinity (all bytes are zero); the digest is defined as 0²⁵⁶', { mono: false, wide: true }));
+      parts.push(cell('Point', 'O, the point at infinity (all message bytes are zero, or in the scalar variant the message is a multiple of n); the digest is defined as 0²⁵⁶', { mono: false, wide: true }));
     }
   }
   parts.push(cell('Digest (256 bits)', `${escape(r.digestHex)}${renderBitGrid(r.digest)}`, { wide: true }));

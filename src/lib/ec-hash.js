@@ -6,8 +6,12 @@
  *
  *     H(m) = x( Σ_i b_i · G_i ),
  *
- * written as 32 big-endian bytes. The point at infinity (reached only by the
- * all-zero message) is mapped to the all-zero digest.
+ * written as 32 big-endian bytes. The point at infinity has no x-coordinate
+ * and is mapped to the all-zero digest. The all-zero message gives ∞; in the
+ * scalar variant so does every message whose little-endian integer is a
+ * multiple of n (for example the 32-byte encoding of n), since n·G = ∞; in the
+ * Pedersen variant any other preimage of ∞ would reveal a discrete-logarithm
+ * relation among the generators.
  *
  * Two generator families share this single definition:
  *

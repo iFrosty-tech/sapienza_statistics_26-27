@@ -16,6 +16,7 @@ import {
   sacMatrix,
   birthdayCollisions,
   runsAndIndependence,
+  expectedRunsOfFairBits,
   smallCurvePoints,
   smallCurveOrderOf,
   smallCurveMul,
@@ -127,6 +128,13 @@ for (const variant of ['sha256', 'scalar']) {
     assert.ok(Math.abs(r.adjacent.lag1Correlation) < 0.05);
   });
 }
+
+test('E7 the unconditional expectation of the runs of a 256-bit digest is 1 + 255/2', () => {
+  // One run to start, then each of the 255 adjacent pairs changes value with probability 1/2.
+  const r = runsAndIndependence({ variant: 'sha256', n: 20, seed: 5 });
+  assert.equal(r.expectedRuns, 128.5);
+  for (const bits of [1, 2, 8, 256]) assert.equal(expectedRunsOfFairBits(bits), 1 + (bits - 1) / 2);
+});
 
 test('E7 survives a sample with no applicable digest', () => {
   const r = runsAndIndependence({ variant: 'sha256', n: 1, seed: 3 });

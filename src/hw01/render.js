@@ -330,7 +330,7 @@ export function statsOf(kind, data) {
         n: int(data.n),
         applicable: int(data.applicable),
         meanRuns: fmt(data.meanRuns, 1),
-        expectedRuns: int(data.expectedRuns),
+        expectedRuns: fmt(data.expectedRuns, 1),
         uniformityStatistic: fmt(data.uniformityStatistic, 1),
         uniformityP: formatP(data.uniformityP),
         passing: fmt(100 * data.proportionPassing, 2),

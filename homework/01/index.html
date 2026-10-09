@@ -81,7 +81,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
             <h3 id="s2-1">2.1 The curve secp256k1 and its group law</h3>
             <p>
-              Elliptic-curve cryptography was proposed independently by Miller [<a href="#ref-69">69</a>] and Koblitz [<a href="#ref-65">65</a>]
+              Elliptic-curve cryptography was proposed independently by Miller [<a href="#ref-70">70</a>] and Koblitz [<a href="#ref-65">65</a>]
               as a way to run discrete-logarithm protocols in a group for which no sub-exponential attack is known.
               The curve used by Bitcoin is one of those recommended by the Standards for Efficient Cryptography
               Group, secp256k1, defined over the prime field <span data-tex>\mathbb{F}_p</span> by the equation
@@ -201,17 +201,19 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               The inverse problem, recovering <span data-tex>k</span> from <span data-tex>k \cdot G</span>, is the
               elliptic-curve discrete logarithm problem (<abbr title="elliptic-curve discrete logarithm problem">ECDLP</abbr>).
               No algorithm is known that exploits the structure of a general prime-order curve, so the best attacks
-              are the generic ones: Pollard's rho method [<a href="#ref-86">86</a>] finds the logarithm in about
+              are the generic ones: Pollard's rho method [<a href="#ref-87">87</a>] finds the logarithm in about
               <span data-tex>\sqrt{n}</span> group operations with negligible memory, van Oorschot and Wiener showed
-              how to distribute it over many machines [<a href="#ref-96">96</a>], and Shoup proved that no algorithm that treats the
+              how to distribute it over many machines [<a href="#ref-97">97</a>], and Shoup proved that no algorithm that treats the
               group as a black box can do better than <span data-tex>\Omega(\sqrt{n})</span> operations when
-              <span data-tex>n</span> is prime [<a href="#ref-94">94</a>]. For secp256k1 this is about <span data-tex>2^{128}</span>
+              <span data-tex>n</span> is prime [<a href="#ref-95">95</a>]. For secp256k1 this is about <span data-tex>2^{128}</span>
               operations, the 128-bit security level that the standard assigns to the curve [<a href="#ref-34">34</a>, Table 1] and the
               <span data-tex>2^{127.8}</span> of SafeCurves [<a href="#ref-14">14</a>]. The largest instances solved in public
-              give the scale: a 112-bit prime-field curve, secp112r1, was broken in 2009 on a cluster of about 215
-              PlayStation 3 consoles running from 13 January to 8 July [<a href="#ref-22">22</a>], and a 113-bit binary-field curve on a
-              cluster of FPGAs in under two months in 2016 [<a href="#ref-13">13</a>]. Each pair of additional bits doubles
-              the cost, so secp256k1 lies about <span data-tex>2^{72}</span> times beyond the prime-field record.
+              give the scale: a 112-bit generic prime-field curve, secp112r1, was broken in 2009 on a cluster of about 215
+              PlayStation 3 consoles running from 13 January to 8 July [<a href="#ref-22">22</a>]; a 113-bit binary-field curve fell
+              to a cluster of FPGAs in under two months in 2016 [<a href="#ref-13">13</a>]; and a 114-bit prime-field problem on a
+              pairing-friendly Barreto–Naehrig curve was solved by Kusaka and co-authors, presented in 2017 and published in
+              2018 [<a href="#ref-66">66</a>]. Each pair of additional bits doubles the cost, so secp256k1 lies about
+              <span data-tex>2^{71}</span> times beyond the largest of these, the 114-bit record.
             </p>
             <p>
               Bitcoin turns this one-way map into its identity system. A private key is an integer
@@ -231,17 +233,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               A cryptographic hash function <span data-tex>h</span> maps inputs of arbitrary length to outputs of a
               fixed length <span data-tex>\ell</span>, here 256 bits, and is expected to resist three kinds of attack,
-              in the classical formulation of Menezes, van Oorschot and Vanstone [<a href="#ref-68">68</a>, §9.2]: preimage resistance,
+              in the classical formulation of Menezes, van Oorschot and Vanstone [<a href="#ref-69">69</a>, §9.2]: preimage resistance,
               so that for essentially any output <span data-tex>y</span> it is infeasible to find an input with
               <span data-tex>h(x) = y</span>; second-preimage resistance, so that given <span data-tex>x</span> it is
               infeasible to find <span data-tex>x' \ne x</span> with <span data-tex>h(x') = h(x)</span>; and collision
               resistance, so that it is infeasible to find any two distinct inputs with the same digest. Rogaway and
               Shrimpton refined these into seven notions and settled which implies which: collision resistance implies
               second-preimage resistance, but implies preimage resistance only provisionally, to a degree that depends
-              on how much the function compresses [<a href="#ref-89">89</a>]. Against a generic adversary an ideal
+              on how much the function compresses [<a href="#ref-90">90</a>]. Against a generic adversary an ideal
               <span data-tex>\ell</span>-bit hash resists preimage and second-preimage search up to about
               <span data-tex>2^{\ell}</span> evaluations and collision search up to about
-              <span data-tex>2^{\ell/2}</span>, the birthday bound [<a href="#ref-68">68</a>, Fact 9.33]; for 256 bits these are
+              <span data-tex>2^{\ell/2}</span>, the birthday bound [<a href="#ref-69">69</a>, Fact 9.33]; for 256 bits these are
               <span data-tex>2^{256}</span> and <span data-tex>2^{128}</span>, the latter equal to the cost of the
               discrete logarithm on the curve.
             </p>
@@ -261,20 +263,20 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 <strong>Uniformity.</strong> The count of ones at a fixed bit position over
                 <span data-tex>n</span> digests is <span data-tex>\mathrm{Bin}(n, \tfrac12)</span>, and the pooled
                 count over all bits is the subject of the frequency, or monobit, test of NIST Special Publication
-                800-22 [<a href="#ref-91">91</a>, §2.1]; the 256 byte values are equally likely, which Pearson's chi-square statistic
+                800-22 [<a href="#ref-92">92</a>, §2.1]; the 256 byte values are equally likely, which Pearson's chi-square statistic
                 tests on 255 degrees of freedom; and the number of ones in a digest is
                 <span data-tex>\mathrm{Bin}(256, \tfrac12)</span>.
               </li>
               <li>
                 <strong>Independence.</strong> The number of runs of identical bits in a digest follows the law
-                tested by the runs test [<a href="#ref-91">91</a>, §2.3], and adjacent bits are uncorrelated.
+                tested by the runs test [<a href="#ref-92">92</a>, §2.3], and adjacent bits are uncorrelated.
               </li>
               <li>
                 <strong>Avalanche.</strong> Complementing one input bit should change "an average of one half of the
                 output bits"; Webster and Tavares, who attribute the idea to Feistel, sharpened it into the strict
                 avalanche criterion, that every output bit changes with probability exactly one half whenever any
                 single input bit is complemented, and the bit independence criterion, that these changes are
-                pairwise independent [<a href="#ref-99">99</a>]. Under <span data-tex>H_0</span> the digests of two messages that
+                pairwise independent [<a href="#ref-100">100</a>]. Under <span data-tex>H_0</span> the digests of two messages that
                 differ in one bit are independent, so their Hamming distance is
                 <span data-tex>\mathrm{Bin}(256, \tfrac12)</span> and every cell of the input-bit by output-bit
                 matrix of flip probabilities equals one half.
@@ -284,17 +286,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 <span data-tex>t</span> bits the number of colliding pairs has mean
                 <span data-tex>\binom{m}{2} / 2^{t}</span>, and the probability of at least one repeat is
                 <span data-tex>1 - \prod_{i &lt; m} (1 - i / 2^{t})</span>, which passes one half when
-                <span data-tex>m</span> is about <span data-tex>1.18 \sqrt{2^{t}}</span> [<a href="#ref-68">68</a>, Fact 2.27].
+                <span data-tex>m</span> is about <span data-tex>1.18 \sqrt{2^{t}}</span> [<a href="#ref-69">69</a>, Fact 2.27].
               </li>
             </ul>
             <p>
-              These are the tests of §4. Larger batteries exist, TestU01 among them [<a href="#ref-66">66</a>], but the NIST tests
+              These are the tests of §4. Larger batteries exist, TestU01 among them [<a href="#ref-67">67</a>], but the NIST tests
               have the merit that each comes with an explicit null distribution, so that a p-value can be read as the
               probability, under <span data-tex>H_0</span>, of a result at least as extreme as the one observed. What
               such tests can establish is bounded by the authors of SP 800-22 themselves: "no set of statistical
               tests can absolutely certify a generator as appropriate for usage in a particular application, i.e.,
               statistical testing cannot serve as a substitute for cryptanalysis", and "no specific finite set of
-              tests is deemed 'complete'" [<a href="#ref-91">91</a>]. The toy hash of §3 is built to make this caveat concrete.
+              tests is deemed 'complete'" [<a href="#ref-92">92</a>]. The toy hash of §3 is built to make this caveat concrete.
             </p>
           </section>
 
@@ -313,9 +315,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span class="equation__no">(3)</span>
             </div>
             <p>
-              written as 32 big-endian bytes; the point at infinity, reached only by the all-zero message, is mapped
-              to the all-zero digest. Two families of generators share this single definition and are compared
-              throughout.
+              written as 32 big-endian bytes. The point at infinity <span data-tex>O</span> has no
+              <span data-tex>x</span>-coordinate, so whenever the sum is <span data-tex>O</span> the digest is
+              defined to be the all-zero string <span data-tex>0^{256}</span>. The all-zero message gives
+              <span data-tex>O</span>; in the scalar variant defined below so does every message whose
+              little-endian integer is a multiple of the group order <span data-tex>n</span>, for example the 32-byte
+              encoding of <span data-tex>n</span> itself, because <span data-tex>n \cdot G = O</span>; in the
+              Pedersen variant, finding any other preimage of <span data-tex>O</span> would reveal a
+              discrete-logarithm relation among the generators. Two families of generators share this single
+              definition and are compared throughout.
             </p>
             <ul>
               <li>
@@ -330,7 +338,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 "nothing-up-my-sleeve" points obtained by hashing the index <span data-tex>i</span> to the curve
                 with SHA-256 and try-and-increment, so that no discrete-logarithm relation between them is known.
                 This is the hash of Pedersen with 8-bit chunks; a collision would reveal a linear relation among
-                the generators and hence a discrete logarithm [<a href="#ref-85">85</a>] [<a href="#ref-61">61</a>, §4.1.8].
+                the generators and hence a discrete logarithm [<a href="#ref-86">86</a>] [<a href="#ref-61">61</a>, §4.1.8].
               </li>
             </ul>
             <p>
@@ -639,7 +647,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               the distance is again <span data-tex>\mathrm{Bin}(256, \tfrac12)</span>. Figure 8 refines the
               question to every pair of input and output bits: the strict avalanche criterion requires that output
               bit <span data-tex>j</span> flip with probability one half whenever input bit <span data-tex>i</span>
-              is flipped, for all <span data-tex>i</span> and <span data-tex>j</span> [<a href="#ref-99">99</a>].
+              is flipped, for all <span data-tex>i</span> and <span data-tex>j</span> [<a href="#ref-100">100</a>].
             </p>
 
             <figure class="chart-figure" data-fig="avalanche" data-fig-kind="avalanche" aria-labelledby="fig7-title">
@@ -772,7 +780,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>0.99 \pm 3\sqrt{0.0099 / n}</span> used by the NIST suite. The same section tests
               adjacent bits directly: the 2 × 2 table of pairs <span data-tex>(b_j, b_{j+1})</span> pooled over all
               digests, with its chi-square statistic on one degree of freedom and the lag-one correlation
-              [<a href="#ref-91">91</a>, §2.3].
+              [<a href="#ref-92">92</a>, §2.3].
             </p>
 
             <figure class="chart-figure" data-fig="runs" data-fig-kind="runs" aria-labelledby="fig9-title">
@@ -814,8 +822,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   Bars count the digests whose runs-test p-value falls in each decile; the step is the exact
                   expectation for 256-bit strings of independent fair bits, uneven because the runs statistic is
                   discrete. The mean number of runs per digest is
-                  <span class="tabular" data-fig-stat="meanRuns">{{fig.runs.scalar.meanRuns}}</span> against 129
-                  expected. Adjacent bits: table
+                  <span class="tabular" data-fig-stat="meanRuns">{{fig.runs.scalar.meanRuns}}</span> against
+                  <span class="tabular" data-fig-stat="expectedRuns">{{fig.runs.scalar.expectedRuns}}</span>
+                  expected (1 + 255/2). Adjacent bits: table
                   (<span class="tabular" data-fig-stat="n00">{{fig.runs.scalar.n00}}</span>,
                   <span class="tabular" data-fig-stat="n01">{{fig.runs.scalar.n01}}</span>,
                   <span class="tabular" data-fig-stat="n10">{{fig.runs.scalar.n10}}</span>,
@@ -847,7 +856,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>\binom{n}{2} / 2^{t}</span>, and the probability that a sample of
               <span data-tex>m</span> values contains a repeat is
               <span data-tex>1 - \prod_{i &lt; m} (1 - i / 2^{t})</span>, which passes one half near
-              <span data-tex>m \approx 1.18 \sqrt{2^{t}}</span> [<a href="#ref-68">68</a>, Fact 2.27]. Table 1 compares expected and observed pairs
+              <span data-tex>m \approx 1.18 \sqrt{2^{t}}</span> [<a href="#ref-69">69</a>, Fact 2.27]. Table 1 compares expected and observed pairs
               for four truncations; Figure 10 draws the probability curve for
               <span data-tex>t</span> = {{fig.collisions.scalar.bits}}, estimated from
               <span class="tabular">{{fig.collisions.scalar.subsets}}</span> random subsets of each size taken from
@@ -941,8 +950,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>2^7, \dots, 2^{14}</span>, with a random base point and
               {{fig.ecdlp.challenges}} random challenges each. Exhaustive search costs about half the group order;
               Shanks's baby-step giant-step costs about <span data-tex>2\sqrt{n}</span> operations and
-              <span data-tex>\sqrt{n}</span> memory, and Pollard's rho the same time with no memory [<a href="#ref-86">86</a>], which
-              no generic algorithm can beat [<a href="#ref-94">94</a>]. Figure 11 shows the measured costs growing as
+              <span data-tex>\sqrt{n}</span> memory, and Pollard's rho the same time with no memory [<a href="#ref-87">87</a>], which
+              no generic algorithm can beat [<a href="#ref-95">95</a>]. Figure 11 shows the measured costs growing as
               <span data-tex>n</span> and <span data-tex>\sqrt{n}</span> (on the largest curve, of order
               {{fig.ecdlp.largestOrder}}, exhaustive search averaged {{fig.ecdlp.largestBrute}} operations and
               baby-step giant-step {{fig.ecdlp.largestBsgs}}), and extends the lines to the order of secp256k1,
@@ -962,7 +971,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   measured ratios are <span class="tabular">{{fig.ecdlp.bsgsRatio}}</span>
                   <span data-tex>\sqrt{n}</span> and <span class="tabular">{{fig.ecdlp.bruteRatio}}</span>
                   <span data-tex>n</span>. The right panel repeats the axes up to <span data-tex>2^{256}</span>,
-                  marking the largest publicly solved prime-field instance of 112 bits and the
+                  marking, by two nearly coincident circles, the two largest publicly solved prime-field instances, of
+                  112 bits (a generic curve, 2009) and 114 bits (a Barreto–Naehrig curve, 2017), and the
                   <span data-tex>2^{128}</span> operations that secp256k1 would demand. Primes
                   {{fig.ecdlp.smallestPrime}}–{{fig.ecdlp.largestPrime}}, seed {{fig.params.seedEcdlp}}.
                 </p>
@@ -1006,13 +1016,16 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               of the Pedersen weights are as expected: a mean of {{fig.hammingWeight.pedersen.mean}} against 128,
               with a standard error of 0.13, and a standard deviation of {{fig.hammingWeight.pedersen.sd}} against 8;
               the discrepancy lies in the shape of the binned histogram, where a few bins are over- or
-              under-populated. Third, and decisively, the result does not replicate. Table 3 repeats the
+              under-populated. Third, the result does not recur on fresh pools. This replication was designed after
+              the p-value of the Pedersen Hamming weights had been observed, so it is a post hoc check of that single
+              result and not one of the pre-planned tests of Table 2; its six seeds were chosen before it was run
+              and none was changed afterwards. Table 3 repeats the
               Hamming-weight test, together with the count of colliding pairs, on six fresh pools of
               {{fig.params.replicationN}} messages for each hash function: the Pedersen p-values range from
               {{fig.replication.pedersen.hwPMin}} to {{fig.replication.pedersen.hwPMax}}, and the "Draw new sample"
               control of Figure 6 lets the reader draw further pools. We therefore do not reject the null hypothesis
-              for any of the three functions, and we keep the published seed rather than exchange it for one that
-              gives a tidier table: the seed was fixed, as the date of the work, before any result was seen.
+              for any of the three functions, and we keep the published pool seed rather than exchange it for one that
+              gives a tidier table: that seed was fixed, as the date of the work, before any result was seen.
             </p>
             <p>
               Two further rows deserve a note. The strict-avalanche row reports about 6% of cells beyond ±1.96
@@ -1088,7 +1101,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               sampling. This is the central lesson of the exercise: statistical tests are necessary, since a hash
               that fails them is certainly unfit, but they are never sufficient, since security is a statement about
               every adversary and not about the average input; the NIST test suite says as much of itself
-              [<a href="#ref-91">91</a>].
+              [<a href="#ref-92">92</a>].
             </p>
             <p>
               The Pedersen variant repairs collision resistance, and the argument is short. A collision
@@ -1096,7 +1109,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               gives <span data-tex>\sum_i (b_i - b_i') G_i = O</span>, a non-trivial linear relation among generators
               whose mutual discrete logarithms are unknown; an adversary who finds collisions can therefore compute
               discrete logarithms, which is the argument of Pedersen for the binding of his commitment
-              [<a href="#ref-85">85</a>], of Chaum, van Heijst and Pfitzmann for the first collision-free hash based on the
+              [<a href="#ref-86">86</a>], of Chaum, van Heijst and Pfitzmann for the first collision-free hash based on the
               discrete logarithm [<a href="#ref-35">35</a>], and of Bellare and Micciancio for their incremental hash MuHASH, with a
               loss of a factor two [<a href="#ref-10">10</a>]; the Zcash specification states it in one line, a collision
               "trivially gives a discrete logarithm relation" [<a href="#ref-61">61</a>, §4.1.8]. The reduction holds for inputs
@@ -1109,7 +1122,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               they prove collision-freeness alone, in the random-oracle model for the inner function, and warn that
               this is not standard provable security [<a href="#ref-10">10</a>]. The halo2 book makes the same point
               about Zcash's Sinsemilla, which "is not designed to be used where a random oracle, PRF, or
-              preimage-resistant hash is required" [<a href="#ref-104">104</a>], and Bottinelli catalogues the practical pitfalls of
+              preimage-resistant hash is required" [<a href="#ref-105">105</a>], and Bottinelli catalogues the practical pitfalls of
               Pedersen hashes, among them keeping only the <span data-tex>x</span>-coordinate, which identifies
               <span data-tex>P</span> with <span data-tex>-P</span> [<a href="#ref-23">23</a>]: here that cannot be exploited,
               because negative byte values are not in the domain, but it halves the output space to
@@ -1155,10 +1168,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               Bitcoin's cryptography is a small set of primitives used with discipline. Transactions are authorised
               by ECDSA signatures on secp256k1 [<a href="#ref-4">4</a>]; since the Taproot upgrade, which activated at block
-              height 709,632 on 14 November 2021 after a signalling period with a 90% miner threshold [<a href="#ref-101">101</a>],
+              height 709,632 on 14 November 2021 after a signalling period with a 90% miner threshold [<a href="#ref-102">102</a>],
               outputs can also be spent with the Schnorr signatures of BIP 340, 64-byte signatures over 32-byte
-              x-only public keys whose linearity makes them easy to combine [<a href="#ref-100">100</a>]. On that linearity rest
-              MuSig2, a two-round multi-signature whose output is a single ordinary BIP 340 signature [<a href="#ref-77">77</a>], and
+              x-only public keys whose linearity makes them easy to combine [<a href="#ref-101">101</a>]. On that linearity rest
+              MuSig2, a two-round multi-signature whose output is a single ordinary BIP 340 signature [<a href="#ref-78">78</a>], and
               FROST, a two-round threshold Schnorr scheme standardised by the IRTF in 2024 with a secp256k1
               ciphersuite [<a href="#ref-38">38</a>]. Hashing is SHA-256 applied twice, "double SHA-256", for block headers,
               transaction identifiers and the Merkle tree that commits to the transactions of a block, and SHA-256
@@ -1178,7 +1191,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </p>
             <p>
               The race analysed in the original paper is the clearest example of statistics as a security argument
-              [<a href="#ref-76">76</a>, §11]: an attacker holding a fraction <span data-tex>q</span> of the hash rate, trying to
+              [<a href="#ref-77">77</a>, §11]: an attacker holding a fraction <span data-tex>q</span> of the hash rate, trying to
               replace a transaction buried under <span data-tex>z</span> blocks, progresses as a Poisson variable
               with mean <span data-tex>\lambda = z\,q/p</span> while the honest chain grows, and catches up from a
               deficit of <span data-tex>d</span> blocks with probability <span data-tex>(q/p)^d</span>, as in the
@@ -1197,7 +1210,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               {{fig.nakamoto.q30z20}} after twenty. Rosenfeld replaced the Poisson approximation by the exact
               negative-binomial law of the attacker's progress and found the original table slightly optimistic: for
               <span data-tex>q</span> = 10% the probability of success drops below 0.1% at six confirmations rather
-              than five [<a href="#ref-90">90</a>]; Grunspan and Pérez-Marco obtained a closed form through the regularised
+              than five [<a href="#ref-91">91</a>]; Grunspan and Pérez-Marco obtained a closed form through the regularised
               incomplete beta function and proved that the probability decays exponentially in the number of
               confirmations [<a href="#ref-59">59</a>]. Honest majority is not the only assumption at stake. Eyal and Sirer showed
               that a miner who withholds blocks strategically earns more than its fair share as soon as its share
@@ -1236,17 +1249,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               the hidden number problem, computed hundreds of Bitcoin private keys from signatures whose nonces were
               merely non-uniform [<a href="#ref-25">25</a>]. The standard remedy is to derive the nonce deterministically from the
               key and the message, as RFC 6979 specifies, since "even slight biases in that process may be turned
-              into attacks on the signature schemes" [<a href="#ref-87">87</a>]; BIP 340 goes further with synthetic nonces that
-              combine the deterministic derivation with auxiliary randomness [<a href="#ref-100">100</a>].
+              into attacks on the signature schemes" [<a href="#ref-88">88</a>]; BIP 340 goes further with synthetic nonces that
+              combine the deterministic derivation with auxiliary randomness [<a href="#ref-101">101</a>].
             </p>
             <p>
               Statistics is, finally, the instrument of forensic analysis. Meiklejohn and co-authors clustered
               12,056,684 public keys into 3,384,179 clusters with two heuristics, that the inputs of a transaction
               are controlled by one user and that change addresses can be recognised, and attached names to 2,197
-              clusters by transacting with services [<a href="#ref-67">67</a>]. Vičič and Tošić tested the first digits of
+              clusters by transacting with services [<a href="#ref-68">68</a>]. Vičič and Tošić tested the first digits of
               transaction values against Benford's law and found that the aggregated values of the well-known
               projects conform to it, while most of the non-conforming coins had documented anomalous incidents
-              [<a href="#ref-98">98</a>].
+              [<a href="#ref-99">99</a>].
             </p>
 
             <h3 id="s6-2">6.2 Ethereum</h3>
@@ -1254,7 +1267,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Ethereum shares Bitcoin's curve but not its hash: an account is identified by the last 20 bytes of the
               Keccak-256 hash of the secp256k1 public key [<a href="#ref-48">48</a>]. Keccak-256 is the function submitted to
               the SHA-3 competition; the standardised SHA3-256 of FIPS 202 differs from it only by a two-bit
-              domain-separation suffix appended to the message before padding [<a href="#ref-78">78</a>, §6.1], which is why the two
+              domain-separation suffix appended to the message before padding [<a href="#ref-79">79</a>, §6.1], which is why the two
               give different digests for the same input. Since the Merge, executed on 15 September 2022, Ethereum has
               been secured by proof of stake [<a href="#ref-49">49</a>]: validators who have deposited stake are chosen to propose and
               attest blocks under Gasper, which combines the finality gadget Casper FFG with the fork-choice rule
@@ -1289,7 +1302,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               [<a href="#ref-1">1</a>]. PeerDAS, specified in EIP-7594 and activated in the Fusaka upgrade on 3 December 2025,
               implements this with nodes that each custody a few of 128 columns and sample eight per slot, so that
               with ten thousand nodes the probability that a withheld blob is accepted as available by even 2% of
-              them is bounded by about <span data-tex>10^{-20}</span> [<a href="#ref-46">46</a>, <a href="#ref-92">92</a>].
+              them is bounded by about <span data-tex>10^{-20}</span> [<a href="#ref-46">46</a>, <a href="#ref-93">93</a>].
             </p>
             <p>
               Much of Ethereum's computation now happens in rollups that post succinct proofs: Groth16, a
@@ -1307,9 +1320,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               Zcash is the closest relative of the toy of §3. Its shielded transactions prove, in zero knowledge, that
               a spend is valid without revealing sender, receiver or amount. Sapling, activated at block 419,200 on
-              29 October 2018, used Groth16 proofs over BLS12-381 [<a href="#ref-61">61</a>, <a href="#ref-103">103</a>, <a href="#ref-105">105</a>]; NU5,
+              29 October 2018, used Groth16 proofs over BLS12-381 [<a href="#ref-61">61</a>, <a href="#ref-104">104</a>, <a href="#ref-106">106</a>]; NU5,
               activated at height 1,687,104 on 31 May 2022, introduced the Orchard protocol with the Halo 2 proving
-              system, which needs no trusted setup [<a href="#ref-42">42</a>, <a href="#ref-106">106</a>]. Inside those circuits ordinary hash
+              system, which needs no trusted setup [<a href="#ref-42">42</a>, <a href="#ref-107">107</a>]. Inside those circuits ordinary hash
               functions are expensive, so Zcash uses algebraic ones. The Sapling Pedersen hash is a sum of points of
               the Jubjub curve indexed by 3-bit windows of the message, "an algebraic hash function with collision
               resistance (for fixed input length) derived from assumed hardness of the Discrete Logarithm Problem on
@@ -1319,7 +1332,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               [<a href="#ref-61">61</a>, §5.4.1.9]. The specification names the only property claimed, collision resistance
               between inputs of fixed length, and adds that "no other security properties commonly associated with
               hash functions are needed"; the halo2 book is blunter: Sinsemilla "is not designed to be used where a
-              random oracle, PRF, or preimage-resistant hash is required" [<a href="#ref-104">104</a>]. The Pedersen variant of §3 is
+              random oracle, PRF, or preimage-resistant hash is required" [<a href="#ref-105">105</a>]. The Pedersen variant of §3 is
               this construction with 8-bit chunks on secp256k1, and §5 is the reason for the caveat.
             </p>
 
@@ -1328,10 +1341,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Monero hides the sender with ring signatures: an input is signed by one of a ring of possible outputs,
               the real one and a number of decoys, and a key image prevents double spending without revealing which
               member signed. The scheme descends from the one-time ring signatures of the CryptoNote protocol
-              [<a href="#ref-97">97</a>]; amounts were hidden from January 2017 by Ring Confidential Transactions, which embed
-              Pedersen commitments in the ring signature [<a href="#ref-83">83</a>], with range proofs given since October 2018 by
-              Bulletproofs, whose size grows only logarithmically in the number of bits proved [<a href="#ref-28">28</a>, <a href="#ref-70">70</a>]. The upgrade of August 2022, at block 2,688,888, adopted the shorter Bulletproofs+
-              and raised the ring size from 11 to 16 [<a href="#ref-37">37</a>, <a href="#ref-71">71</a>], and the ring signature in
+              [<a href="#ref-98">98</a>]; amounts were hidden from January 2017 by Ring Confidential Transactions, which embed
+              Pedersen commitments in the ring signature [<a href="#ref-84">84</a>], with range proofs given since October 2018 by
+              Bulletproofs, whose size grows only logarithmically in the number of bits proved [<a href="#ref-28">28</a>, <a href="#ref-71">71</a>]. The upgrade of August 2022, at block 2,688,888, adopted the shorter Bulletproofs+
+              and raised the ring size from 11 to 16 [<a href="#ref-37">37</a>, <a href="#ref-72">72</a>], and the ring signature in
               use is CLSAG, a concise linkable ring signature with smaller signatures than its predecessor
               [<a href="#ref-57">57</a>].
             </p>
@@ -1340,14 +1353,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               and co-authors found that about 62% of the inputs with one or more decoys before RingCT could be
               traced by "chain-reaction" elimination, because decoys provably spent elsewhere could be excluded, and
               that the real input could be guessed with 80% accuracy as simply the newest member of the ring, since
-              decoys were drawn from a distribution unlike that of real spending [<a href="#ref-75">75</a>]. They fitted the age of
+              decoys were drawn from a distribution unlike that of real spending [<a href="#ref-76">76</a>]. They fitted the age of
               spent outputs, on a logarithmic time scale, with a gamma distribution of shape 19.28 and rate 1.61 and
               proposed sampling decoys from it; Monero adopted the gamma sampler in version 0.13.0 in October 2018
-              [<a href="#ref-70">70</a>], and a post-mortem published in 2023 documented an off-by-one error that had prevented
+              [<a href="#ref-71">71</a>], and a post-mortem published in 2023 documented an off-by-one error that had prevented
               the sampler from ever choosing an output exactly ten blocks old, a statistical fingerprint in its own
-              right [<a href="#ref-72">72</a>]. The next step, Full-Chain Membership Proofs, replaces the ring of 16 by a proof
-              that the spent output is any output on the chain [<a href="#ref-84">84</a>]; as of October 2026 it is being exercised on
-              a beta stress-test network, with no mainnet date announced [<a href="#ref-73">73</a>].
+              right [<a href="#ref-73">73</a>]. The next step, Full-Chain Membership Proofs, replaces the ring of 16 by a proof
+              that the spent output is any output on the chain [<a href="#ref-85">85</a>]; as of October 2026 it is being exercised on
+              a beta stress-test network, with no mainnet date announced [<a href="#ref-74">74</a>].
             </p>
 
             <h3 id="s6-5">6.5 Algorand and Cardano</h3>
@@ -1380,11 +1393,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Solana's distinctive primitive is Proof of History, a clock made of hashing: a single core runs
               SHA-256 in sequence, each output the next input, recording the output and the count at intervals, so
               that the length of the chain is a verifiable lower bound on the time elapsed and the verification can
-              be run in parallel [<a href="#ref-102">102</a>]. It is a delay function in the informal sense, built from a sequential
+              be run in parallel [<a href="#ref-103">103</a>]. It is a delay function in the informal sense, built from a sequential
               hash rather than from the algebraic constructions of §6.7, and the order it imposes on events is used
               before consensus is reached. Votes are cast under Tower BFT, in which a validator's successive votes
               carry exponentially growing lockouts, so that reverting an old vote becomes prohibitively expensive
-              [<a href="#ref-5">5</a>]; transactions are signed with Ed25519, 64 bytes per signer [<a href="#ref-95">95</a>].
+              [<a href="#ref-5">5</a>]; transactions are signed with Ed25519, 64 bytes per signer [<a href="#ref-96">96</a>].
             </p>
 
             <h3 id="s6-7">6.7 Cross-cutting themes</h3>
@@ -1405,13 +1418,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               <strong>The post-quantum transition.</strong> Every signature in this survey, ECDSA and Schnorr on
               secp256k1, Ed25519, BLS and the VRFs, rests on a discrete logarithm, and Shor's algorithm computes
-              discrete logarithms in polynomial time on a quantum computer [<a href="#ref-93">93</a>]. NIST published the first
+              discrete logarithms in polynomial time on a quantum computer [<a href="#ref-94">94</a>]. NIST published the first
               post-quantum standards on 13 August 2024, ML-KEM for key establishment and ML-DSA and SLH-DSA for
-              signatures [<a href="#ref-79">79</a>, <a href="#ref-80">80</a>, <a href="#ref-81">81</a>], selected the code-based HQC for a further
-              encryption standard in March 2025 [<a href="#ref-82">82</a>], and in a draft transition plan proposed that ECDSA, EdDSA
+              signatures [<a href="#ref-80">80</a>, <a href="#ref-81">81</a>, <a href="#ref-82">82</a>], selected the code-based HQC for a further
+              encryption standard in March 2025 [<a href="#ref-83">83</a>], and in a draft transition plan proposed that ECDSA, EdDSA
               and RSA be deprecated after 2030 at 112 bits of security and disallowed after 2035 at every strength
-              [<a href="#ref-74">74</a>]. The resource estimates have fallen quickly. Roetteler and co-authors put Shor's algorithm
-              for a 256-bit curve at 2,330 logical qubits in 2017 [<a href="#ref-88">88</a>]; Chevignard, Fouque and
+              [<a href="#ref-75">75</a>]. The resource estimates have fallen quickly. Roetteler and co-authors put Shor's algorithm
+              for a 256-bit curve at 2,330 logical qubits in 2017 [<a href="#ref-89">89</a>]; Chevignard, Fouque and
               Schrottenloher reduced the count to 1,193 in 2026 [<a href="#ref-36">36</a>]; and Babbush and co-authors, in a
               paper by Google Quantum AI, the Ethereum Foundation and Stanford, estimated in March 2026 that the
               256-bit ECDLP runs with fewer than 1,200 logical qubits and 90 million Toffoli gates, on fewer than
@@ -1432,7 +1445,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               defeated by an age distribution; RANDAO's bias is a few hundredths of a percentage point that an
               adversary can nevertheless compute and collect; and the toy hash of §3 passes every statistical test
               while admitting collisions by algebra. The tests of §4 are therefore necessary and never sufficient,
-              exactly as the NIST suite says of itself [<a href="#ref-91">91</a>], and the designers of the systems above have
+              exactly as the NIST suite says of itself [<a href="#ref-92">92</a>], and the designers of the systems above have
               increasingly replaced "random enough" by "unique and verifiable": deterministic nonces, threshold
               signatures, verifiable random functions and delay functions.
             </p>
@@ -1479,9 +1492,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               key derived from the parameters and the source of the libraries, so that a change to either recomputes
               everything. The pools of §4 use the seeds {{fig.params.seedPool}} (frequency, weight, runs and
               collision tests), {{fig.params.seedAvalanche}} (avalanche pairs) and {{fig.params.seedSac}}
-              (strict-avalanche matrix), the replications of Table 3 the seeds {{fig.params.replicationSeeds}}, and
-              the small-curve experiment of Figure 11 the seed {{fig.params.seedEcdlp}}; all were fixed before any
-              result was seen and none was changed afterwards. The browser controls redraw figures on fresh seeds at
+              (strict-avalanche matrix), and the small-curve experiment of Figure 11 the seed
+              {{fig.params.seedEcdlp}}; these seeds were fixed before any result was seen and none was changed
+              afterwards. The replication of Table 3, with the seeds {{fig.params.replicationSeeds}}, was designed
+              after the Pedersen Hamming-weight p-value of {{fig.hammingWeight.pedersen.p}} had been observed, as a
+              post hoc check of that single result; its seeds were chosen before the replication was run and none was
+              changed afterwards. An earlier exploratory rerun at <span data-tex>n = 3000</span> and a scratch run on
+              20 seeds, neither of which is published, also showed no recurrence. The browser controls redraw figures on fresh seeds at
               reduced sample sizes and report the seed used, so that a reader can check for themselves that the one
               small p-value of Table 2 does not recur. With 21 tests at the 5% level about one rejection is expected
               under the null hypothesis; the reading of §4.8 follows that arithmetic rather than any single value.
@@ -1570,47 +1587,48 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <li id="ref-63">Kiayias, A., Russell, A., David, B. and Oliynykov, R. (2017). <cite>Ouroboros: A Provably Secure Proof-of-Stake Blockchain Protocol</cite>. Advances in Cryptology, CRYPTO 2017. Cryptology ePrint Archive, paper 2016/889. <a class="ref-link" href="https://eprint.iacr.org/2016/889">https://eprint.iacr.org/2016/889</a></li>
               <li id="ref-64">Klyubin, A. (2013). <cite>Some SecureRandom Thoughts</cite>. Android Developers Blog, 14 August 2013. <a class="ref-link" href="https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html">https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html</a></li>
               <li id="ref-65">Koblitz, N. (1987). <cite>Elliptic curve cryptosystems</cite>. Mathematics of Computation 48(177), 203–209. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1987-0866109-5">https://doi.org/10.1090/S0025-5718-1987-0866109-5</a></li>
-              <li id="ref-66">L'Ecuyer, P. and Simard, R. (2007). <cite>TestU01: A C library for empirical testing of random number generators</cite>. ACM Transactions on Mathematical Software 33(4), 1–40. <a class="ref-link" href="https://doi.org/10.1145/1268776.1268777">https://doi.org/10.1145/1268776.1268777</a></li>
-              <li id="ref-67">Meiklejohn, S., Pomarole, M., Jordan, G., Levchenko, K., McCoy, D., Voelker, G. M. and Savage, S. (2013). <cite>A fistful of bitcoins: characterizing payments among men with no names</cite>. Proceedings of the 2013 Internet Measurement Conference (IMC '13), pp. 127–140. <a class="ref-link" href="https://doi.org/10.1145/2504730.2504747">https://doi.org/10.1145/2504730.2504747</a></li>
-              <li id="ref-68">Menezes, A. J., van Oorschot, P. C. and Vanstone, S. A. (1996). <cite>Handbook of Applied Cryptography</cite>. CRC Press. Chapters 2 and 9, available from the authors: <a class="ref-link" href="https://cacr.uwaterloo.ca/hac/">https://cacr.uwaterloo.ca/hac/</a></li>
-              <li id="ref-69">Miller, V. S. (1986). <cite>Use of elliptic curves in cryptography</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 417–426. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_31">https://doi.org/10.1007/3-540-39799-X_31</a></li>
-              <li id="ref-70">Monero Project (2018). <cite>Monero 0.13.0 "Beryllium Bullet" Release</cite>. 11 October 2018. <a class="ref-link" href="https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html">https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html</a></li>
-              <li id="ref-71">Monero Project (2022). <cite>Monero's network upgrade of July 2022</cite> (date later moved to August 2022). <a class="ref-link" href="https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html">https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html</a></li>
-              <li id="ref-72">Monero Project (2023). <cite>Post-Mortem of 10-Block-Old Decoy Selection Bug</cite>. 8 June 2023. <a class="ref-link" href="https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html">https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html</a></li>
-              <li id="ref-73">Monero Project (2026). <cite>FCMP++ and Carrot stressnet releases</cite>, repository seraphis-migration/monero. <a class="ref-link" href="https://github.com/seraphis-migration/monero/releases">https://github.com/seraphis-migration/monero/releases</a> (accessed 8 October 2026)</li>
-              <li id="ref-74">Moody, D., Perlner, R., Regenscheid, A., Robinson, A. and Cooper, D. (2024). <cite>Transition to Post-Quantum Cryptography Standards</cite>. NIST IR 8547, initial public draft, 12 November 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.IR.8547.ipd">https://doi.org/10.6028/NIST.IR.8547.ipd</a></li>
-              <li id="ref-75">Möser, M., Soska, K., Heilman, E., Lee, K., Heffan, H., Srivastava, S., Hogan, K., Hennessey, J., Miller, A., Narayanan, A. and Christin, N. (2018). <cite>An Empirical Analysis of Traceability in the Monero Blockchain</cite>. Proceedings on Privacy Enhancing Technologies 2018(3), 143–163. <a class="ref-link" href="https://doi.org/10.1515/popets-2018-0025">https://doi.org/10.1515/popets-2018-0025</a></li>
-              <li id="ref-76">Nakamoto, S. (2008). <cite>Bitcoin: A Peer-to-Peer Electronic Cash System</cite>. <a class="ref-link" href="https://bitcoin.org/bitcoin.pdf">https://bitcoin.org/bitcoin.pdf</a></li>
-              <li id="ref-77">Nick, J., Ruffing, T. and Jin, E. <cite>BIP 327: MuSig2 for BIP340-compatible Multi-Signatures</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki</a> (accessed 8 October 2026)</li>
-              <li id="ref-78">NIST (2015). <cite>FIPS 202: SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions</cite>. August 2015. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.202">https://doi.org/10.6028/NIST.FIPS.202</a></li>
-              <li id="ref-79">NIST (2024a). <cite>FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.203">https://doi.org/10.6028/NIST.FIPS.203</a></li>
-              <li id="ref-80">NIST (2024b). <cite>FIPS 204: Module-Lattice-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.204">https://doi.org/10.6028/NIST.FIPS.204</a></li>
-              <li id="ref-81">NIST (2024c). <cite>FIPS 205: Stateless Hash-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.205">https://doi.org/10.6028/NIST.FIPS.205</a></li>
-              <li id="ref-82">NIST (2025). <cite>NIST PQC Standardization Process: HQC Announced as 4th Round Selection</cite>. 11 March 2025. <a class="ref-link" href="https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection">https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection</a></li>
-              <li id="ref-83">Noether, S. and Mackenzie, A. (2016). <cite>Ring Confidential Transactions</cite>. Ledger 1, 1–18. <a class="ref-link" href="https://doi.org/10.5195/ledger.2016.34">https://doi.org/10.5195/ledger.2016.34</a></li>
-              <li id="ref-84">Parker, L. (2024). <cite>Full-Chain Membership Proofs Development</cite>. getmonero.org, 27 April 2024. <a class="ref-link" href="https://www.getmonero.org/2024/04/27/fcmps.html">https://www.getmonero.org/2024/04/27/fcmps.html</a></li>
-              <li id="ref-85">Pedersen, T. P. (1992). <cite>Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing</cite>. Advances in Cryptology, CRYPTO '91, LNCS 576, pp. 129–140. <a class="ref-link" href="https://doi.org/10.1007/3-540-46766-1_9">https://doi.org/10.1007/3-540-46766-1_9</a></li>
-              <li id="ref-86">Pollard, J. M. (1978). <cite>Monte Carlo Methods for Index Computation (mod p)</cite>. Mathematics of Computation 32(143), 918–924. <a class="ref-link" href="https://doi.org/10.2307/2006496">https://doi.org/10.2307/2006496</a></li>
-              <li id="ref-87">Pornin, T. (2013). <cite>RFC 6979: Deterministic Usage of the Digital Signature Algorithm (DSA) and Elliptic Curve Digital Signature Algorithm (ECDSA)</cite>. August 2013. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc6979">https://www.rfc-editor.org/rfc/rfc6979</a></li>
-              <li id="ref-88">Roetteler, M., Naehrig, M., Svore, K. M. and Lauter, K. (2017). <cite>Quantum resource estimates for computing elliptic curve discrete logarithms</cite>. Advances in Cryptology, ASIACRYPT 2017. Cryptology ePrint Archive, paper 2017/598. <a class="ref-link" href="https://eprint.iacr.org/2017/598">https://eprint.iacr.org/2017/598</a></li>
-              <li id="ref-89">Rogaway, P. and Shrimpton, T. (2004). <cite>Cryptographic Hash-Function Basics: Definitions, Implications, and Separations for Preimage Resistance, Second-Preimage Resistance, and Collision Resistance</cite>. Fast Software Encryption (FSE 2004). Cryptology ePrint Archive, paper 2004/035. <a class="ref-link" href="https://eprint.iacr.org/2004/035">https://eprint.iacr.org/2004/035</a></li>
-              <li id="ref-90">Rosenfeld, M. (2014). <cite>Analysis of hashrate-based double spending</cite>. arXiv:1402.2009. <a class="ref-link" href="https://arxiv.org/abs/1402.2009">https://arxiv.org/abs/1402.2009</a></li>
-              <li id="ref-91">Rukhin, A., Soto, J., Nechvatal, J., Smid, M., Barker, E., Leigh, S., Levenson, M., Vangel, M., Banks, D., Heckert, A., Dray, J. and Vo, S.; revised by Bassham, L. E. (2010). <cite>A Statistical Test Suite for Random and Pseudorandom Number Generators for Cryptographic Applications</cite>. NIST Special Publication 800-22, revision 1a, April 2010. <a class="ref-link" href="https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf">https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf</a></li>
-              <li id="ref-92">Ryan, D., Feist, D., D'Amato, F., Wang, H.-W. and Stokes, A. <cite>EIP-7594: PeerDAS, Peer Data Availability Sampling</cite>. Ethereum Improvement Proposal, status Final, created 12 January 2024. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-7594">https://eips.ethereum.org/EIPS/eip-7594</a> (accessed 8 October 2026)</li>
-              <li id="ref-93">Shor, P. W. (1997). <cite>Polynomial-time algorithms for prime factorization and discrete logarithms on a quantum computer</cite>. SIAM Journal on Computing 26(5), 1484–1509. <a class="ref-link" href="https://doi.org/10.1137/S0097539795293172">https://doi.org/10.1137/S0097539795293172</a></li>
-              <li id="ref-94">Shoup, V. (1997). <cite>Lower Bounds for Discrete Logarithms and Related Problems</cite>. Advances in Cryptology, EUROCRYPT '97, LNCS 1233, pp. 256–266. <a class="ref-link" href="https://doi.org/10.1007/3-540-69053-0_18">https://doi.org/10.1007/3-540-69053-0_18</a></li>
-              <li id="ref-95">Solana. <cite>Transactions</cite>. Solana documentation, core concepts. <a class="ref-link" href="https://solana.com/docs/core/transactions">https://solana.com/docs/core/transactions</a> (accessed 8 October 2026)</li>
-              <li id="ref-96">van Oorschot, P. C. and Wiener, M. J. (1999). <cite>Parallel Collision Search with Cryptanalytic Applications</cite>. Journal of Cryptology 12(1), 1–28. <a class="ref-link" href="https://doi.org/10.1007/PL00003816">https://doi.org/10.1007/PL00003816</a></li>
-              <li id="ref-97">van Saberhagen, N. (2013). <cite>CryptoNote v 2.0</cite>. 17 October 2013. <a class="ref-link" href="https://bytecoin.org/old/whitepaper.pdf">https://bytecoin.org/old/whitepaper.pdf</a></li>
-              <li id="ref-98">Vičič, J. and Tošić, A. (2022). <cite>Application of Benford's Law on Cryptocurrencies</cite>. Journal of Theoretical and Applied Electronic Commerce Research 17(1), 313–326. <a class="ref-link" href="https://doi.org/10.3390/jtaer17010016">https://doi.org/10.3390/jtaer17010016</a></li>
-              <li id="ref-99">Webster, A. F. and Tavares, S. E. (1986). <cite>On the Design of S-Boxes</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 523–534. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_41">https://doi.org/10.1007/3-540-39799-X_41</a></li>
-              <li id="ref-100">Wuille, P., Nick, J. and Ruffing, T. <cite>BIP 340: Schnorr Signatures for secp256k1</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki</a> (accessed 8 October 2026)</li>
-              <li id="ref-101">Wuille, P., Nick, J. and Towns, A. <cite>BIP 341: Taproot: SegWit version 1 spending rules</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki</a> (accessed 8 October 2026)</li>
-              <li id="ref-102">Yakovenko, A. (n.d.). <cite>Solana: A new architecture for a high performance blockchain</cite>, v0.8.13. <a class="ref-link" href="https://solana.com/solana-whitepaper.pdf">https://solana.com/solana-whitepaper.pdf</a> (undated document; accessed 8 October 2026)</li>
-              <li id="ref-103">Zcash (2018). <cite>Sapling</cite>. Network upgrade page. <a class="ref-link" href="https://z.cash/upgrade/sapling/">https://z.cash/upgrade/sapling/</a> (accessed 8 October 2026)</li>
-              <li id="ref-104">Zcash (Electric Coin Company). <cite>Sinsemilla</cite>. The halo2 Book, design: gadgets. <a class="ref-link" href="https://zcash.github.io/halo2/design/gadgets/sinsemilla.html">https://zcash.github.io/halo2/design/gadgets/sinsemilla.html</a> (accessed 8 October 2026)</li>
-              <li id="ref-105">Zcash Improvement Proposals. <cite>ZIP 205: Deployment of the Sapling Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0205">https://zips.z.cash/zip-0205</a> (accessed 8 October 2026)</li>
-              <li id="ref-106">Zcash Improvement Proposals. <cite>ZIP 252: Deployment of the NU5 Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0252">https://zips.z.cash/zip-0252</a> (accessed 8 October 2026)</li>
+              <li id="ref-66">Kusaka, T., Joichi, S., Ikuta, K., Khandaker, M. A.-A., Nogami, Y., Uehara, S., Yamai, N. and Duquesne, S. (2018). <cite>Solving 114-Bit ECDLP for a Barreto-Naehrig Curve</cite>. Information Security and Cryptology, ICISC 2017, LNCS 10779, pp. 231–244. <a class="ref-link" href="https://doi.org/10.1007/978-3-319-78556-1_13">https://doi.org/10.1007/978-3-319-78556-1_13</a></li>
+              <li id="ref-67">L'Ecuyer, P. and Simard, R. (2007). <cite>TestU01: A C library for empirical testing of random number generators</cite>. ACM Transactions on Mathematical Software 33(4), 1–40. <a class="ref-link" href="https://doi.org/10.1145/1268776.1268777">https://doi.org/10.1145/1268776.1268777</a></li>
+              <li id="ref-68">Meiklejohn, S., Pomarole, M., Jordan, G., Levchenko, K., McCoy, D., Voelker, G. M. and Savage, S. (2013). <cite>A fistful of bitcoins: characterizing payments among men with no names</cite>. Proceedings of the 2013 Internet Measurement Conference (IMC '13), pp. 127–140. <a class="ref-link" href="https://doi.org/10.1145/2504730.2504747">https://doi.org/10.1145/2504730.2504747</a></li>
+              <li id="ref-69">Menezes, A. J., van Oorschot, P. C. and Vanstone, S. A. (1996). <cite>Handbook of Applied Cryptography</cite>. CRC Press. Chapters 2 and 9, available from the authors: <a class="ref-link" href="https://cacr.uwaterloo.ca/hac/">https://cacr.uwaterloo.ca/hac/</a></li>
+              <li id="ref-70">Miller, V. S. (1986). <cite>Use of elliptic curves in cryptography</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 417–426. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_31">https://doi.org/10.1007/3-540-39799-X_31</a></li>
+              <li id="ref-71">Monero Project (2018). <cite>Monero 0.13.0 "Beryllium Bullet" Release</cite>. 11 October 2018. <a class="ref-link" href="https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html">https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html</a></li>
+              <li id="ref-72">Monero Project (2022). <cite>Monero's network upgrade of July 2022</cite> (date later moved to August 2022). <a class="ref-link" href="https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html">https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html</a></li>
+              <li id="ref-73">Monero Project (2023). <cite>Post-Mortem of 10-Block-Old Decoy Selection Bug</cite>. 8 June 2023. <a class="ref-link" href="https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html">https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html</a></li>
+              <li id="ref-74">Monero Project (2026). <cite>FCMP++ and Carrot stressnet releases</cite>, repository seraphis-migration/monero. <a class="ref-link" href="https://github.com/seraphis-migration/monero/releases">https://github.com/seraphis-migration/monero/releases</a> (accessed 8 October 2026)</li>
+              <li id="ref-75">Moody, D., Perlner, R., Regenscheid, A., Robinson, A. and Cooper, D. (2024). <cite>Transition to Post-Quantum Cryptography Standards</cite>. NIST IR 8547, initial public draft, 12 November 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.IR.8547.ipd">https://doi.org/10.6028/NIST.IR.8547.ipd</a></li>
+              <li id="ref-76">Möser, M., Soska, K., Heilman, E., Lee, K., Heffan, H., Srivastava, S., Hogan, K., Hennessey, J., Miller, A., Narayanan, A. and Christin, N. (2018). <cite>An Empirical Analysis of Traceability in the Monero Blockchain</cite>. Proceedings on Privacy Enhancing Technologies 2018(3), 143–163. <a class="ref-link" href="https://doi.org/10.1515/popets-2018-0025">https://doi.org/10.1515/popets-2018-0025</a></li>
+              <li id="ref-77">Nakamoto, S. (2008). <cite>Bitcoin: A Peer-to-Peer Electronic Cash System</cite>. <a class="ref-link" href="https://bitcoin.org/bitcoin.pdf">https://bitcoin.org/bitcoin.pdf</a></li>
+              <li id="ref-78">Nick, J., Ruffing, T. and Jin, E. <cite>BIP 327: MuSig2 for BIP340-compatible Multi-Signatures</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-79">NIST (2015). <cite>FIPS 202: SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions</cite>. August 2015. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.202">https://doi.org/10.6028/NIST.FIPS.202</a></li>
+              <li id="ref-80">NIST (2024a). <cite>FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.203">https://doi.org/10.6028/NIST.FIPS.203</a></li>
+              <li id="ref-81">NIST (2024b). <cite>FIPS 204: Module-Lattice-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.204">https://doi.org/10.6028/NIST.FIPS.204</a></li>
+              <li id="ref-82">NIST (2024c). <cite>FIPS 205: Stateless Hash-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.205">https://doi.org/10.6028/NIST.FIPS.205</a></li>
+              <li id="ref-83">NIST (2025). <cite>NIST PQC Standardization Process: HQC Announced as 4th Round Selection</cite>. 11 March 2025. <a class="ref-link" href="https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection">https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection</a></li>
+              <li id="ref-84">Noether, S. and Mackenzie, A. (2016). <cite>Ring Confidential Transactions</cite>. Ledger 1, 1–18. <a class="ref-link" href="https://doi.org/10.5195/ledger.2016.34">https://doi.org/10.5195/ledger.2016.34</a></li>
+              <li id="ref-85">Parker, L. (2024). <cite>Full-Chain Membership Proofs Development</cite>. getmonero.org, 27 April 2024. <a class="ref-link" href="https://www.getmonero.org/2024/04/27/fcmps.html">https://www.getmonero.org/2024/04/27/fcmps.html</a></li>
+              <li id="ref-86">Pedersen, T. P. (1992). <cite>Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing</cite>. Advances in Cryptology, CRYPTO '91, LNCS 576, pp. 129–140. <a class="ref-link" href="https://doi.org/10.1007/3-540-46766-1_9">https://doi.org/10.1007/3-540-46766-1_9</a></li>
+              <li id="ref-87">Pollard, J. M. (1978). <cite>Monte Carlo Methods for Index Computation (mod p)</cite>. Mathematics of Computation 32(143), 918–924. <a class="ref-link" href="https://doi.org/10.2307/2006496">https://doi.org/10.2307/2006496</a></li>
+              <li id="ref-88">Pornin, T. (2013). <cite>RFC 6979: Deterministic Usage of the Digital Signature Algorithm (DSA) and Elliptic Curve Digital Signature Algorithm (ECDSA)</cite>. August 2013. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc6979">https://www.rfc-editor.org/rfc/rfc6979</a></li>
+              <li id="ref-89">Roetteler, M., Naehrig, M., Svore, K. M. and Lauter, K. (2017). <cite>Quantum resource estimates for computing elliptic curve discrete logarithms</cite>. Advances in Cryptology, ASIACRYPT 2017. Cryptology ePrint Archive, paper 2017/598. <a class="ref-link" href="https://eprint.iacr.org/2017/598">https://eprint.iacr.org/2017/598</a></li>
+              <li id="ref-90">Rogaway, P. and Shrimpton, T. (2004). <cite>Cryptographic Hash-Function Basics: Definitions, Implications, and Separations for Preimage Resistance, Second-Preimage Resistance, and Collision Resistance</cite>. Fast Software Encryption (FSE 2004). Cryptology ePrint Archive, paper 2004/035. <a class="ref-link" href="https://eprint.iacr.org/2004/035">https://eprint.iacr.org/2004/035</a></li>
+              <li id="ref-91">Rosenfeld, M. (2014). <cite>Analysis of hashrate-based double spending</cite>. arXiv:1402.2009. <a class="ref-link" href="https://arxiv.org/abs/1402.2009">https://arxiv.org/abs/1402.2009</a></li>
+              <li id="ref-92">Rukhin, A., Soto, J., Nechvatal, J., Smid, M., Barker, E., Leigh, S., Levenson, M., Vangel, M., Banks, D., Heckert, A., Dray, J. and Vo, S.; revised by Bassham, L. E. (2010). <cite>A Statistical Test Suite for Random and Pseudorandom Number Generators for Cryptographic Applications</cite>. NIST Special Publication 800-22, revision 1a, April 2010. <a class="ref-link" href="https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf">https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf</a></li>
+              <li id="ref-93">Ryan, D., Feist, D., D'Amato, F., Wang, H.-W. and Stokes, A. <cite>EIP-7594: PeerDAS, Peer Data Availability Sampling</cite>. Ethereum Improvement Proposal, status Final, created 12 January 2024. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-7594">https://eips.ethereum.org/EIPS/eip-7594</a> (accessed 8 October 2026)</li>
+              <li id="ref-94">Shor, P. W. (1997). <cite>Polynomial-time algorithms for prime factorization and discrete logarithms on a quantum computer</cite>. SIAM Journal on Computing 26(5), 1484–1509. <a class="ref-link" href="https://doi.org/10.1137/S0097539795293172">https://doi.org/10.1137/S0097539795293172</a></li>
+              <li id="ref-95">Shoup, V. (1997). <cite>Lower Bounds for Discrete Logarithms and Related Problems</cite>. Advances in Cryptology, EUROCRYPT '97, LNCS 1233, pp. 256–266. <a class="ref-link" href="https://doi.org/10.1007/3-540-69053-0_18">https://doi.org/10.1007/3-540-69053-0_18</a></li>
+              <li id="ref-96">Solana. <cite>Transactions</cite>. Solana documentation, core concepts. <a class="ref-link" href="https://solana.com/docs/core/transactions">https://solana.com/docs/core/transactions</a> (accessed 8 October 2026)</li>
+              <li id="ref-97">van Oorschot, P. C. and Wiener, M. J. (1999). <cite>Parallel Collision Search with Cryptanalytic Applications</cite>. Journal of Cryptology 12(1), 1–28. <a class="ref-link" href="https://doi.org/10.1007/PL00003816">https://doi.org/10.1007/PL00003816</a></li>
+              <li id="ref-98">van Saberhagen, N. (2013). <cite>CryptoNote v 2.0</cite>. 17 October 2013. <a class="ref-link" href="https://bytecoin.org/old/whitepaper.pdf">https://bytecoin.org/old/whitepaper.pdf</a></li>
+              <li id="ref-99">Vičič, J. and Tošić, A. (2022). <cite>Application of Benford's Law on Cryptocurrencies</cite>. Journal of Theoretical and Applied Electronic Commerce Research 17(1), 313–326. <a class="ref-link" href="https://doi.org/10.3390/jtaer17010016">https://doi.org/10.3390/jtaer17010016</a></li>
+              <li id="ref-100">Webster, A. F. and Tavares, S. E. (1986). <cite>On the Design of S-Boxes</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 523–534. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_41">https://doi.org/10.1007/3-540-39799-X_41</a></li>
+              <li id="ref-101">Wuille, P., Nick, J. and Ruffing, T. <cite>BIP 340: Schnorr Signatures for secp256k1</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-102">Wuille, P., Nick, J. and Towns, A. <cite>BIP 341: Taproot: SegWit version 1 spending rules</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-103">Yakovenko, A. (n.d.). <cite>Solana: A new architecture for a high performance blockchain</cite>, v0.8.13. <a class="ref-link" href="https://solana.com/solana-whitepaper.pdf">https://solana.com/solana-whitepaper.pdf</a> (undated document; accessed 8 October 2026)</li>
+              <li id="ref-104">Zcash (2018). <cite>Sapling</cite>. Network upgrade page. <a class="ref-link" href="https://z.cash/upgrade/sapling/">https://z.cash/upgrade/sapling/</a> (accessed 8 October 2026)</li>
+              <li id="ref-105">Zcash (Electric Coin Company). <cite>Sinsemilla</cite>. The halo2 Book, design: gadgets. <a class="ref-link" href="https://zcash.github.io/halo2/design/gadgets/sinsemilla.html">https://zcash.github.io/halo2/design/gadgets/sinsemilla.html</a> (accessed 8 October 2026)</li>
+              <li id="ref-106">Zcash Improvement Proposals. <cite>ZIP 205: Deployment of the Sapling Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0205">https://zips.z.cash/zip-0205</a> (accessed 8 October 2026)</li>
+              <li id="ref-107">Zcash Improvement Proposals. <cite>ZIP 252: Deployment of the NU5 Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0252">https://zips.z.cash/zip-0252</a> (accessed 8 October 2026)</li>
             </ol>
           </section>
         </article>

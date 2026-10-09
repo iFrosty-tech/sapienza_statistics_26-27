@@ -59,6 +59,21 @@ test('digest is 32 bytes, big-endian x, and the all-zero message maps to ∞ →
   assert.throws(() => ecHash(new Uint8Array(1), { variant: 'md5' }), /variant/i);
 });
 
+test('the scalar variant maps the 32-byte little-endian encoding of n to ∞ → the all-zero digest', () => {
+  // A non-zero message: the point at infinity is not reached only by the all-zero message.
+  const encodedN = messageFromScalar(N, 32);
+  assert.ok(encodedN.some((b) => b !== 0));
+  assert.equal(bytesToBigInt(encodedN, 'le'), N);
+  const { point, digest } = ecHash(encodedN, { variant: 'scalar' });
+  assert.ok(equals(point, INFINITY));
+  assert.equal(digest.length, 32);
+  assert.ok(digest.every((b) => b === 0));
+  // Every multiple of n behaves the same way.
+  const twice = ecHash(messageFromScalar(2n * N, 33), { variant: 'scalar' });
+  assert.ok(equals(twice.point, INFINITY));
+  assert.ok(twice.digest.every((b) => b === 0));
+});
+
 test('structural collision of the scalar variant: H(n − k) = H(k)', () => {
   const m = rnd.bytes(32);
   const k = scalarOf(m);
