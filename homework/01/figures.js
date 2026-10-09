@@ -9,8 +9,9 @@
  * a change to the code recomputes everything.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { encodePng, pngDataUrl } from '../../src/lib/png.js';
 import { sha256Hex } from '../../src/lib/sha256.js';
 import { hammingWeight, utf8Bytes } from '../../src/lib/bytes.js';
@@ -40,6 +41,8 @@ export const PARAMS = Object.freeze({
   demoFlipIndex: 0,
 });
 
+/* The cache key covers the parameters, the libraries and this provider itself. */
+const SELF = fileURLToPath(import.meta.url);
 const DEPENDENCIES = [
   'src/lib/ec-hash-study.js',
   'src/lib/stats.js',
@@ -150,21 +153,30 @@ function computeAll() {
 let memo = null;
 
 function loadOrCompute(root) {
-  const source = DEPENDENCIES.map((f) => readFileSync(resolve(root, f), 'utf8')).join('\n');
+  const source = [...DEPENDENCIES.map((f) => resolve(root, f)), SELF].map((f) => readFileSync(f, 'utf8')).join('\n');
   const key = sha256Hex(utf8Bytes(JSON.stringify(PARAMS) + source)).slice(0, 16);
   if (memo?.key === key) return memo.value;
   const dir = resolve(root, 'node_modules/.cache/hw01');
   const file = resolve(dir, `${key}.json`);
-  let value;
+  let value = null;
   if (existsSync(file)) {
-    value = JSON.parse(readFileSync(file, 'utf8'));
-  } else {
+    // A truncated or corrupt cache file falls back to recomputation instead of breaking the build.
+    try {
+      value = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      value = null;
+    }
+  }
+  if (!value) {
     const t0 = performance.now();
     const results = computeAll();
     const ms = performance.now() - t0;
     value = { computedAt: new Date().toISOString(), ms, results };
     mkdirSync(dir, { recursive: true });
-    writeFileSync(file, JSON.stringify(value));
+    // Written to a temporary file and renamed, so an interrupted write never leaves a partial cache.
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(value));
+    renameSync(tmp, file);
     console.log(`[hw01] experiments computed in ${(ms / 1000).toFixed(1)} s, cached in node_modules/.cache/hw01/${key}.json`);
   }
   memo = { key, value };
@@ -241,11 +253,10 @@ export default async function provide({ root }) {
   // E8: the cost of the discrete logarithm.
   const rows = results.ecdlp;
   const marks = [
-    // The two records are two bits apart on an axis of 256 bits, so their marks nearly coincide
-    // and a label to the left of each would be printed on top of the other: one shared label,
-    // the details (generic curve 2009, Barreto–Naehrig curve 2017) are in the caption.
-    { x: 2 ** 112, y: 2 ** 56, label: '' },
-    { x: 2 ** 114, y: 2 ** 57, label: '112- and 114-bit records' },
+    // The two records are two bits apart on an axis of 256 bits, so their marks nearly coincide;
+    // the labels are offset vertically so that each record keeps its own.
+    { x: 2 ** 112, y: 2 ** 56, label: '112-bit record (2009)', dy: 12 },
+    { x: 2 ** 114, y: 2 ** 57, label: '114-bit record (BN curve, 2017)', dy: -8 },
     { x: 2 ** 256, y: 2 ** 128, label: 'secp256k1: √n ≈ 2^128' },
   ];
   html.ecdlp = renderChart('ecdlp', { rows, marks }, { id: 'ecdlp' });

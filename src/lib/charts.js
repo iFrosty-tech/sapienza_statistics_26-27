@@ -155,8 +155,12 @@ export function renderHistogram({
 }) {
   const g = layout({ width, height });
   const hasExpected = bins.some((b) => typeof b.expected === 'number');
-  const top = yMax ?? Math.max(1, ...bins.map((b) => Math.max(b.observed, b.expected ?? 0))) * 1.08;
+  const dataMax = Math.max(1, ...bins.map((b) => Math.max(b.observed, b.expected ?? 0)));
+  const top = yMax ?? dataMax * 1.08;
   const yTicks = niceTicks(0, top, g.narrow ? 4 : 5);
+  // The axis ends on the last nice tick, which must sit at or above the tallest bar; when the
+  // nice step rounds below the data maximum, one more tick is added so no bar leaves the frame.
+  if (yTicks.values.at(-1) < dataMax) yTicks.values.push(+(yTicks.values.at(-1) + yTicks.step).toFixed(10));
   const y = linear(0, yTicks.values.at(-1) || top, g.bottom, g.top);
   const bandW = g.plotW / bins.length;
   const gap = bandW > 6 ? Math.min(3, bandW * 0.18) : bandW > 2.5 ? 0.6 : 0;
@@ -250,7 +254,9 @@ export function renderZStrip({ id, title, desc, z, width = 960, height = 320, xL
 /**
  * Probability of at least one collision against the sample size: the exact
  * birthday curve as a line, the empirical frequencies as points with 95%
- * binomial error bars.
+ * binomial error bars. The bars are the binomial standard error of the subset
+ * proportion for the fixed pool the subsets are drawn from; they do not
+ * measure the uncertainty of the birthday law, since the subsets overlap.
  */
 export function renderCollisionCurve({
   id,
@@ -381,9 +387,10 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
   for (const m of marks) {
     const mx = x(lx(m.x));
     const my = y(lx(m.y));
+    // `dy` shifts a label vertically (CSS pixels) so that marks close on the axis keep separate labels.
     out.push(
       `<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="5"/>`,
-      `<text class="chart__annotation" x="${round(mx - 9)}" y="${round(my + 4)}" text-anchor="end">${escapeXml(m.label)}</text>`,
+      `<text class="chart__annotation" x="${round(mx - 9)}" y="${round(my + 4 + (m.dy ?? 0))}" text-anchor="end">${escapeXml(m.label)}</text>`,
     );
   }
   out.push('</g>');
@@ -403,7 +410,7 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
  * of the measured curves and the full range up to secp256k1.
  * @param {{ series: { key: string, label: string, points: { x: number, y: number }[] }[],
  *   references?: { label: string, exponent: number, factor?: number }[],
- *   marks?: { x: number, y: number, label: string }[] }} options
+ *   marks?: { x: number, y: number, label: string, dy?: number }[] }} options
  */
 export function renderLogLog({
   id,

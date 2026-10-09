@@ -320,7 +320,9 @@ export function birthdayCollisions({
   const keys = digests.map((d) => leadingBits(d, curveBits));
   const rnd = createRandom(seed ^ 0x9e3779b9);
   const indices = Array.from({ length: n }, (_, i) => i);
-  const fractions = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+  // 0.075 places a size between 200 and 400 for n = 4000, around the theoretical
+  // half-way point of a 16-bit space (m ≈ 302), so the crossing is not a grid artefact.
+  const fractions = [0.02, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
   const sizes = [...new Set(fractions.map((f) => Math.max(2, Math.round(f * n))))].sort((a, b) => a - b);
   const points = sizes.map((m) => {
     let withCollision = 0;
