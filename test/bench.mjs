@@ -54,3 +54,54 @@ console.log(`keccak256 on 1 MiB: ${keccakMs.toFixed(0)} ms → ${(1000 / keccakM
 const publicKeys = Array.from({ length: 2000 }, () => rnd.bytes(64));
 time('keccak256, 64-byte messages (public keys)', (i) => keccak256(publicKeys[i % publicKeys.length]), 20000);
 time('uncompressedPublicKey(k), 256-bit k', (i) => uncompressedPublicKey((BigInt(`0x${Buffer.from(messages[i]).toString('hex')}`) % (N - 1n)) + 1n), 200);
+
+/* Homework 02 experiments at their default sizes (opt-in, about a minute): node test/bench.mjs --experiments */
+if (process.argv.includes('--experiments')) {
+  const study = await import('../src/lib/wallet-study.js');
+  const { keccakDiffusion } = await import('../src/lib/keccak-diffusion.js');
+  const fmt = (p) => (Number.isFinite(p) ? p.toPrecision(3) : String(p));
+  const rows = [];
+  const run = (name, fn, headline) => {
+    const start = performance.now();
+    const result = fn();
+    rows.push([name, ((performance.now() - start) / 1000).toFixed(2), headline(result)]);
+    return result;
+  };
+  run('W1 entropyLedger', () => study.entropyLedger(), (r) => `P(IL ≥ n) = ${r.invalidKey.probability}, log2 = ${r.invalidKey.log2.toFixed(3)}`);
+  for (const words of [12, 24]) {
+    run(`W2 checksumAcceptance ${words} words`, () => study.checksumAcceptance({ words }),
+      (r) => `n ${r.n}, valid ${r.valid}, rate ${r.rate.toPrecision(4)} vs ${r.expectedRate.toPrecision(4)}, p = ${fmt(r.p)}`);
+    run(`W3 substitutionDetection ${words} words`, () => study.substitutionDetection({ words }),
+      (r) => `n ${r.n}, undetected ${r.overall.undetected}, rate ${r.overall.rate.toPrecision(4)} vs ${r.overall.expectedRate.toPrecision(4)}, p = ${fmt(r.overall.p)}; last word ${r.lastWord.undetected}/${r.lastWord.trials}, p = ${fmt(r.lastWord.p)}`);
+  }
+  run('W4 wordIndexUniformity', () => study.wordIndexUniformity(),
+    (r) => `n ${r.n}, pooled χ² = ${r.pooled.statistic.toFixed(1)}, p = ${fmt(r.pooled.p)}; last word χ² = ${r.lastWord.statistic.toFixed(1)}, p = ${fmt(r.lastWord.p)} (df 2047)`);
+  const pipeline = run('W5/W6 pipelineSample', () => study.pipelineSample(), (r) =>
+    `n ${r.n}; ` +
+    ['seed', 'privateKey', 'publicKeyX', 'address']
+      .map((s) => {
+        const st = r.stages[s];
+        const sibling = st.sibling ? `, sibling mean ${st.sibling.mean.toFixed(2)} p = ${fmt(st.sibling.p)}` : '';
+        return `${s}: weight p = ${fmt(st.weight.p)}, avalanche mean ${st.avalanche.mean.toFixed(2)} p = ${fmt(st.avalanche.p)}${sibling}`;
+      })
+      .join('; ') +
+    `; address bits χ²(160) = ${r.addressBits.statistic.toFixed(1)}, p = ${fmt(r.addressBits.p)}`);
+  const pipelineSeconds = Number(rows.at(-1)[1]);
+  run('W7 keccakDiffusion', () => keccakDiffusion(), (r) => {
+    const at = (label) => r.checkpoints.find((c) => c.label === label).mean.toFixed(2);
+    return `n ${r.n}, mean after R1 θ ${at('R1 θ')}, R1 χ ${at('R1 χ')}, R2 ${at('R2')}, R3 ${at('R3')}, R24 ${r.final.mean.toFixed(1)} (sd ${r.final.sd.toFixed(1)}), χ² p = ${fmt(r.final.p)}`;
+  });
+  for (const k of [1, 2]) {
+    run(`W8 vanitySearch k = ${k}`, () => study.vanitySearch({ prefixNibbles: k }),
+      (r) => `${r.searches} searches, mean ${r.mean.toFixed(2)} [${r.interval.low.toFixed(1)}, ${r.interval.high.toFixed(1)}] vs ${r.expectedMean}, χ²(${r.df}) p = ${fmt(r.p)}; leading zeros χ²(${r.leadingZeros.test.df}) p = ${fmt(r.leadingZeros.test.p)}`);
+  }
+  run('W9 addressCase', () => study.addressCase({ realAddresses: pipeline.addresses }),
+    (r) => `n ${r.n}, L mean ${r.random.letters.mean.toFixed(3)} p = ${fmt(r.random.letters.p)}, U mean ${r.random.upper.mean.toFixed(3)} p = ${fmt(r.random.upper.p)}; real (n ${r.real.n}) L p = ${fmt(r.real.letters.p)}, U p = ${fmt(r.real.upper.p)}`);
+  run('W10 checksumErrorDetection', () => study.checksumErrorDetection(),
+    (r) => `n ${r.n}; (a) ${r.randomCase.accepted} accepted vs ${r.randomCase.expectedAccepted.toFixed(1)}, p = ${fmt(r.randomCase.p)}, RB ${r.randomCase.raoBlackwell.estimate.toExponential(4)}; (b) ${r.substitution.accepted} accepted, p = ${fmt(r.substitution.p)}; (c) ${r.caseFlip.detected}/${r.caseFlip.lettersTested} detected`);
+  // Each pipeline sample derives two full accounts (original and twin A).
+  run('W11 bruteForceScale', () => study.bruteForceScale({ addressesPerSecond: (2 * pipeline.n) / pipelineSeconds }),
+    (r) => `${r.addressesPerSecond.toFixed(1)} addresses/s: 2^32 in ${r.searchSpaces[0].exhaustYears.toFixed(2)} years; rho log2 = ${r.rho.log2Additions.toFixed(3)}; P(collision, 1e12) = ${r.collisions[2].probability.toExponential(3)}`);
+  console.log('\nexperiment | seconds | headline');
+  for (const row of rows) console.log(row.join(' | '));
+}

@@ -151,3 +151,47 @@ test('exact null distribution of the runs-test p-value for short strings', async
   // Discreteness: the deciles are visibly unequal for 256-bit strings.
   assert.ok(Math.max(...d.bins) - Math.min(...d.bins) > 0.01);
 });
+
+test('Wilson score interval', async () => {
+  const { wilsonInterval } = await import('../src/lib/stats.js');
+  // 5 successes in 10 trials: centre 0.5, bounds 0.2366 and 0.7634 (95 %).
+  const w = wilsonInterval(5, 10);
+  assert.ok(Math.abs(w.low - 0.236593) < 1e-5 && Math.abs(w.high - 0.763407) < 1e-5, JSON.stringify(w));
+  // Zero successes: the lower bound is 0 and the upper one z² / (n + z²).
+  const z0 = wilsonInterval(0, 100);
+  assert.equal(z0.low, 0);
+  assert.ok(Math.abs(z0.high - 1.959964 ** 2 / (100 + 1.959964 ** 2)) < 1e-9);
+  assert.ok(wilsonInterval(100, 100).high <= 1);
+  assert.throws(() => wilsonInterval(3, 0));
+});
+
+test('exact two-sided binomial test (minimum-likelihood rule, as R binom.test)', async () => {
+  const { binomialTestTwoSided } = await import('../src/lib/stats.js');
+  near(binomialTestTwoSided(3, 10, 0.5), 0.34375, 1e-12);
+  near(binomialTestTwoSided(0, 10, 0.5), 2 / 1024, 1e-15);
+  near(binomialTestTwoSided(5, 10, 0.5), 1, 1e-12);
+  // R documentation example (Mendel's peas): binom.test(682, 925, p = 3/4) has p-value 0.3825.
+  near(binomialTestTwoSided(682, 925, 0.75), 0.3825, 5e-5);
+  // Large n, tiny p (the regime of the EIP-55 Monte Carlo).
+  const p = binomialTestTwoSided(49, 200000, (13 / 16) ** 40);
+  assert.ok(p > 0.5 && p <= 1, `p = ${p}`);
+  assert.ok(binomialTestTwoSided(120, 200000, (13 / 16) ** 40) < 1e-10);
+});
+
+test('geometric distribution on {1, 2, …}', async () => {
+  const { geometricPmf, geometricCdf } = await import('../src/lib/stats.js');
+  near(geometricPmf(1, 1 / 16), 1 / 16, 1e-15);
+  near(geometricPmf(3, 1 / 16), (15 / 16) ** 2 / 16, 1e-15);
+  assert.equal(geometricPmf(0, 0.5), 0);
+  near(geometricCdf(10, 0.25), 1 - 0.75 ** 10, 1e-15);
+  let s = 0;
+  for (let t = 1; t <= 40; t += 1) s += geometricPmf(t, 0.25);
+  near(s, geometricCdf(40, 0.25), 1e-12);
+});
+
+test('collision probability keeps tiny values (no cancellation in 1 − e^−x)', () => {
+  // m = 10^6 random 160-bit values: m(m − 1) / 2^161 ≈ 3.42e-37.
+  const p = collisionProbability(1e6, 2 ** 160);
+  const approx = (1e6 * (1e6 - 1)) / 2 ** 161;
+  assert.ok(p > 0 && Math.abs(p / approx - 1) < 1e-9, `p = ${p}`);
+});
