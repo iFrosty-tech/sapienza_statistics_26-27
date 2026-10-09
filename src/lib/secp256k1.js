@@ -303,6 +303,19 @@ export function compress(point) {
   return out;
 }
 
+/**
+ * SEC 1 uncompressed encoding: the byte 0x04 followed by the 32-byte
+ * big-endian x- and y-coordinates (65 bytes). Ethereum hashes the last 64.
+ */
+export function encodeUncompressed(point) {
+  if (point === INFINITY) throw new Error('the point at infinity has no uncompressed encoding');
+  const out = new Uint8Array(65);
+  out[0] = 0x04;
+  out.set(bigIntToBytes(point.x, 32, 'be'), 1);
+  out.set(bigIntToBytes(point.y, 32, 'be'), 33);
+  return out;
+}
+
 /** Recovers the affine point from its compressed encoding. */
 export function decompress(bytes) {
   if (bytes.length !== 33 || (bytes[0] !== 0x02 && bytes[0] !== 0x03)) {
