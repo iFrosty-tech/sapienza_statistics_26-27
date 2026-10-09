@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw02.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> A taxonomy of operations</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> The pipeline step by step</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Statistical properties</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Historical context</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Why several primitives</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> When the statistical assumption fails</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Conclusion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                HMWK 2 — From Wallet Seed to Ethereum Address: Hashing, Key Derivation and Cryptographic Primitives.
+                Statistical properties. TASK: Check the practical cryptographic pipeline used in Ethereum wallets, from
+                a mnemonic phrase to an Ethereum address and briefly describe the role and purpose of the following
+                standards and cryptographic primitives: BIP-39 — mnemonic sentence and seed generation; BIP-32 —
+                hierarchical deterministic (HD) key derivation; BIP-44 — standard derivation paths for hierarchical
+                deterministic wallets; secp256k1 — elliptic-curve public-key cryptography; Keccak-256 — hash function
+                used in Ethereum address derivation; EIP-55 — mixed-case checksum encoding for Ethereum addresses.
+              </p>
+            </blockquote>
+            <!-- T5: prose -->
+            <p class="placeholder">The questions addressed and the structure of the work are stated here.</p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> A taxonomy of operations</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              Key generation and key derivation, public-key cryptography, hashing, checksums and encodings are
+              distinguished here by their formal properties.
+            </p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption">
+              <table class="data-table data-table--taxonomy">
+                <caption id="table1-caption">Table 1. The classes of operation in the wallet pipeline: what each computes, whether it takes a secret key, whether it can be inverted, and the pipeline steps that belong to it.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Operation class</th>
+                    <th scope="col">Definition</th>
+                    <th scope="col">Keyed?</th>
+                    <th scope="col">Invertible?</th>
+                    <th scope="col">Pipeline steps</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- T5: rows -->
+                  <tr><th scope="row">Key generation</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Key derivation (key stretching)</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Key derivation (hierarchical)</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Public-key cryptography</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Hashing</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Checksum</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                  <tr><th scope="row">Encoding</th><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td><td class="is-pending">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The pipeline step by step</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              The eight stages from entropy to the checksummed address are followed on one worked example, the
+              mnemonic <code>{{fig.example.mnemonic}}</code> with an {{fig.example.passphrase}} passphrase at the
+              path <code>{{fig.example.path}}</code>.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-pipeline aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas" data-pipeline-canvas><!-- @figure id=pipeline --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The pipeline ledger: eight stages from entropy to the checksummed address
+                </p>
+                <p>
+                  Each row is one stage of the worked example: the standard that defines it, its operation class
+                  (§2), the operation applied and the value it produces, with the size of that value in bits. The
+                  final value, <code>{{fig.example.address}}</code>, is the address of account #0 published for this
+                  mnemonic by the Hardhat development network, and is checked when the page is built.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-pipeline-status aria-live="polite"></p>
+            </figure>
+
+            <!-- T5: prose -->
+            <p class="placeholder">Figure 2 repeats the computation for any test mnemonic, passphrase and index.</p>
+
+            <figure class="chart-figure hw02-figure explorer" data-explorer aria-labelledby="fig2-title">
+              <div class="explorer__warning" role="note" aria-labelledby="explorer-warning-title">
+                <p class="explorer__warning-title" id="explorer-warning-title">A teaching tool, not a wallet</p>
+                <p>
+                  This explorer reproduces the computations of a wallet for study only. Every computation runs in
+                  this browser and nothing typed here is sent anywhere. Even so, a real recovery phrase must never be
+                  typed into any web page, this one included: a page cannot prove what its scripts do with what it
+                  receives. Use only published test phrases, such as the one shown, and never send funds to an
+                  address derived from them.
+                </p>
+              </div>
+              <form class="explorer__form" data-explorer-form hidden>
+                <label class="text-field text-field--area">
+                  <span class="caption">Mnemonic (12 to 24 words)</span>
+                  <textarea data-explorer-mnemonic rows="2" autocomplete="off" autocapitalize="off" spellcheck="false">{{fig.example.mnemonic}}</textarea>
+                  <span class="text-field__note" data-explorer-mnemonic-note></span>
+                </label>
+                <div class="demo__row">
+                  <label class="text-field">
+                    <span class="caption">Passphrase (optional)</span>
+                    <input type="text" data-explorer-passphrase value="" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="text-field">
+                    <span class="caption">Account (hardened)</span>
+                    <input type="number" data-explorer-account value="0" min="0" max="2147483647" step="1" />
+                  </label>
+                  <label class="text-field">
+                    <span class="caption">Address index</span>
+                    <input type="number" data-explorer-index value="0" min="0" max="2147483647" step="1" />
+                  </label>
+                </div>
+                <div class="demo__row">
+                  <button type="button" class="form-button" data-explorer-generate>Generate new 12-word phrase</button>
+                </div>
+              </form>
+              <div class="chart-figure__canvas" data-explorer-output><!-- @figure id=explorer --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>The pipeline, computed live
+                </p>
+                <p>
+                  The mnemonic is normalised and checked, stretched into the seed, derived along
+                  m/44'/60'/account'/0/index and turned into the address and its checksummed form. Without scripting
+                  the panel shows the worked example of Figure 1.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-explorer-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-1">3.1 From entropy to the BIP-39 mnemonic</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              The {{fig.example.entropyBits}} entropy bits of the example and the {{fig.example.checksumLength}}
+              checksum bits <code>{{fig.example.checksumBits}}</code> are cut into {{fig.example.words}} word indices.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-bip39 aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas" data-bip39-canvas><!-- @figure id=bip39 --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>BIP-39: entropy and checksum bits grouped into 11-bit word indices
+                </p>
+                <p>
+                  The {{fig.example.entropyBits}} bits of entropy, followed by the first
+                  {{fig.example.checksumLength}} bits of SHA-256(entropy) (marked), are read in groups of 11 bits,
+                  most significant first; each group is an index between 0 and 2047 into the English word list. Word
+                  indices of the example: {{fig.example.indices}}.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-bip39-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-2">3.2 From the mnemonic to the seed</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">PBKDF2-HMAC-SHA512 stretches the mnemonic and the passphrase into the 512-bit seed.</p>
+            <div class="worked">
+              <div><span class="caption">Mnemonic (password)</span><span class="worked__value">{{fig.example.mnemonic}}</span></div>
+              <div><span class="caption">Salt</span><span class="worked__value">"mnemonic" + passphrase ({{fig.example.passphrase}})</span></div>
+              <div><span class="caption">Seed, 512 bits</span><span class="worked__value">{{fig.example.seed}}</span></div>
+            </div>
+
+            <h3 id="s3-3">3.3 BIP-32: master key and child keys</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The master key and chain code come from HMAC-SHA512 of the seed; child keys follow by CKDpriv.</p>
+            <div class="worked">
+              <div><span class="caption">Master private key IL</span><span class="worked__value">{{fig.example.masterKey}}</span></div>
+              <div><span class="caption">Master chain code IR</span><span class="worked__value">{{fig.example.masterChainCode}}</span></div>
+              <div><span class="caption">Master extended private key (xprv)</span><span class="worked__value">{{fig.example.xprvMaster}}</span></div>
+              <div><span class="caption">Extended public key at {{fig.example.changePath}} (xpub)</span><span class="worked__value">{{fig.example.xpubChange}}</span></div>
+            </div>
+
+            <figure class="chart-figure hw02-figure" data-hdtree aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas hdtree-frame" data-hdtree-canvas><!-- @figure id=hdtree --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>The derivation tree of m/44'/60'/0'/0/i
+                </p>
+                <p>
+                  Hardened derivations (index at least 2³¹, written with an apostrophe) are drawn as double rules,
+                  normal derivations as single rules. The three leaves are the first three addresses of the example:
+                  <code>{{fig.example.address0}}</code>, <code>{{fig.example.address1}}</code> and
+                  <code>{{fig.example.address2}}</code>.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-hdtree-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-4">3.4 BIP-44 paths and wallet conventions</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The levels of the path m / purpose' / coin_type' / account' / change / address_index are described here.</p>
+
+            <h3 id="s3-5">3.5 secp256k1: the public key</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The public key K = k · G of the example is given below in its uncompressed and compressed forms.</p>
+            <div class="worked">
+              <div><span class="caption">Private key k</span><span class="worked__value">{{fig.example.privateKey}}</span></div>
+              <div><span class="caption">K, x-coordinate</span><span class="worked__value">{{fig.example.publicKeyX}}</span></div>
+              <div><span class="caption">K, y-coordinate</span><span class="worked__value">{{fig.example.publicKeyY}}</span></div>
+              <div><span class="caption">K, compressed (SEC 1)</span><span class="worked__value">{{fig.example.publicKeyCompressed}}</span></div>
+            </div>
+
+            <h3 id="s3-6">3.6 Keccak-256 and the address</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The address is the last 20 bytes of the Keccak-256 digest of x ‖ y.</p>
+            <div class="worked">
+              <div><span class="caption">Keccak-256(x ‖ y)</span><span class="worked__value">{{fig.example.keccak}}</span></div>
+              <div><span class="caption">Address, last 20 bytes</span><span class="worked__value">{{fig.example.addressLower}}</span></div>
+            </div>
+
+            <figure class="chart-figure hw02-figure" data-keccak3d aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas" data-keccak3d-canvas><!-- @figure id=keccak3d --></div>
+              <div class="chart-figure__controls" data-keccak3d-controls hidden></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>The Keccak-f[1600] state as a 5 × 5 × 64 lattice of bits
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Two random states that differ in one bit, at x = {{fig.keccak3d.flipX}}, y = {{fig.keccak3d.flipY}},
+                  z = {{fig.keccak3d.flipZ}}, are passed through the step mappings θ, ρ, π, χ and ι. The red dots are
+                  the <span class="tabular">{{fig.keccak3d.count}}</span> bits in which the two states differ after
+                  {{fig.keccak3d.checkpoint}}; the other bits agree.
+                </p>
+                <p class="pplot__seed">One state pair, seed <span class="tabular">{{fig.keccak3d.seed}}</span>, {{fig.keccak3d.steps}} recorded steps</p>
+              </figcaption>
+              <p class="visually-hidden" data-keccak3d-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-7">3.7 EIP-55: the mixed-case checksum</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The case of each letter of the address is set by one nibble of a second Keccak-256 digest.</p>
+
+            <figure class="chart-figure hw02-figure" data-eip55 aria-labelledby="fig6-title">
+              <div class="chart-figure__canvas" data-eip55-canvas><!-- @figure id=eip55 --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>EIP-55 applied to the address of the worked example
+                </p>
+                <p>
+                  Under each of the 40 hex digits is the nibble of Keccak-256 of the lower-case address at the same
+                  position. A letter is printed in upper case when its nibble is 8 or more (filled mark) and in lower
+                  case otherwise (open mark); digits carry no case. The example has
+                  <span class="tabular">{{fig.example.letters}}</span> letters, of which
+                  <span class="tabular">{{fig.example.upper}}</span> are upper case.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-eip55-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-8">3.8 Reproducing the example in a wallet</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">A procedure to reproduce the worked example in wallet software with the published test mnemonic is given here.</p>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Statistical properties</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">The null hypothesis of every test and the sizes and seeds of the simulations are stated here.</p>
+
+            <h3 id="s4-1">4.1 The entropy ledger</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              A deterministic function cannot create entropy, <span data-tex>H(f(X)) \le H(X)</span>; Figure 7 sets the
+              size of each representation against the entropy it carries.
+            </p>
+
+            <figure class="chart-figure" data-fig="entropyLedger" data-fig-kind="entropyLedger" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=entropyLedger --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Mnemonic length</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-w12" name="fig7-w" value="w12" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig7-w12">12 words</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-w24" name="fig7-w" value="w24" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig7-w24">24 words</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>Representation size and maximum entropy of every stage
+                </p>
+                <p>
+                  Hollow bars give the number of bits of each representation, filled bars the largest entropy the stage
+                  can carry, for a <span data-fig-stat="words">{{fig.entropyLedger.w12.words}}</span>-word mnemonic
+                  and an empty passphrase: <span class="tabular" data-fig-stat="entropy">{{fig.entropyLedger.w12.entropy}}</span>
+                  bits of entropy throughout, in a seed of <span class="tabular" data-fig-stat="seedBits">{{fig.entropyLedger.w12.seedBits}}</span>
+                  bits, and at most <span class="tabular" data-fig-stat="addressEntropy">{{fig.entropyLedger.w12.addressEntropy}}</span>
+                  bits in the address.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-2">4.2 The BIP-39 checksum</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              The proportion of random word sequences with a valid checksum, and the proportion of single-word
+              substitutions that the checksum misses, are compared with their exact values in Table 2.
+            </p>
+
+            <h3 id="s4-3">4.3 Uniformity of the word indices</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The word indices of {{fig.wordIndex.last.count}} simulated 12-word mnemonics are tested against the uniform law on 2048 values.</p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption">
+              <table class="data-table data-table--hw02">
+                <caption id="table2-caption">Table 2. Simulated tests of the BIP-39 checksum and word indices: observed count and proportion, exact expected proportion, 95% Wilson interval and exact two-sided binomial p-value; for the word indices, Pearson's statistic against the uniform law on 2048 values. Seeds {{fig.params.acceptance.seed}} (acceptance), {{fig.params.substitution.seed}} (substitution) and {{fig.params.wordIndex.seed}} (word indices).</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Experiment</th>
+                    <th scope="col" class="is-number">n</th>
+                    <th scope="col" class="is-number">Observed</th>
+                    <th scope="col" class="is-number">Proportion</th>
+                    <th scope="col" class="is-number">Exact</th>
+                    <th scope="col" class="is-number">95% interval</th>
+                    <th scope="col" class="is-number">p-value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Random 12-word sequence accepted</th><td class="is-number">{{fig.checksum.w12.n}}</td><td class="is-number">{{fig.checksum.w12.count}}</td><td class="is-number">{{fig.checksum.w12.rate}}</td><td class="is-number">{{fig.checksum.w12.expected}}</td><td class="is-number">{{fig.checksum.w12.low}}–{{fig.checksum.w12.high}}</td><td class="is-number">{{fig.checksum.w12.p}}</td></tr>
+                  <tr><th scope="row">Random 24-word sequence accepted</th><td class="is-number">{{fig.checksum.w24.n}}</td><td class="is-number">{{fig.checksum.w24.count}}</td><td class="is-number">{{fig.checksum.w24.rate}}</td><td class="is-number">{{fig.checksum.w24.expected}}</td><td class="is-number">{{fig.checksum.w24.low}}–{{fig.checksum.w24.high}}</td><td class="is-number">{{fig.checksum.w24.p}}</td></tr>
+                  <tr><th scope="row">12 words, substitution undetected, all positions</th><td class="is-number">{{fig.substitution.w12.overall.n}}</td><td class="is-number">{{fig.substitution.w12.overall.count}}</td><td class="is-number">{{fig.substitution.w12.overall.rate}}</td><td class="is-number">{{fig.substitution.w12.overall.expected}}</td><td class="is-number">{{fig.substitution.w12.overall.low}}–{{fig.substitution.w12.overall.high}}</td><td class="is-number">{{fig.substitution.w12.overall.p}}</td></tr>
+                  <tr><th scope="row">12 words, substitution undetected, last word ({{fig.substitution.w12.lastExact}})</th><td class="is-number">{{fig.substitution.w12.last.n}}</td><td class="is-number">{{fig.substitution.w12.last.count}}</td><td class="is-number">{{fig.substitution.w12.last.rate}}</td><td class="is-number">{{fig.substitution.w12.last.expected}}</td><td class="is-number">{{fig.substitution.w12.last.low}}–{{fig.substitution.w12.last.high}}</td><td class="is-number">{{fig.substitution.w12.last.p}}</td></tr>
+                  <tr><th scope="row">24 words, substitution undetected, all positions</th><td class="is-number">{{fig.substitution.w24.overall.n}}</td><td class="is-number">{{fig.substitution.w24.overall.count}}</td><td class="is-number">{{fig.substitution.w24.overall.rate}}</td><td class="is-number">{{fig.substitution.w24.overall.expected}}</td><td class="is-number">{{fig.substitution.w24.overall.low}}–{{fig.substitution.w24.overall.high}}</td><td class="is-number">{{fig.substitution.w24.overall.p}}</td></tr>
+                  <tr><th scope="row">24 words, substitution undetected, last word ({{fig.substitution.w24.lastExact}})</th><td class="is-number">{{fig.substitution.w24.last.n}}</td><td class="is-number">{{fig.substitution.w24.last.count}}</td><td class="is-number">{{fig.substitution.w24.last.rate}}</td><td class="is-number">{{fig.substitution.w24.last.expected}}</td><td class="is-number">{{fig.substitution.w24.last.low}}–{{fig.substitution.w24.last.high}}</td><td class="is-number">{{fig.substitution.w24.last.p}}</td></tr>
+                  <tr><th scope="row">Word indices, positions 1–11 pooled</th><td class="is-number">{{fig.wordIndex.pooled.count}}</td><td class="is-number" colspan="3">χ²({{fig.wordIndex.pooled.df}}) = {{fig.wordIndex.pooled.statistic}}</td><td class="is-number">—</td><td class="is-number">{{fig.wordIndex.pooled.p}}</td></tr>
+                  <tr><th scope="row">Word indices, last word</th><td class="is-number">{{fig.wordIndex.last.count}}</td><td class="is-number" colspan="3">χ²({{fig.wordIndex.last.df}}) = {{fig.wordIndex.last.statistic}}</td><td class="is-number">—</td><td class="is-number">{{fig.wordIndex.last.p}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s4-4">4.4 Uniformity and avalanche of the seed, the keys and the address</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              For {{fig.params.pipeline.n}} simulated wallets, the Hamming weight of every stage, its distance to the
+              stage of a wallet whose entropy differs in one bit, and the distance between sibling keys are compared
+              with the binomial law.
+            </p>
+
+            <figure class="chart-figure" data-fig="stages" data-fig-kind="stages" aria-labelledby="fig8-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=stages --></div>
+              <div class="chart-figure__controls chart-figure__controls--wide" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Stage</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-seed" name="fig8-s" value="seed" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-seed">Seed</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-privateKey" name="fig8-s" value="privateKey" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-privateKey">Private key</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-publicKeyX" name="fig8-s" value="publicKeyX" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-publicKeyX">Public key x</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-address" name="fig8-s" value="address" data-fig-series-choice data-fig-axis="stage" checked />
+                      <label for="fig8-s-address">Address</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset class="choice">
+                  <legend>Statistic</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-weight" name="fig8-m" value="weight" data-fig-series-choice data-fig-axis="measure" />
+                      <label for="fig8-m-weight">Weight</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-avalanche" name="fig8-m" value="avalanche" data-fig-series-choice data-fig-axis="measure" checked />
+                      <label for="fig8-m-avalanche">Avalanche</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-sibling" name="fig8-m" value="sibling" data-fig-series-choice data-fig-axis="measure" />
+                      <label for="fig8-m-sibling">Sibling</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig8-title">
+                  <span class="pplot__fig-no">Figure 8.</span>Hamming weight, avalanche and sibling distance of each stage against Bin(n, ½)
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars are observed counts over the simulated wallets; the step line is the expected count under
+                  Bin(<span data-fig-stat="bits">{{fig.stages.address.avalanche.bits}}</span>, ½), the law of a
+                  uniformly random string of that length (weight) or of two independent ones (distances).
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean (exp. <span data-fig-stat="expectedMean">{{fig.stages.address.avalanche.expectedMean}}</span>)</dt><dd data-fig-stat="mean">{{fig.stages.address.avalanche.mean}}</dd></div>
+                  <div><dt>SD (exp. <span data-fig-stat="expectedSd">{{fig.stages.address.avalanche.expectedSd}}</span>)</dt><dd data-fig-stat="sd">{{fig.stages.address.avalanche.sd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.stages.address.avalanche.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.stages.address.avalanche.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.stages.address.avalanche.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.stages.address.avalanche.n}}</span> wallets,
+                  <span class="tabular" data-fig-stat="df">{{fig.stages.address.avalanche.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.stages.address.avalanche.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="addressBits" data-fig-kind="addressBits" aria-labelledby="fig9-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=addressBits --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig9-title">
+                  <span class="pplot__fig-no">Figure 9.</span>Standardised frequency of ones at each of the 160 address bit positions
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Each lollipop is the z-score of the number of ones at one bit position over the simulated
+                  addresses; the dashed rules mark ±1.96 and the dotted ones ±3.
+                  <span class="tabular" data-fig-stat="beyondTwoSigma">{{fig.addressBits.all.beyondTwoSigma}}</span> of 160
+                  positions lie beyond ±1.96, against 8 expected.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>χ²(160)</dt><dd data-fig-stat="statistic">{{fig.addressBits.all.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.addressBits.all.p}}</dd></div>
+                  <div><dt>max |z|</dt><dd data-fig-stat="maxAbsZ">{{fig.addressBits.all.maxAbsZ}}</dd></div>
+                  <div><dt>Monobit p</dt><dd data-fig-stat="monobitP">{{fig.addressBits.all.monobitP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  n = <span class="tabular" data-fig-stat="n">{{fig.addressBits.all.n}}</span> addresses, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.addressBits.all.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-5">4.5 The range of the private key</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              The probability that a uniform 256-bit IL is at least the group order n is
+              {{fig.ledger.invalidKeyProbability}}, that is 2 to the power {{fig.ledger.invalidKeyLog2}}.
+            </p>
+
+            <h3 id="s4-6">4.6 Diffusion in Keccak-f[1600]</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">A one-bit difference between two states is followed step by step through the 24 rounds.</p>
+
+            <figure class="chart-figure" data-fig="diffusion" data-fig-kind="diffusion" aria-labelledby="fig10-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=diffusion --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig10-title">
+                  <span class="pplot__fig-no">Figure 10.</span>Differing state bits after each step and round of Keccak-f[1600]
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Points are the mean number of differing bits between two states that start one bit apart, on a
+                  logarithmic scale; the band is the interquartile range; the dashed rule is 800, the mean of
+                  Bin(1600, ½). Mean after θ of round 1:
+                  <span class="tabular" data-fig-stat="r1theta">{{fig.diffusion.all.r1theta}}</span>; after round 1:
+                  <span class="tabular" data-fig-stat="r1chi">{{fig.diffusion.all.r1chi}}</span>; after rounds 2, 3 and 4:
+                  <span class="tabular" data-fig-stat="r2">{{fig.diffusion.all.r2}}</span>,
+                  <span class="tabular" data-fig-stat="r3">{{fig.diffusion.all.r3}}</span> and
+                  <span class="tabular" data-fig-stat="r4">{{fig.diffusion.all.r4}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean, round 24</dt><dd data-fig-stat="finalMean">{{fig.diffusion.all.finalMean}}</dd></div>
+                  <div><dt>SD (exp. 20)</dt><dd data-fig-stat="finalSd">{{fig.diffusion.all.finalSd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.diffusion.all.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.diffusion.all.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  n = <span class="tabular" data-fig-stat="n">{{fig.diffusion.all.n}}</span> state pairs,
+                  <span class="tabular" data-fig-stat="df">{{fig.diffusion.all.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.diffusion.all.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-7">4.7 Statistics of the address</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The cost of a vanity-address search and the letter counts of addresses are compared with their laws.</p>
+
+            <figure class="chart-figure" data-fig="vanity" data-fig-kind="vanity" aria-labelledby="fig11-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=vanity --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Required prefix</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig11-k1" name="fig11-k" value="k1" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig11-k1">One zero digit</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig11-k2" name="fig11-k" value="k2" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig11-k2">Two zero digits</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig11-title">
+                  <span class="pplot__fig-no">Figure 11.</span>Trials of a vanity-address search against the geometric law
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Consecutive private keys are tried until the address begins with
+                  <span data-fig-stat="series">{{fig.vanity.k1.series}}</span>. Bars are the observed number of
+                  searches per bin, the step the expectation under the geometric law with mean
+                  <span class="tabular" data-fig-stat="expectedMean">{{fig.vanity.k1.expectedMean}}</span>. Observed mean
+                  <span class="tabular" data-fig-stat="mean">{{fig.vanity.k1.mean}}</span>, 95% interval
+                  <span class="tabular" data-fig-stat="low">{{fig.vanity.k1.low}}</span>–<span class="tabular" data-fig-stat="high">{{fig.vanity.k1.high}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Searches</dt><dd data-fig-stat="searches">{{fig.vanity.k1.searches}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.vanity.k1.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.vanity.k1.p}}</dd></div>
+                  <div><dt>Leading zeros p</dt><dd data-fig-stat="lzP">{{fig.vanity.k1.lzP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span class="tabular" data-fig-stat="generated">{{fig.vanity.k1.generated}}</span> addresses generated,
+                  <span class="tabular" data-fig-stat="df">{{fig.vanity.k1.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.vanity.k1.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="addressCase" data-fig-kind="addressCase" aria-labelledby="fig12-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=addressCase --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Addresses</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig12-random" name="fig12-p" value="random" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig12-random">Random strings</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig12-real" name="fig12-p" value="real" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig12-real">Pipeline addresses</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig12-title">
+                  <span class="pplot__fig-no">Figure 12.</span>Letters and upper-case letters per address against Bin(40, 6/16) and Bin(40, 3/16)
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Left, the number L of letters a–f among the 40 hex digits; right, the number U of letters printed in
+                  upper case by EIP-55. Bars are observed counts, steps the binomial expectations (means 15 and 7.5).
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean L (exp. 15)</dt><dd data-fig-stat="lMean">{{fig.addressCase.random.lMean}}</dd></div>
+                  <div><dt>L: p-value</dt><dd data-fig-stat="lP">{{fig.addressCase.random.lP}}</dd></div>
+                  <div><dt>Mean U (exp. 7.5)</dt><dd data-fig-stat="uMean">{{fig.addressCase.random.uMean}}</dd></div>
+                  <div><dt>U: p-value</dt><dd data-fig-stat="uP">{{fig.addressCase.random.uP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.addressCase.random.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.addressCase.random.n}}</span>, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.addressCase.random.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption">
+              <table class="data-table data-table--compact data-table--hw02">
+                <caption id="table3-caption">Table 3. Tests of the pipeline stages against their binomial laws: observed mean (expected mean), binned chi-square statistic, degrees of freedom and p-value. Pipeline sample of {{fig.params.pipeline.n}} wallets (seed {{fig.params.pipeline.seed}}); random addresses {{fig.params.addressCase.n}} (seed {{fig.params.addressCase.seed}}).</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Law</th>
+                    <th scope="col" class="is-number">Mean (exp.)</th>
+                    <th scope="col" class="is-number">χ²</th>
+                    <th scope="col" class="is-number">df</th>
+                    <th scope="col" class="is-number">p-value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Seed, weight</th><td>Bin(512, ½)</td><td class="is-number">{{fig.stages.seed.weight.mean}} ({{fig.stages.seed.weight.expectedMean}})</td><td class="is-number">{{fig.stages.seed.weight.statistic}}</td><td class="is-number">{{fig.stages.seed.weight.df}}</td><td class="is-number">{{fig.stages.seed.weight.p}}</td></tr>
+                  <tr><th scope="row">Seed, avalanche</th><td>Bin(512, ½)</td><td class="is-number">{{fig.stages.seed.avalanche.mean}} ({{fig.stages.seed.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.seed.avalanche.statistic}}</td><td class="is-number">{{fig.stages.seed.avalanche.df}}</td><td class="is-number">{{fig.stages.seed.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Private key, weight</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.weight.mean}} ({{fig.stages.privateKey.weight.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.weight.statistic}}</td><td class="is-number">{{fig.stages.privateKey.weight.df}}</td><td class="is-number">{{fig.stages.privateKey.weight.p}}</td></tr>
+                  <tr><th scope="row">Private key, avalanche</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.avalanche.mean}} ({{fig.stages.privateKey.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.avalanche.statistic}}</td><td class="is-number">{{fig.stages.privateKey.avalanche.df}}</td><td class="is-number">{{fig.stages.privateKey.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Private key, sibling</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.sibling.mean}} ({{fig.stages.privateKey.sibling.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.sibling.statistic}}</td><td class="is-number">{{fig.stages.privateKey.sibling.df}}</td><td class="is-number">{{fig.stages.privateKey.sibling.p}}</td></tr>
+                  <tr><th scope="row">Public key x, weight</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.publicKeyX.weight.mean}} ({{fig.stages.publicKeyX.weight.expectedMean}})</td><td class="is-number">{{fig.stages.publicKeyX.weight.statistic}}</td><td class="is-number">{{fig.stages.publicKeyX.weight.df}}</td><td class="is-number">{{fig.stages.publicKeyX.weight.p}}</td></tr>
+                  <tr><th scope="row">Public key x, avalanche</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.mean}} ({{fig.stages.publicKeyX.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.statistic}}</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.df}}</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Address, weight</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.weight.mean}} ({{fig.stages.address.weight.expectedMean}})</td><td class="is-number">{{fig.stages.address.weight.statistic}}</td><td class="is-number">{{fig.stages.address.weight.df}}</td><td class="is-number">{{fig.stages.address.weight.p}}</td></tr>
+                  <tr><th scope="row">Address, avalanche</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.avalanche.mean}} ({{fig.stages.address.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.address.avalanche.statistic}}</td><td class="is-number">{{fig.stages.address.avalanche.df}}</td><td class="is-number">{{fig.stages.address.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Address, sibling</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.sibling.mean}} ({{fig.stages.address.sibling.expectedMean}})</td><td class="is-number">{{fig.stages.address.sibling.statistic}}</td><td class="is-number">{{fig.stages.address.sibling.df}}</td><td class="is-number">{{fig.stages.address.sibling.p}}</td></tr>
+                  <tr><th scope="row">Address bit frequencies</th><td>χ²(160)</td><td class="is-number">—</td><td class="is-number">{{fig.addressBits.all.statistic}}</td><td class="is-number">{{fig.addressBits.all.df}}</td><td class="is-number">{{fig.addressBits.all.p}}</td></tr>
+                  <tr><th scope="row">Letters L, random strings</th><td>Bin(40, 6/16)</td><td class="is-number">{{fig.addressCase.random.lMean}} (15)</td><td class="is-number">{{fig.addressCase.random.lStatistic}}</td><td class="is-number">{{fig.addressCase.random.lDf}}</td><td class="is-number">{{fig.addressCase.random.lP}}</td></tr>
+                  <tr><th scope="row">Letters L, pipeline addresses</th><td>Bin(40, 6/16)</td><td class="is-number">{{fig.addressCase.real.lMean}} (15)</td><td class="is-number">{{fig.addressCase.real.lStatistic}}</td><td class="is-number">{{fig.addressCase.real.lDf}}</td><td class="is-number">{{fig.addressCase.real.lP}}</td></tr>
+                  <tr><th scope="row">Upper case U, random strings</th><td>Bin(40, 3/16)</td><td class="is-number">{{fig.addressCase.random.uMean}} (7.5)</td><td class="is-number">{{fig.addressCase.random.uStatistic}}</td><td class="is-number">{{fig.addressCase.random.uDf}}</td><td class="is-number">{{fig.addressCase.random.uP}}</td></tr>
+                  <tr><th scope="row">Upper case U, pipeline addresses</th><td>Bin(40, 3/16)</td><td class="is-number">{{fig.addressCase.real.uMean}} (7.5)</td><td class="is-number">{{fig.addressCase.real.uStatistic}}</td><td class="is-number">{{fig.addressCase.real.uDf}}</td><td class="is-number">{{fig.addressCase.real.uP}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s4-8">4.8 Undetected errors: BIP-39 and EIP-55</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              The probability that a random case pattern passes EIP-55 is
+              <span data-tex>E[2^{-L}] = (13/16)^{40}</span>, about {{fig.eip55.exactPercent}}%.
+            </p>
+
+            <figure class="chart-figure" data-fig="errorRates" data-fig-kind="errorRates" aria-labelledby="fig13-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=errorRates --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig13-title">
+                  <span class="pplot__fig-no">Figure 13.</span>Probability that a random error passes the check: exact value and simulation
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  For each check the ink tick is the exact probability, the point the simulated proportion and the
+                  line its 95% Wilson interval, on a logarithmic scale. EIP-55, random case:
+                  {{fig.eip55.randomCase.accepted}} accepted of {{fig.eip55.randomCase.n}} (expected
+                  {{fig.eip55.randomCase.expectedAccepted}}), p = {{fig.eip55.randomCase.p}}; one substituted
+                  character: {{fig.eip55.substitution.accepted}} of {{fig.eip55.substitution.n}}, p =
+                  {{fig.eip55.substitution.p}}. Case-only errors: {{fig.eip55.caseFlip.detected}} of
+                  {{fig.eip55.caseFlip.tested}} detected.
+                </p>
+                <p class="pplot__seed">
+                  BIP-39: n = {{fig.params.acceptance.n}} per row, seeds {{fig.params.acceptance.seed}} and
+                  {{fig.params.substitution.seed}}; EIP-55: n = {{fig.params.errors.n}} per row, seed {{fig.params.errors.seed}}
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-9">4.9 The scale of a brute-force search</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">Table 4 converts the sizes of the secret spaces into search times at the rate measured for this implementation.</p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption">
+              <table class="data-table data-table--hw02">
+                <caption id="table4-caption">Table 4. Expected and exhaustive search over secret spaces of 2^b equally likely values, at {{fig.brute.rate}} mnemonics per second (this implementation, one thread), and the probability of at least one collision among m uniform 160-bit addresses.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Secret space</th>
+                    <th scope="col" class="is-number">Expected trials</th>
+                    <th scope="col" class="is-number">Expected time (years)</th>
+                    <th scope="col" class="is-number">Exhaustive time (years)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">32-bit generator seed</th><td class="is-number">{{fig.brute.b32.expectedTrials}}</td><td class="is-number">{{fig.brute.b32.expectedYears}}</td><td class="is-number">{{fig.brute.b32.exhaustYears}}</td></tr>
+                  <tr><th scope="row">12-word mnemonic, 128 bits</th><td class="is-number">{{fig.brute.b128.expectedTrials}}</td><td class="is-number">{{fig.brute.b128.expectedYears}}</td><td class="is-number">{{fig.brute.b128.exhaustYears}}</td></tr>
+                  <tr><th scope="row">24-word mnemonic, 256 bits</th><td class="is-number">{{fig.brute.b256.expectedTrials}}</td><td class="is-number">{{fig.brute.b256.expectedYears}}</td><td class="is-number">{{fig.brute.b256.exhaustYears}}</td></tr>
+                </tbody>
+                <tbody>
+                  <tr><th scope="col">Addresses generated m</th><th scope="col" class="is-number" colspan="3">P(at least one collision)</th></tr>
+                  <tr><th scope="row">{{fig.brute.c6.m}}</th><td class="is-number" colspan="3">{{fig.brute.c6.probability}}</td></tr>
+                  <tr><th scope="row">{{fig.brute.c9.m}}</th><td class="is-number" colspan="3">{{fig.brute.c9.probability}}</td></tr>
+                  <tr><th scope="row">{{fig.brute.c12.m}}</th><td class="is-number" colspan="3">{{fig.brute.c12.probability}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- T5: prose -->
+            <p class="placeholder">Pollard's rho needs about {{fig.brute.rhoCoefficient}} √n additions on secp256k1, that is 2 to the power {{fig.brute.rhoLog2}}.</p>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Historical context</h2>
+
+            <h3 id="s5-1">5.1 A chronology</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The technologies of the pipeline are placed in chronological order in Figure 14 and Table 5.</p>
+
+            <figure class="chart-figure hw02-figure" data-timeline aria-labelledby="fig14-title">
+              <div class="chart-figure__canvas" data-timeline-canvas><!-- @figure id=timeline --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig14-title">
+                  <span class="pplot__fig-no">Figure 14.</span>Public-key cryptography, hash standards and wallet standards, 1976 to 2023
+                </p>
+                <p>
+                  One row per event, in chronological order; the space between rows grows with the time between
+                  events. Where a draft, memorandum or conference date precedes the final publication, both are
+                  printed (open mark: earlier date; filled mark: final date).
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-timeline-status aria-live="polite"></p>
+            </figure>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption">
+              <table class="data-table">
+                <caption id="table5-caption">Table 5. The dates given in the assignment and the dates verified in the primary sources.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Technology</th>
+                    <th scope="col" class="is-number">Assignment</th>
+                    <th scope="col">Verified date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">RSA</th><td class="is-number">1977</td><td>April 1977 (MIT memorandum); February 1978 (Communications of the ACM)</td></tr>
+                  <tr><th scope="row">SHA-2 / SHA-512</th><td class="is-number">2001</td><td>30 May 2001 (draft FIPS 180-2); 1 August 2002 (final)</td></tr>
+                  <tr><th scope="row">BIP-32</th><td class="is-number">2012</td><td>11 February 2012 (assigned)</td></tr>
+                  <tr><th scope="row">BIP-39</th><td class="is-number">2013</td><td>10 September 2013 (assigned)</td></tr>
+                  <tr><th scope="row">BIP-44</th><td class="is-number">2014</td><td>24 April 2014 (assigned)</td></tr>
+                  <tr><th scope="row">SHA-3</th><td class="is-number">2015</td><td>2 October 2012 (Keccak selected); May 2014 (draft FIPS 202); 4 August 2015 (FIPS 202)</td></tr>
+                  <tr><th scope="row">EIP-55</th><td class="is-number">2016</td><td>14 January 2016 (created)</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s5-2">5.2 SHA-2 and Keccak / SHA-3</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The Merkle–Damgård construction of SHA-2 and the sponge construction of Keccak are compared here.</p>
+
+            <h3 id="s5-3">5.3 Keccak-256 is not SHA3-256</h3>
+            <!-- T5: prose -->
+            <p class="placeholder">The two functions share the permutation and the rate and differ only in the padding suffix.</p>
+
+            <figure class="chart-figure hw02-figure" data-digests aria-labelledby="fig15-title">
+              <div class="digests__controls" data-digests-controls hidden>
+                <label class="text-field">
+                  <span class="caption">Input (UTF-8)</span>
+                  <input type="text" data-digests-input value="" autocomplete="off" spellcheck="false" />
+                </label>
+              </div>
+              <div class="chart-figure__canvas" data-digests-output><!-- @figure id=digests --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig15-title">
+                  <span class="pplot__fig-no">Figure 15.</span>One input, four hash functions
+                </p>
+                <p>
+                  Digests of {{fig.digests.input}} under SHA-256, SHA-512, Keccak-256 and SHA3-256. The Keccak-256
+                  value, <code>{{fig.digests.keccak256}}</code>, and the SHA3-256 value,
+                  <code>{{fig.digests.sha3_256}}</code>, are the published values for the empty input and are checked
+                  when the page is built.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-digests-status aria-live="polite"></p>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Why several primitives</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">The purpose of each primitive in the overall system is discussed here.</p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> When the statistical assumption fails</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">Two cases in which the entropy of a wallet was far smaller than its length suggests are examined here.</p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Conclusion</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">The findings of the work are summarised here.</p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <!-- T5: prose -->
+            <p class="placeholder">
+              Every simulated figure is computed at build time from the seed printed in its caption; the experiments
+              took {{fig.params.computeSeconds}} seconds when last computed ({{fig.params.computedAt}}) and are cached
+              under <code>node_modules/.cache/hw02/</code>.
+            </p>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/bip39.js">src/lib/bip39.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/bip32.js">src/lib/bip32.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/ethereum.js">src/lib/ethereum.js</a>: the wallet pipeline.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/sha512.js">src/lib/sha512.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/keccak.js">src/lib/keccak.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/secp256k1.js">src/lib/secp256k1.js</a>: the primitives.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/wallet-study.js">src/lib/wallet-study.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/keccak-diffusion.js">src/lib/keccak-diffusion.js</a>: the experiments of §4.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/02/figures.js">homework/02/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <!-- T5: references -->
+            <p class="references__note placeholder">The numbered list of references is given here.</p>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

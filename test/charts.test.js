@@ -13,6 +13,9 @@ import {
   renderCurveScatter,
   renderNakamoto,
   renderHeatMap,
+  renderBandChart,
+  renderIntervalDots,
+  renderCapacityBars,
 } from '../src/lib/charts.js';
 import { modelFromSample } from '../src/lib/normal.js';
 import { renderProbabilityPlotSVG, plotTitle, plotDescription } from '../src/lib/probability-plot.js';
@@ -155,4 +158,70 @@ test('modelFromSample builds a probability-plot model that renders', () => {
   assert.ok(plotDescription(model).startsWith('desc'));
   const svg = renderProbabilityPlotSVG(model, { width: 600, height: 400, id: 'pp' });
   assert.equal(count(svg, 'class="pplot__point"'), 6);
+});
+
+test('band chart draws one point per checkpoint, one quartile band, the references and the groups', () => {
+  const points = [1, 11, 20, 200, 360, 800].map((mean, i) => ({ label: `C${i}`, tick: `c${i}`, mean, q1: mean * 0.9, q3: mean * 1.1 }));
+  const svg = renderBandChart({
+    id: 'b',
+    title: 'T',
+    desc: 'D',
+    points,
+    references: [{ value: 800, label: 'Half the state' }],
+    groups: [{ from: 0, to: 2, label: 'Round 1' }, { from: 3, to: 5, label: 'Round 2' }],
+    yLog: true,
+    xLabel: 'Checkpoint',
+    yLabel: 'Differing bits',
+  });
+  assert.ok(svg.startsWith('<svg'));
+  assert.equal(count(svg, 'class="chart__point"'), 6);
+  assert.equal(count(svg, 'class="chart__band-area"'), 1);
+  assert.equal(count(svg, 'class="chart__trace"'), 1);
+  assert.equal(count(svg, 'class="chart__reference"'), 1);
+  assert.equal(count(svg, 'class="chart__group"'), 2);
+  assert.ok(svg.includes('>Round 1<') && svg.includes('>Half the state<'));
+  assert.ok(svg.includes('>c3<'), 'tick labels are printed');
+  // On a logarithmic axis every point lies inside the frame.
+  const frame = svg.match(/class="chart__frame" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/).slice(1).map(Number);
+  const ys = [...svg.matchAll(/class="chart__point" cx="[\d.]+" cy="([\d.-]+)"/g)].map((m) => Number(m[1]));
+  assert.ok(ys.every((y) => y >= frame[1] - 0.05 && y <= frame[1] + frame[3] + 0.05));
+});
+
+test('interval dot plot draws one estimate, one interval and one expected mark per row on a log axis', () => {
+  const rows = [
+    { label: 'A', expected: 1 / 16, estimate: 0.062, low: 0.06, high: 0.064 },
+    { label: 'B', expected: 1 / 256, estimate: 0.0041, low: 0.0037, high: 0.0045 },
+    { label: 'C', expected: 2.47e-4, estimate: 2.4e-4, low: 1.8e-4, high: 3.2e-4 },
+  ];
+  const svg = renderIntervalDots({ id: 'i', title: 'T', desc: 'D', rows, xLabel: 'Probability' });
+  assert.equal(count(svg, 'class="chart__point"'), 3);
+  assert.equal(count(svg, 'class="chart__interval"'), 3);
+  assert.equal(count(svg, 'class="chart__expected-mark"'), 3);
+  assert.equal(count(svg, 'class="chart__row-label"'), 3);
+  // Decade ticks from 10^-4 to 10^0 cover the data.
+  assert.ok(svg.includes('10<tspan class="chart__sup" dy="-0.5em" font-size="75%">−4</tspan>'));
+  // The estimate of the larger probability lies to the right of the smaller one.
+  const cx = [...svg.matchAll(/class="chart__point" cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.ok(cx[0] > cx[1] && cx[1] > cx[2]);
+});
+
+test('capacity bars draw a hollow total and a filled part per row', () => {
+  const rows = [
+    { label: 'Entropy', total: 128, part: 128 },
+    { label: 'Mnemonic', total: 132, part: 128 },
+    { label: 'Seed', total: 512, part: 128 },
+  ];
+  const svg = renderCapacityBars({ id: 'cb', title: 'T', desc: 'D', rows, totalLabel: 'Representation', partLabel: 'Entropy' });
+  assert.equal(count(svg, 'class="chart__capacity"'), 3);
+  assert.equal(count(svg, 'class="chart__bar"'), 3);
+  assert.equal(count(svg, 'chart__swatch'), 2, 'the legend shows both marks');
+  assert.equal(count(svg, 'class="chart__row-label"'), 3);
+  assert.ok(svg.includes('>128 of 512<'));
+  const widths = [...svg.matchAll(/class="chart__capacity" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(widths[2] / widths[0] - 4) < 0.01, 'bar length is proportional to the bits');
+  // With max 512 the nice ticks stop at 500; the axis gains a tick so the longest bar stays inside the frame.
+  const wide = renderCapacityBars({ id: 'cb2', title: 'T', desc: 'D', rows, max: 512 });
+  const frameW = Number(wide.match(/class="chart__frame" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/)[1]);
+  const longest = Math.max(...[...wide.matchAll(/class="chart__capacity" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map((m) => Number(m[1])));
+  assert.ok(longest <= frameW + 0.05, `bar ${longest} exceeds the frame ${frameW}`);
 });
