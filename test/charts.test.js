@@ -44,6 +44,27 @@ test('histogram draws one bar per bin, an expected step line and the axis titles
   assert.ok(svg.includes('aria-labelledby="h-title h-desc"'));
 });
 
+test('histogram axis covers the tallest bar, so no bar rises above the frame', () => {
+  // A maximum of 212 with five target intervals rounds the tick step to 50: the last tick
+  // used to be 200 and the tallest bars were drawn above the frame (negative y).
+  const bins = Array.from({ length: 81 }, (_, k) => ({ label: String(k), observed: k === 40 ? 212 : 150, expected: 160 }));
+  const svg = renderHistogram({ id: 'h3', title: 'T', desc: 'D', bins });
+  const frameTop = Number(svg.match(/class="chart__frame" x="[\d.]+" y="([\d.]+)"/)[1]);
+  const ys = [...svg.matchAll(/class="chart__bar" x="[\d.-]+" y="([\d.-]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(ys.length, 81);
+  assert.ok(ys.every((y) => y >= frameTop), `bar above the frame: min y ${Math.min(...ys)} < ${frameTop}`);
+  assert.ok(svg.includes('>250<'), 'the axis gains a tick above the data maximum');
+});
+
+test('log-log marks accept a label offset', () => {
+  const series = [{ key: 's', label: 'S', points: [{ x: 128, y: 11 }, { x: 1024, y: 32 }] }];
+  const marks = [{ x: 2 ** 112, y: 2 ** 56, label: 'A', dy: 12 }, { x: 2 ** 114, y: 2 ** 57, label: 'B', dy: -8 }];
+  const svg = renderLogLog({ id: 'll', title: 'T', desc: 'D', series, marks });
+  const labels = [...svg.matchAll(/class="chart__annotation" x="[\d.-]+" y="([\d.-]+)" text-anchor="end">(A|B)</g)];
+  assert.equal(labels.length, 2);
+  assert.ok(Math.abs(Number(labels[0][1]) - Number(labels[1][1])) >= 18, 'the two labels are separated vertically');
+});
+
 test('histogram without expectations draws no step line and honours labelEvery', () => {
   const bins = Array.from({ length: 40 }, (_, k) => ({ label: String(k), observed: k }));
   const svg = renderHistogram({ id: 'h2', title: 'T', desc: 'D', bins, labelEvery: 10 });

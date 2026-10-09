@@ -162,13 +162,18 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
             <p>
               Over a finite field the picture loses all geometry: Figure 2 plots every point of the same equation
-              over the field of {{fig.smallCurve.p}} elements. The {{fig.smallCurve.points}} affine points show no
-              structure beyond the mirror symmetry <span data-tex>-(x, y) = (x, p - y)</span>, and their number,
-              {{fig.smallCurve.order}} with the point at infinity, lies within the interval
-              <span data-tex>|\,\#E - (p + 1)\,| \le 2\sqrt{p}</span> given by Hasse's theorem, here between
-              {{fig.smallCurve.hasseLow}} and {{fig.smallCurve.hasseHigh}}. Nothing in the picture betrays the group
-              structure, and that is the point: the order and the position of a point reveal nothing about the
-              scalar that produced it.
+              over the field of {{fig.smallCurve.p}} elements. The {{fig.smallCurve.points}} affine points show two
+              symmetries and nothing else: the mirror symmetry <span data-tex>-(x, y) = (x, p - y)</span>, and, because
+              {{fig.smallCurve.p}} is congruent to 1 modulo 3 so that the field contains a cube root of unity
+              <span data-tex>\beta</span>, the order-3 symmetry <span data-tex>(x, y) \mapsto (\beta x, y)</span>,
+              under which the equation is invariant since <span data-tex>(\beta x)^3 = x^3</span>. This is the
+              efficiently computable endomorphism of §2.1 that gives Koblitz curves their speed; on the picture it
+              puts the points in horizontal triples of equal <span data-tex>y</span>, apart from the two points with
+              <span data-tex>x = 0</span>. The number of points, {{fig.smallCurve.order}} with the point at infinity,
+              lies within the interval <span data-tex>|\,\#E - (p + 1)\,| \le 2\sqrt{p}</span> given by Hasse's
+              theorem, here between {{fig.smallCurve.hasseLow}} and {{fig.smallCurve.hasseHigh}}. Beyond these two
+              symmetries nothing in the picture betrays the group structure, and that is the point: the position of
+              a point reveals nothing about the scalar that produced it.
             </p>
 
             <figure class="chart-figure" aria-labelledby="fig2-title">
@@ -181,7 +186,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   Each red mark is an affine point <span data-tex>(x, y)</span> with
                   <span data-tex>y^2 \equiv x^3 + 7 \pmod{p}</span>; the dotted ruling at
                   <span data-tex>y = p/2</span> is the axis of the mirror symmetry between a point and its
-                  negative. Exhaustively enumerated: <span class="tabular">{{fig.smallCurve.points}}</span> points,
+                  negative; the order-3 symmetry <span data-tex>x \mapsto \beta x</span> places the points in
+                  horizontal triples. Exhaustively enumerated: <span class="tabular">{{fig.smallCurve.points}}</span> points,
                   group order <span class="tabular">{{fig.smallCurve.order}}</span>.
                 </p>
               </figcaption>
@@ -322,7 +328,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               little-endian integer is a multiple of the group order <span data-tex>n</span>, for example the 32-byte
               encoding of <span data-tex>n</span> itself, because <span data-tex>n \cdot G = O</span>; in the
               Pedersen variant, finding any other preimage of <span data-tex>O</span> would reveal a
-              discrete-logarithm relation among the generators. Two families of generators share this single
+              discrete-logarithm relation among the generators. A zero byte contributes nothing to the sum, so a
+              message and the same message padded with zero bytes have the same digest in both variants: the
+              construction is a hash of fixed-length inputs, as the production Pedersen hashes of §6.3 are, and
+              messages are compared at equal length throughout. Two families of generators share this single
               definition and are compared throughout.
             </p>
             <ul>
@@ -338,7 +347,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 "nothing-up-my-sleeve" points obtained by hashing the index <span data-tex>i</span> to the curve
                 with SHA-256 and try-and-increment, so that no discrete-logarithm relation between them is known.
                 This is the hash of Pedersen with 8-bit chunks; a collision would reveal a linear relation among
-                the generators and hence a discrete logarithm [<a href="#ref-86">86</a>] [<a href="#ref-61">61</a>, §4.1.8].
+                the generators and hence a discrete logarithm [<a href="#ref-86">86</a>], the argument the Zcash
+                specification uses for its own group hash [<a href="#ref-61">61</a>, §4.1.8].
               </li>
             </ul>
             <p>
@@ -777,10 +787,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Figure 9 compares the histogram of p-values over ten bins with that exact law by a chi-square test;
               a flat reference would wrongly reject even SHA-256. The proportion of digests with
               <span data-tex>p \ge 0.01</span> is compared with the interval
-              <span data-tex>0.99 \pm 3\sqrt{0.0099 / n}</span> used by the NIST suite. The same section tests
-              adjacent bits directly: the 2 × 2 table of pairs <span data-tex>(b_j, b_{j+1})</span> pooled over all
-              digests, with its chi-square statistic on one degree of freedom and the lag-one correlation
-              [<a href="#ref-92">92</a>, §2.3].
+              <span data-tex>0.99 \pm 3\sqrt{0.0099 / n}</span> used by the NIST suite [<a href="#ref-92">92</a>, §2.3]. The same
+              section adds a test of our own that is not part of the NIST suite: the 2 × 2 table of adjacent pairs
+              <span data-tex>(b_j, b_{j+1})</span> pooled over all digests, with its chi-square statistic on one
+              degree of freedom and the lag-one correlation.
             </p>
 
             <figure class="chart-figure" data-fig="runs" data-fig-kind="runs" aria-labelledby="fig9-title">
@@ -921,10 +931,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 </p>
                 <p>
                   The line is the exact birthday probability; each point is the proportion of random subsets of
-                  size <span data-tex>m</span> that contained a repeated value, with a 95% binomial error bar. The
+                  size <span data-tex>m</span> that contained a repeated value. The error bar is the 95% binomial
+                  interval of that proportion for this fixed pool: the subsets overlap and share the pool's own
+                  number of colliding pairs, so the bars measure the subset sampling only, not the uncertainty about
+                  the birthday law itself, and the whole empirical curve shifts together with the pool. The
                   theoretical curve crosses one half at
                   <span data-tex>m = </span><span class="tabular" data-fig-stat="halfPoint">{{fig.collisions.scalar.halfPoint}}</span>;
-                  the first observed proportion at or above one half occurs at
+                  on the grid of sizes drawn, the first observed proportion at or above one half occurs at
                   <span data-tex>m = </span><span class="tabular" data-fig-stat="empiricalHalf">{{fig.collisions.scalar.empiricalHalf}}</span>.
                 </p>
                 <dl class="pplot__stats">
@@ -946,16 +959,20 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               Inverting the toy hash means recovering the scalar from the point, the discrete logarithm problem. It
               cannot be observed on secp256k1, so it is measured where it can be solved: on the curves
-              <span data-tex>y^2 = x^3 + 7</span> over the {{fig.ecdlp.curves}} primes nearest to
-              <span data-tex>2^7, \dots, 2^{14}</span>, with a random base point and
-              {{fig.ecdlp.challenges}} random challenges each. Exhaustive search costs about half the group order;
-              Shanks's baby-step giant-step costs about <span data-tex>2\sqrt{n}</span> operations and
-              <span data-tex>\sqrt{n}</span> memory, and Pollard's rho the same time with no memory [<a href="#ref-87">87</a>], which
-              no generic algorithm can beat [<a href="#ref-95">95</a>]. Figure 11 shows the measured costs growing as
-              <span data-tex>n</span> and <span data-tex>\sqrt{n}</span> (on the largest curve, of order
-              {{fig.ecdlp.largestOrder}}, exhaustive search averaged {{fig.ecdlp.largestBrute}} operations and
-              baby-step giant-step {{fig.ecdlp.largestBsgs}}), and extends the lines to the order of secp256k1,
-              where <span data-tex>\sqrt{n} \approx 2^{128}</span>.
+              <span data-tex>y^2 = x^3 + 7</span> over {{fig.ecdlp.curves}} small primes, the least prime at or
+              above each of <span data-tex>2^7, \dots, 2^{14}</span>, with a random base point and
+              {{fig.ecdlp.challenges}} random challenges each. Half of these primes are congruent to 2 modulo 3,
+              where the curve is supersingular with exactly <span data-tex>p + 1</span> points, unlike secp256k1;
+              this does not affect the cost of the generic algorithms measured here. Exhaustive search costs about
+              half the order of the base point; Shanks's baby-step giant-step costs at most
+              <span data-tex>2\sqrt{n}</span> operations, about <span data-tex>1.5\sqrt{n}</span> on average, and
+              <span data-tex>\sqrt{n}</span> memory, and Pollard's rho the same order of time with no memory
+              [<a href="#ref-87">87</a>], which no generic algorithm can beat [<a href="#ref-95">95</a>]. Figure 11 shows
+              the measured costs growing as <span data-tex>n</span> and <span data-tex>\sqrt{n}</span>, where
+              <span data-tex>n</span> is the order of the random base point rather than of the curve (on the largest
+              curve, whose base point has order {{fig.ecdlp.largestOrder}}, exhaustive search averaged
+              {{fig.ecdlp.largestBrute}} operations and baby-step giant-step {{fig.ecdlp.largestBsgs}}), and extends
+              the lines to the order of secp256k1, where <span data-tex>\sqrt{n} \approx 2^{128}</span>.
             </p>
 
             <figure class="chart-figure" aria-labelledby="fig11-title">
@@ -971,7 +988,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   measured ratios are <span class="tabular">{{fig.ecdlp.bsgsRatio}}</span>
                   <span data-tex>\sqrt{n}</span> and <span class="tabular">{{fig.ecdlp.bruteRatio}}</span>
                   <span data-tex>n</span>. The right panel repeats the axes up to <span data-tex>2^{256}</span>,
-                  marking, by two nearly coincident circles, the two largest publicly solved prime-field instances, of
+                  marking the two largest publicly solved prime-field instances, of
                   112 bits (a generic curve, 2009) and 114 bits (a Barreto–Naehrig curve, 2017), and the
                   <span data-tex>2^{128}</span> operations that secp256k1 would demand. Primes
                   {{fig.ecdlp.smallestPrime}}–{{fig.ecdlp.largestPrime}}, seed {{fig.params.seedEcdlp}}.
@@ -1011,7 +1028,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Pedersen Hamming weights, is {{fig.hammingWeight.pedersen.p}}. Three remarks put this value in
               proportion. First, with 21 tests the chance that at least one p-value falls below 0.05 under
               <span data-tex>H_0</span> is about 66%, and the chance that the smallest of them falls below 0.001 is
-              about 2%, so one small value is weak evidence unless it recurs; a Bonferroni threshold of
+              about 2%; these figures assume independent tests, whereas several rows of Table 2 are computed from
+              the same pool of digests, so they are a guide rather than exact values. Either way one small value is
+              weak evidence unless it recurs; a Bonferroni threshold of
               0.05/21, about 0.0024, would still reject this one if it stood alone. Second, the location and scale
               of the Pedersen weights are as expected: a mean of {{fig.hammingWeight.pedersen.mean}} against 128,
               with a standard error of 0.13, and a standard deviation of {{fig.hammingWeight.pedersen.sd}} against 8;
@@ -1039,7 +1058,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>n</span> digests has variance <span data-tex>\binom{n}{2} 2^{-t} (1 - 2^{-t})</span>,
               a standard deviation of {{fig.replication.sd16}} here. The six replications of Table 3 give counts
               between {{fig.replication.scalar.t16Min}} and {{fig.replication.scalar.t16Max}} for the scalar
-              variant, on both sides of the expectation, so this too is sampling variation.
+              variant, on both sides of the expectation. Table 1 also shows the scalar and Pedersen counts at 12
+              bits about two standard deviations below their expectation of {{fig.replication.expected12}}; in Table
+              3 the same counts range from {{fig.replication.pedersen.t12Min}} to {{fig.replication.pedersen.t12Max}}
+              for the Pedersen variant, straddling the expectation, though the pooled mean over the seven pools
+              stays somewhat below it. We read the deficits as sampling variation, with the honest caveat that this
+              reading was formed after the counts were seen and that no pooled test was planned in advance.
             </p>
 
             <div class="data-table--scroll">
@@ -1109,9 +1133,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               gives <span data-tex>\sum_i (b_i - b_i') G_i = O</span>, a non-trivial linear relation among generators
               whose mutual discrete logarithms are unknown; an adversary who finds collisions can therefore compute
               discrete logarithms, which is the argument of Pedersen for the binding of his commitment
-              [<a href="#ref-86">86</a>], of Chaum, van Heijst and Pfitzmann for the first collision-free hash based on the
-              discrete logarithm [<a href="#ref-35">35</a>], and of Bellare and Micciancio for their incremental hash MuHASH, with a
-              loss of a factor two [<a href="#ref-10">10</a>]; the Zcash specification states it in one line, a collision
+              [<a href="#ref-86">86</a>], of Chaum, van Heijst and Pfitzmann for an efficient collision-free hash based on
+              the discrete logarithm, at about one multiplication per message bit [<a href="#ref-35">35</a>], and of Bellare
+              and Micciancio for their incremental hash MuHASH, with a loss of a factor two [<a href="#ref-10">10</a>]; the
+              Zcash specification states the same argument in one line for its group hash, whose collision
               "trivially gives a discrete logarithm relation" [<a href="#ref-61">61</a>, §4.1.8]. The reduction holds for inputs
               of a fixed length and requires generators derived without a known relation, hence the hash-to-curve
               step; RFC 9380 declines to specify the try-and-increment method used here and marks it
@@ -1124,8 +1149,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               about Zcash's Sinsemilla, which "is not designed to be used where a random oracle, PRF, or
               preimage-resistant hash is required" [<a href="#ref-105">105</a>], and Bottinelli catalogues the practical pitfalls of
               Pedersen hashes, among them keeping only the <span data-tex>x</span>-coordinate, which identifies
-              <span data-tex>P</span> with <span data-tex>-P</span> [<a href="#ref-23">23</a>]: here that cannot be exploited,
-              because negative byte values are not in the domain, but it halves the output space to
+              <span data-tex>P</span> with <span data-tex>-P</span> [<a href="#ref-23">23</a>]: here a digest collision
+              gives <span data-tex>\sum_i b_i G_i = \pm \sum_i b_i' G_i</span>, and the minus sign still yields the
+              non-trivial relation <span data-tex>\sum_i (b_i + b_i') G_i = O</span>, so the reduction survives the
+              loss of the sign, but keeping only <span data-tex>x</span> halves the output space to
               <span data-tex>(n - 1)/2</span> values and so lowers the birthday bound to about
               <span data-tex>2^{127.5}</span>. ECOH, a SHA-3 candidate built entirely on elliptic-curve arithmetic
               [<a href="#ref-27">27</a>], fell to a second-preimage attack costing <span data-tex>2^{143}</span> operations for its
@@ -1143,8 +1170,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span class="tabular">{{fig.speed.ratio}}</span>. A digest of a 32-byte message costs up to 32 point
               additions and one inversion on 256-bit integers, each addition about a dozen modular multiplications
               of 256-bit numbers, where SHA-256 processes the same message with 64 rounds of additions, rotations and
-              logical operations on 32-bit words. The gap is intrinsic to the arithmetic, not to the implementation,
-              and it is the reason the algebraic hashes of §6.3 are used only where their homomorphic structure buys
+              logical operations on 32-bit words. The gap is intrinsic to the arithmetic as implemented here, point
+              arithmetic on arbitrary-precision integers against SHA-256 on 32-bit words, and a native implementation
+              would narrow it without closing it; it is the reason the algebraic hashes of §6.3 are used only where their homomorphic structure buys
               something, inside zero-knowledge circuits.
             </p>
           </section>
@@ -1181,7 +1209,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               The statistical heart of the protocol is proof of work. A header is valid when its double SHA-256
               hash, read as a 256-bit integer, is at or below a target encoded in the header [<a href="#ref-17">17</a>]. Each hash
               attempt succeeds independently with the same small probability, so block discovery is, to a first
-              approximation, a Poisson process whose rate is the network hash rate divided by the difficulty, and
+              approximation, a Poisson process whose rate is the network hash rate divided by the difficulty times
+              <span data-tex>2^{32}</span>, and
               the times between blocks are exponential. Every 2016 blocks the target is rescaled by the ratio of the
               time the last 2016 blocks actually took to the two weeks they should have taken at one block per 600
               seconds, the ratio being clamped to the interval from one quarter to four [<a href="#ref-15">15</a>, <a href="#ref-16">16</a>].
@@ -1204,7 +1233,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span class="equation__no">(4)</span>
             </div>
             <p>
-              Figure 12 evaluates equation (4). With a tenth of the hash rate the attacker's chance falls below
+              Figure 12 evaluates equation (4). With a tenth of the hash rate the attacker's chance falls to about
               {{fig.nakamoto.q10z6}} after {{fig.nakamoto.markZ}} confirmations, the depth conventionally treated as
               final; with three tenths it is still {{fig.nakamoto.q30z6}} at the same depth and
               {{fig.nakamoto.q30z20}} after twenty. Rosenfeld replaced the Poisson approximation by the exact
@@ -1341,8 +1370,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               Monero hides the sender with ring signatures: an input is signed by one of a ring of possible outputs,
               the real one and a number of decoys, and a key image prevents double spending without revealing which
               member signed. The scheme descends from the one-time ring signatures of the CryptoNote protocol
-              [<a href="#ref-98">98</a>]; amounts were hidden from January 2017 by Ring Confidential Transactions, which embed
-              Pedersen commitments in the ring signature [<a href="#ref-84">84</a>], with range proofs given since October 2018 by
+              [<a href="#ref-98">98</a>]; amounts were hidden from January 2017 [<a href="#ref-76">76</a>, §3.2] by Ring Confidential
+              Transactions, which embed Pedersen commitments in the ring signature [<a href="#ref-84">84</a>], with range proofs given since October 2018 by
               Bulletproofs, whose size grows only logarithmically in the number of bits proved [<a href="#ref-28">28</a>, <a href="#ref-71">71</a>]. The upgrade of August 2022, at block 2,688,888, adopted the shorter Bulletproofs+
               and raised the ring size from 11 to 16 [<a href="#ref-37">37</a>, <a href="#ref-72">72</a>], and the ring signature in
               use is CLSAG, a concise linkable ring signature with smaller signatures than its predecessor
@@ -1432,8 +1461,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               [<a href="#ref-6">6</a>]. By comparison, Gidney's 2025 estimate for RSA-2048 is under a week on fewer than a
               million noisy qubits [<a href="#ref-54">54</a>]. The exposure is measurable on chain: about 1.7 million bitcoin lie in
               outputs that publish their public key directly, and about 6.9 million in all once reused addresses
-              are counted [<a href="#ref-6">6</a>], where an earlier Deloitte analysis had counted over 4 million, about a
-              quarter of the supply [<a href="#ref-7">7</a>]. Bitcoin's response is BIP 360, a draft soft fork for a new output
+              are counted [<a href="#ref-6">6</a>], where a Deloitte analysis, on an undated page, counted over 4 million,
+              about a quarter of the supply [<a href="#ref-7">7</a>]. Bitcoin's response is BIP 360, a draft soft fork for a new output
               type, Pay-to-Merkle-Root, with the post-quantum signature algorithms themselves deferred to a later
               proposal [<a href="#ref-8">8</a>]; Ethereum's is the roadmap of §6.2 [<a href="#ref-47">47</a>]; Algorand already signs its state
               proofs with the lattice-based Falcon scheme [<a href="#ref-2">2</a>].
@@ -1442,8 +1471,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <strong>Statistics as a weapon.</strong> The thread that runs through this survey is that the quality
               of randomness is at once a security assumption and an attack surface. The Android generator of 2013
               and the biased nonces of 2019 broke signatures that were mathematically sound; Monero's decoys were
-              defeated by an age distribution; RANDAO's bias is a few hundredths of a percentage point that an
-              adversary can nevertheless compute and collect; and the toy hash of §3 passes every statistical test
+              defeated by an age distribution; RANDAO's bias is a fraction of a percentage point, from 0.05 to 0.7
+              points for stakes between 5% and 20%, that an adversary can nevertheless compute and collect; and the toy hash of §3 passes every statistical test
               while admitting collisions by algebra. The tests of §4 are therefore necessary and never sufficient,
               exactly as the NIST suite says of itself [<a href="#ref-92">92</a>], and the designers of the systems above have
               increasingly replaced "random enough" by "unique and verifiable": deterministic nonces, threshold
@@ -1465,7 +1494,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               replicate. Cryptographically, the scalar variant is nonetheless broken by construction: the negation
               and wrap-around symmetries of the group give a second preimage for every message at no cost, and the
               additive homomorphism leaks relations between messages. The Pedersen variant repairs collision
-              resistance by a reduction to the discrete logarithm but remains homomorphic, which is why its
+              resistance, for messages of a fixed length, by a reduction to the discrete logarithm but remains homomorphic, which is why its
               production descendants in Zcash are specified for collision resistance alone.
             </p>
             <p>
@@ -1489,8 +1518,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               vectors of secp256k1 and SHA-256 and the NIST worked examples, and <code>npm run build</code> rebuilds
               the page, recomputing the experiments in about {{fig.params.computeSeconds}} seconds (last computed
               {{fig.params.computedAt}}); the results are cached under <code>node_modules/.cache/hw01/</code> under a
-              key derived from the parameters and the source of the libraries, so that a change to either recomputes
-              everything. The pools of §4 use the seeds {{fig.params.seedPool}} (frequency, weight, runs and
+              key derived from the parameters, the source of the libraries and the source of the provider itself, so
+              that a change to any of them recomputes everything. The pools of §4 use the seeds {{fig.params.seedPool}} (frequency, weight, runs and
               collision tests), {{fig.params.seedAvalanche}} (avalanche pairs) and {{fig.params.seedSac}}
               (strict-avalanche matrix), and the small-curve experiment of Figure 11 the seed
               {{fig.params.seedEcdlp}}; these seeds were fixed before any result was seen and none was changed
