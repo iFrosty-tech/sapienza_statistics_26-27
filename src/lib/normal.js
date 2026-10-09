@@ -209,6 +209,37 @@ export function linearFit(xs, ys) {
 }
 
 /**
+ * A probability-plot model for an arbitrary sample of observed values, with
+ * the same shape as `simulateProbabilityPlot` so that the same renderer draws
+ * it: the sorted sample against its Blom normal scores, with the least-squares
+ * reference line. Used to plot the standardised bit frequencies of a hash.
+ * @param {number[]} values observed values
+ * @param {{ seed?: number, label?: string, name?: string, title?: string, description?: string }} [options]
+ *   `label` names the population in captions; `title` and `description` set
+ *   the accessible name and long description of the rendered plot.
+ */
+export function modelFromSample(values, { seed = 0, label = 'observed values', name = label, title, description } = {}) {
+  const sample = [...values].sort((x, y) => x - y);
+  const n = sample.length;
+  const p = plottingPositions(n);
+  const z = p.map(invNorm);
+  return {
+    n,
+    seed: seed >>> 0,
+    dist: 'sample',
+    population: { label, name },
+    title,
+    description,
+    sample,
+    p,
+    z,
+    mean: mean(sample),
+    sd: sampleSd(sample),
+    fit: linearFit(z, sample),
+  };
+}
+
+/**
  * Everything a normal probability plot needs for one simulated sample.
  * The reference line regresses the ordered sample on the normal scores, so its
  * intercept and slope estimate the location and scale of a normal population;

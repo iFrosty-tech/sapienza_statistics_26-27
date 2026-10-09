@@ -9,9 +9,22 @@
  *                                            its statistics are exposed as {{plot.fig1.mean}} etc.
  *   <!-- @phi-strip -->                      renders a strip of the paper's probability scale,
  *                                            ruled at Φ⁻¹(p) from 0.01% to 99.99%
+ *   <!-- @figure id=name -->                 a figure computed by the homework's own provider
+ *                                            (see below); its statistics are exposed as
+ *                                            {{fig.name.stat}} tokens
  *   <span data-tex>…</span>                  inline TeX rendered with KaTeX
  *   <div data-tex-display>…</div>            display TeX rendered with KaTeX
  *   {{site.author}}, {{hw.title}}, {{base}}  tokens from src/config/site.js and the register
+ *
+ * Figure provider: when homework/NN/figures.js exists next to the page, its
+ * default export is called once per build of that page,
+ *   async ({ base, site, entry, isBuild, root }) => ({ html, tokens }),
+ * where `html` maps figure ids to the HTML that replaces each @figure marker
+ * and `tokens` maps "id.stat" keys to strings exposed as {{fig.id.stat}}.
+ * The provider runs in Node, so a homework can pre-compute its simulations at
+ * build time and ship static, printable figures; the page's own script may
+ * then re-draw them live. Note that modules the provider imports are cached
+ * by Node for the lifetime of the dev server; restart it after editing them.
  *
  * Output is plain HTML, readable and printable without JavaScript.
  */
@@ -180,6 +193,40 @@ function parseAttributes(source) {
   return attrs;
 }
 
+/**
+ * Replaces every `<!-- @figure id=… -->` marker with the provider's HTML.
+ * @param {string} html
+ * @param {Record<string, string>} figures html by figure id
+ * @param {string} file page path, for error messages
+ */
+export function applyFigureMarkers(html, figures, file) {
+  return html.replace(/<!--\s*@figure\s+([^>]*?)\s*-->/g, (_, attrs) => {
+    const { id } = parseAttributes(attrs);
+    if (!id) throw new Error(`[site] ${file}: @figure marker without an id.`);
+    if (typeof figures?.[id] !== 'string') {
+      throw new Error(`[site] ${file}: @figure "${id}" is not provided by the homework's figures.js.`);
+    }
+    return figures[id];
+  });
+}
+
+/**
+ * Namespaces provider statistics as `fig.<id>.<stat>` tokens. Keys must be
+ * dot-separated identifiers so that they match the {{token}} grammar.
+ * @param {Record<string, string>} tokens
+ */
+export function figureTokens(tokens) {
+  const out = {};
+  for (const [key, value] of Object.entries(tokens ?? {})) {
+    if (!/^[a-zA-Z][\w.]*$/.test(key)) {
+      throw new Error(`[site] figure token "${key}" must be a dot-separated identifier (letters, digits, underscores).`);
+    }
+    if (typeof value !== 'string') throw new Error(`[site] figure token "${key}" must be a string.`);
+    out[`fig.${key}`] = value;
+  }
+  return out;
+}
+
 function renderPlotMarker(source, models) {
   const a = parseAttributes(source);
   const id = a.id || 'pplot';
@@ -297,6 +344,26 @@ export function sitePlugin({ root }) {
         const plotModels = new Map();
         out = out.replace(/<!--\s*@plot\s+([^>]*?)\s*-->/g, (_, attrs) => renderPlotMarker(attrs, plotModels));
 
+        // The homework's register entry (template pages use placeholders).
+        let entry = null;
+        if (hwMatch) {
+          const isTemplate = hwMatch[1].startsWith('_');
+          entry = isTemplate ? TEMPLATE_PLACEHOLDERS : registry.find((e) => pad2(e.number) === hwMatch[1]);
+          if (!entry) throw new Error(`[site] ${rel} has no entry in src/data/homeworks.js.`);
+        }
+
+        // Figures computed by the homework's own provider, if it has one.
+        let providedTokens = {};
+        if (hwMatch) {
+          const figuresFile = resolve(root, HOMEWORK_DIR, hwMatch[1], 'figures.js');
+          if (existsSync(figuresFile)) {
+            const provide = await importFresh(figuresFile);
+            const figures = await provide({ base, site, entry, isBuild, root });
+            out = applyFigureMarkers(out, figures?.html ?? {}, rel);
+            providedTokens = figureTokens(figures?.tokens ?? {});
+          }
+        }
+
         const studentIdPending = /^0+$/.test(site.studentId);
         const tokens = {
           base,
@@ -326,13 +393,8 @@ export function sitePlugin({ root }) {
           });
         }
 
-        if (hwMatch) {
-          const isTemplate = hwMatch[1].startsWith('_');
-          const entry = isTemplate
-            ? TEMPLATE_PLACEHOLDERS
-            : registry.find((e) => pad2(e.number) === hwMatch[1]);
-          if (!entry) throw new Error(`[site] ${rel} has no entry in src/data/homeworks.js.`);
-          Object.assign(tokens, {
+        if (entry) {
+          Object.assign(tokens, providedTokens, {
             'hw.no': pad2(entry.number),
             'hw.title': entry.title,
             'hw.abstract': entry.abstract ?? '',

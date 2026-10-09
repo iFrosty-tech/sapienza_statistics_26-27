@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw01.js"></script>
+  </head>
+  <body class="page page--homework"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Background</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Construction of the toy hash</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Statistical study</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> What statistics cannot see</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Cryptography and statistics in blockchains</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Conclusion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                Homework 1: Practical: Create a toy example of hashing using ecc in particular SECP256K1. And study its
+                statistical properties desirable for cryptography. Research: Modern application of cryptography and
+                statistics to the most famous blockchains
+              </p>
+            </blockquote>
+            <p>
+              "Hashing with elliptic-curve cryptography" is taken here to mean building a function that maps a message
+              of any length to a digest of fixed length by means of the arithmetic of an elliptic-curve group, in
+              place of the bit-mixing rounds of a dedicated design such as
+              <abbr title="Secure Hash Algorithm with a 256-bit digest">SHA-256</abbr>. The curve is secp256k1, the
+              curve of Bitcoin, whose domain parameters are fixed by the SEC 2 standard [<a href="#ref-34">34</a>]. The one-way map at
+              the heart of elliptic-curve cryptography, from a scalar <span data-tex>k</span> to the point
+              <span data-tex>k \cdot G</span>, is already a kind of hash: every Bitcoin public key is derived from its
+              private key by it, and an address is then a conventional hash of that point [<a href="#ref-4">4</a>]. The toy of
+              §3 makes this observation literal and asks whether a digest built this way behaves as a cryptographic
+              hash should.
+            </p>
+            <p>
+              A satisfactory answer must establish four things. First, a working construction, implemented from the
+              definitions and checked against published test vectors, so that every number on this page can be
+              regenerated. Second, the properties desirable in a cryptographic hash, translated into hypotheses that
+              can be tested on samples of digests: uniformity of the output, independence of its bits, the avalanche
+              of changes caused by a single input bit, and collision rates that match the birthday bound. Third,
+              experiments with printed seeds and sample sizes, run side by side on the toy hash and on SHA-256, the
+              baseline of a hash designed for the purpose. Fourth, a critical reading of the results: which
+              properties a sample can certify and which it cannot. The research question of the practical part is
+              therefore twofold: does a hash built from secp256k1 arithmetic pass the statistical tests that an ideal
+              hash would pass, and, if it does, is that sufficient for it to be secure? The survey of §6 asks the
+              complementary question of how the most famous blockchains use cryptography and statistics, and where
+              statistics has been turned against them.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Background</h2>
+
+            <h3 id="s2-1">2.1 The curve secp256k1 and its group law</h3>
+            <p>
+              Elliptic-curve cryptography was proposed independently by Miller [<a href="#ref-70">70</a>] and Koblitz [<a href="#ref-65">65</a>]
+              as a way to run discrete-logarithm protocols in a group for which no sub-exponential attack is known.
+              The curve used by Bitcoin is one of those recommended by the Standards for Efficient Cryptography
+              Group, secp256k1, defined over the prime field <span data-tex>\mathbb{F}_p</span> by the equation
+            </p>
+            <div class="equation" id="eq-curve">
+              <div data-tex-display>
+                y^2 = x^3 + 7, \qquad p = 2^{256} - 2^{32} - 977,
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              with the base point <span data-tex>G</span> and the order <span data-tex>n</span> of the group it
+              generates printed in the standard as [<a href="#ref-34">34</a>, §2.4.1]:
+            </p>
+            <div class="worked">
+              <div><span class="caption">p</span><span class="worked__value">FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE FFFFFC2F</span></div>
+              <div><span class="caption">n, the order of G</span><span class="worked__value">FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141</span></div>
+              <div><span class="caption">G, compressed (SEC 1)</span><span class="worked__value">02 79BE667E F9DCBBAC 55A06295 CE870B07 029BFCDB 2DCE28D9 59F2815B 16F81798</span></div>
+            </div>
+            <p>
+              The cofactor is 1, so <span data-tex>G</span> generates the whole group, of prime order
+              <span data-tex>n \approx 2^{256}</span>. The letter k in the name marks a Koblitz curve: SEC 2 explains
+              that its parameters were "chosen by repeatedly selecting parameters admitting an efficiently computable
+              endomorphism until a prime order curve was found", as opposed to the verifiably random curves derived
+              from a hashed seed [<a href="#ref-34">34</a>, §2.1]. The Bitcoin community reads this as a virtue, arguing that constants
+              chosen in a predictable way leave little room for a hidden weakness and that optimised implementations
+              run faster than on the random curves [<a href="#ref-18">18</a>]. The SafeCurves project, which rates curves on the
+              safety of their implementation as well as on the cost of the discrete logarithm, puts the cost of the
+              best attack on secp256k1 at <span data-tex>2^{127.8}</span> operations and yet rates the curve
+              "Safe? False", because it has a small complex-multiplication discriminant and lacks a Montgomery
+              ladder, complete addition formulas and point encodings indistinguishable from random strings
+              [<a href="#ref-14">14</a>]; the last three are properties of implementations, not of the group, and none of
+              them affects the use made of the curve here.
+            </p>
+            <p>
+              The points of the curve, together with a point at infinity <span data-tex>O</span> that serves as the
+              identity, form an abelian group under the chord-and-tangent rule of Figure 1. The line through
+              <span data-tex>P = (x_1, y_1)</span> and <span data-tex>Q = (x_2, y_2)</span> meets the curve in a third
+              point, and <span data-tex>P + Q</span> is its reflection in the horizontal axis; writing
+              <span data-tex>\lambda</span> for the slope of the line,
+            </p>
+            <div class="equation" id="eq-add">
+              <div data-tex-display>
+                \lambda = \frac{y_2 - y_1}{x_2 - x_1}, \qquad x_3 = \lambda^2 - x_1 - x_2, \qquad y_3 = \lambda\,(x_1 - x_3) - y_1,
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              and the tangent at <span data-tex>P</span>, with <span data-tex>\lambda = 3x_1^2 / (2y_1)</span>, gives
+              <span data-tex>2P</span> by the same two formulas. The negative of <span data-tex>(x, y)</span> is
+              <span data-tex>(x, -y)</span>, and <span data-tex>P + (-P) = O</span>. Over the finite field the division
+              in <span data-tex>\lambda</span> becomes multiplication by an inverse modulo <span data-tex>p</span>, and
+              the geometry disappears, but the formulas, and the group they define, remain the same [<a href="#ref-33">33</a>].
+            </p>
+
+            <figure class="chart-figure group-law" data-group-law aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas" data-gl-canvas data-id="gl" data-mode="add"><!-- @figure id=groupLaw --></div>
+              <div class="gl-controls" data-gl-controls hidden>
+                <button type="button" class="form-button" data-gl-mode="add" aria-pressed="true">Add P + Q</button>
+                <button type="button" class="form-button" data-gl-mode="double" aria-pressed="false">Double P</button>
+                <button type="button" class="form-button" data-gl-reset>Reset points</button>
+                <p class="gl-result" data-gl-result>{{fig.groupLaw.result}}</p>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The group law on y² = x³ + 7 over the real numbers
+                </p>
+                <p>
+                  The chord through <span data-tex>P</span> and <span data-tex>Q</span> is extended until it meets
+                  the curve a third time; that point is reflected in the horizontal axis to give
+                  <span data-tex>P + Q</span>. Points can be dragged along the curve, or moved with the arrow keys
+                  when focused; the tangent construction of <span data-tex>2P</span> is shown by the second
+                  button. For the preset points, {{fig.groupLaw.result}}
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-gl-status aria-live="polite"></p>
+            </figure>
+
+            <p>
+              Over a finite field the picture loses all geometry: Figure 2 plots every point of the same equation
+              over the field of {{fig.smallCurve.p}} elements. The {{fig.smallCurve.points}} affine points show no
+              structure beyond the mirror symmetry <span data-tex>-(x, y) = (x, p - y)</span>, and their number,
+              {{fig.smallCurve.order}} with the point at infinity, lies within the interval
+              <span data-tex>|\,\#E - (p + 1)\,| \le 2\sqrt{p}</span> given by Hasse's theorem, here between
+              {{fig.smallCurve.hasseLow}} and {{fig.smallCurve.hasseHigh}}. Nothing in the picture betrays the group
+              structure, and that is the point: the order and the position of a point reveal nothing about the
+              scalar that produced it.
+            </p>
+
+            <figure class="chart-figure" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=smallCurve --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>All points of y² = x³ + 7 over the field of {{fig.smallCurve.p}} elements
+                </p>
+                <p>
+                  Each red mark is an affine point <span data-tex>(x, y)</span> with
+                  <span data-tex>y^2 \equiv x^3 + 7 \pmod{p}</span>; the dotted ruling at
+                  <span data-tex>y = p/2</span> is the axis of the mirror symmetry between a point and its
+                  negative. Exhaustively enumerated: <span class="tabular">{{fig.smallCurve.points}}</span> points,
+                  group order <span class="tabular">{{fig.smallCurve.order}}</span>.
+                </p>
+              </figcaption>
+            </figure>
+
+            <h3 id="s2-2">2.2 Scalar multiplication and the discrete logarithm</h3>
+            <p>
+              Scalar multiplication <span data-tex>k \cdot G</span> is computed by double-and-add: the 256 bits of
+              <span data-tex>k</span> are read in turn, the accumulator is doubled at every bit and
+              <span data-tex>G</span> is added at every bit equal to one, so that a multiplication costs at most 256
+              doublings and 256 additions, each a handful of multiplications in <span data-tex>\mathbb{F}_p</span>.
+              The implementation behind this page keeps points in Jacobian coordinates, so that one inversion modulo
+              <span data-tex>p</span> suffices per multiplication, and for the hash it precomputes the 256 multiples
+              of each generator, so that a digest costs one addition per non-zero byte (§3).
+            </p>
+            <p>
+              The inverse problem, recovering <span data-tex>k</span> from <span data-tex>k \cdot G</span>, is the
+              elliptic-curve discrete logarithm problem (<abbr title="elliptic-curve discrete logarithm problem">ECDLP</abbr>).
+              No algorithm is known that exploits the structure of a general prime-order curve, so the best attacks
+              are the generic ones: Pollard's rho method [<a href="#ref-87">87</a>] finds the logarithm in about
+              <span data-tex>\sqrt{n}</span> group operations with negligible memory, van Oorschot and Wiener showed
+              how to distribute it over many machines [<a href="#ref-97">97</a>], and Shoup proved that no algorithm that treats the
+              group as a black box can do better than <span data-tex>\Omega(\sqrt{n})</span> operations when
+              <span data-tex>n</span> is prime [<a href="#ref-95">95</a>]. For secp256k1 this is about <span data-tex>2^{128}</span>
+              operations, the 128-bit security level that the standard assigns to the curve [<a href="#ref-34">34</a>, Table 1] and the
+              <span data-tex>2^{127.8}</span> of SafeCurves [<a href="#ref-14">14</a>]. The largest instances solved in public
+              give the scale: a 112-bit generic prime-field curve, secp112r1, was broken in 2009 on a cluster of about 215
+              PlayStation 3 consoles running from 13 January to 8 July [<a href="#ref-22">22</a>]; a 113-bit binary-field curve fell
+              to a cluster of FPGAs in under two months in 2016 [<a href="#ref-13">13</a>]; and a 114-bit prime-field problem on a
+              pairing-friendly Barreto–Naehrig curve was solved by Kusaka and co-authors, presented in 2017 and published in
+              2018 [<a href="#ref-66">66</a>]. Each pair of additional bits doubles the cost, so secp256k1 lies about
+              <span data-tex>2^{71}</span> times beyond the largest of these, the 114-bit record.
+            </p>
+            <p>
+              Bitcoin turns this one-way map into its identity system. A private key is an integer
+              <span data-tex>k</span> in <span data-tex>[1, n - 1]</span>; the public key is the point
+              <span data-tex>K = k \cdot G</span>, and recovering <span data-tex>k</span> from <span data-tex>K</span>
+              is exactly the ECDLP [<a href="#ref-4">4</a>]. A legacy address is a hash of the public key,
+              <span data-tex>\mathrm{RIPEMD160}(\mathrm{SHA256}(K))</span>, prefixed by a version byte, extended by the
+              first four bytes of a double SHA-256 checksum and written in Base58 [<a href="#ref-4">4</a>]; Bitcoin Core names
+              the two compositions "double SHA-256" and "SHA-256 + RIPEMD-160" and uses the first for block headers
+              and transaction identifiers as well [<a href="#ref-15">15</a>]. Everything after the point multiplication is a
+              conventional hash; the point multiplication itself is the one-way step. This is the sense in which
+              secp256k1 arithmetic is already a hash in production, and the scalar variant of §3 is nothing more than
+              this step applied to a message instead of a key.
+            </p>
+
+            <h3 id="s2-3">2.3 What a cryptographic hash must provide, and how statistics can test it</h3>
+            <p>
+              A cryptographic hash function <span data-tex>h</span> maps inputs of arbitrary length to outputs of a
+              fixed length <span data-tex>\ell</span>, here 256 bits, and is expected to resist three kinds of attack,
+              in the classical formulation of Menezes, van Oorschot and Vanstone [<a href="#ref-69">69</a>, §9.2]: preimage resistance,
+              so that for essentially any output <span data-tex>y</span> it is infeasible to find an input with
+              <span data-tex>h(x) = y</span>; second-preimage resistance, so that given <span data-tex>x</span> it is
+              infeasible to find <span data-tex>x' \ne x</span> with <span data-tex>h(x') = h(x)</span>; and collision
+              resistance, so that it is infeasible to find any two distinct inputs with the same digest. Rogaway and
+              Shrimpton refined these into seven notions and settled which implies which: collision resistance implies
+              second-preimage resistance, but implies preimage resistance only provisionally, to a degree that depends
+              on how much the function compresses [<a href="#ref-90">90</a>]. Against a generic adversary an ideal
+              <span data-tex>\ell</span>-bit hash resists preimage and second-preimage search up to about
+              <span data-tex>2^{\ell}</span> evaluations and collision search up to about
+              <span data-tex>2^{\ell/2}</span>, the birthday bound [<a href="#ref-69">69</a>, Fact 9.33]; for 256 bits these are
+              <span data-tex>2^{256}</span> and <span data-tex>2^{128}</span>, the latter equal to the cost of the
+              discrete logarithm on the curve.
+            </p>
+            <p>
+              The strongest idealisation is the random oracle of Bellare and Rogaway: a public function that answers
+              every new query with a uniformly random string and repeats its answer on a repeated query
+              [<a href="#ref-9">9</a>]. Protocols are proved secure with the oracle and then instantiated with a concrete
+              hash, on the understanding that the hash should be indistinguishable from the oracle by any feasible
+              test. This is the bridge to statistics. If a hash behaved as a random oracle, the digest of a fresh
+              random message would be a uniformly random 256-bit string, independent of the message and of every other
+              digest; equivalently, its bits would be independent and identically distributed Bernoulli variables with
+              parameter one half. That statement is the null hypothesis <span data-tex>H_0</span> of §4, and each
+              desirable property becomes a consequence of it with a known sampling distribution.
+            </p>
+            <ul>
+              <li>
+                <strong>Uniformity.</strong> The count of ones at a fixed bit position over
+                <span data-tex>n</span> digests is <span data-tex>\mathrm{Bin}(n, \tfrac12)</span>, and the pooled
+                count over all bits is the subject of the frequency, or monobit, test of NIST Special Publication
+                800-22 [<a href="#ref-92">92</a>, §2.1]; the 256 byte values are equally likely, which Pearson's chi-square statistic
+                tests on 255 degrees of freedom; and the number of ones in a digest is
+                <span data-tex>\mathrm{Bin}(256, \tfrac12)</span>.
+              </li>
+              <li>
+                <strong>Independence.</strong> The number of runs of identical bits in a digest follows the law
+                tested by the runs test [<a href="#ref-92">92</a>, §2.3], and adjacent bits are uncorrelated.
+              </li>
+              <li>
+                <strong>Avalanche.</strong> Complementing one input bit should change "an average of one half of the
+                output bits"; Webster and Tavares, who attribute the idea to Feistel, sharpened it into the strict
+                avalanche criterion, that every output bit changes with probability exactly one half whenever any
+                single input bit is complemented, and the bit independence criterion, that these changes are
+                pairwise independent [<a href="#ref-100">100</a>]. Under <span data-tex>H_0</span> the digests of two messages that
+                differ in one bit are independent, so their Hamming distance is
+                <span data-tex>\mathrm{Bin}(256, \tfrac12)</span> and every cell of the input-bit by output-bit
+                matrix of flip probabilities equals one half.
+              </li>
+              <li>
+                <strong>Collisions.</strong> Among <span data-tex>m</span> digests truncated to
+                <span data-tex>t</span> bits the number of colliding pairs has mean
+                <span data-tex>\binom{m}{2} / 2^{t}</span>, and the probability of at least one repeat is
+                <span data-tex>1 - \prod_{i &lt; m} (1 - i / 2^{t})</span>, which passes one half when
+                <span data-tex>m</span> is about <span data-tex>1.18 \sqrt{2^{t}}</span> [<a href="#ref-69">69</a>, Fact 2.27].
+              </li>
+            </ul>
+            <p>
+              These are the tests of §4. Larger batteries exist, TestU01 among them [<a href="#ref-67">67</a>], but the NIST tests
+              have the merit that each comes with an explicit null distribution, so that a p-value can be read as the
+              probability, under <span data-tex>H_0</span>, of a result at least as extreme as the one observed. What
+              such tests can establish is bounded by the authors of SP 800-22 themselves: "no set of statistical
+              tests can absolutely certify a generator as appropriate for usage in a particular application, i.e.,
+              statistical testing cannot serve as a substitute for cryptanalysis", and "no specific finite set of
+              tests is deemed 'complete'" [<a href="#ref-92">92</a>]. The toy hash of §3 is built to make this caveat concrete.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Construction of the toy hash</h2>
+            <p>
+              The toy hash reads a message as a sequence of bytes <span data-tex>b_0, b_1, \dots, b_{L-1}</span>,
+              assigns a curve point <span data-tex>G_i</span> to every byte position, and returns the
+              <span data-tex>x</span>-coordinate of the point
+            </p>
+            <div class="equation" id="eq-hash">
+              <div data-tex-display>
+                H(m) = x\Big( \sum_{i=0}^{L-1} b_i \cdot G_i \Big) \in \{0, 1\}^{256},
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              written as 32 big-endian bytes. The point at infinity <span data-tex>O</span> has no
+              <span data-tex>x</span>-coordinate, so whenever the sum is <span data-tex>O</span> the digest is
+              defined to be the all-zero string <span data-tex>0^{256}</span>. The all-zero message gives
+              <span data-tex>O</span>; in the scalar variant defined below so does every message whose
+              little-endian integer is a multiple of the group order <span data-tex>n</span>, for example the 32-byte
+              encoding of <span data-tex>n</span> itself, because <span data-tex>n \cdot G = O</span>; in the
+              Pedersen variant, finding any other preimage of <span data-tex>O</span> would reveal a
+              discrete-logarithm relation among the generators. Two families of generators share this single
+              definition and are compared throughout.
+            </p>
+            <ul>
+              <li>
+                <strong>Scalar variant.</strong> <span data-tex>G_i = 2^{8i} \cdot G</span>, so that the sum
+                collapses to <span data-tex>k \cdot G</span> with <span data-tex>k</span> the message read as a
+                little-endian integer. The digest is the <span data-tex>x</span>-coordinate of the public key of
+                private key <span data-tex>k</span>: exactly the map Bitcoin applies to derive keys, used here as a
+                hash.
+              </li>
+              <li>
+                <strong>Pedersen variant.</strong> <span data-tex>G_i</span> are independent
+                "nothing-up-my-sleeve" points obtained by hashing the index <span data-tex>i</span> to the curve
+                with SHA-256 and try-and-increment, so that no discrete-logarithm relation between them is known.
+                This is the hash of Pedersen with 8-bit chunks; a collision would reveal a linear relation among
+                the generators and hence a discrete logarithm [<a href="#ref-86">86</a>] [<a href="#ref-61">61</a>, §4.1.8].
+              </li>
+            </ul>
+            <p>
+              Every experiment also runs on SHA-256, implemented from the standard in the same code base, as the
+              baseline of a hash designed for the purpose. The implementation keeps, for each byte position, a table
+              of the 256 multiples <span data-tex>0 \cdot G_i, \dots, 255 \cdot G_i</span>, so that a digest costs
+              one point addition per non-zero byte and one field inversion. All arithmetic is written from the
+              definitions in the project's own modules, linked in the appendix.
+            </p>
+
+            <h3 id="s3-1">3.1 Worked example</h3>
+            <p>
+              For the message <code>{{fig.demo.message}}</code>, encoded as {{fig.demo.bytes}} UTF-8 bytes, the
+              scalar variant computes the following quantities.
+            </p>
+            <div class="worked">
+              <div><span class="caption">Message bytes (hex)</span><span class="worked__value">{{fig.demo.hex}}</span></div>
+              <div><span class="caption">Scalar k = int_LE(m) mod n</span><span class="worked__value">{{fig.demo.scalar}}</span></div>
+              <div><span class="caption">Point k·G, x-coordinate</span><span class="worked__value">{{fig.demo.x}}</span></div>
+              <div><span class="caption">Point k·G, y-coordinate</span><span class="worked__value">{{fig.demo.y}}</span></div>
+              <div><span class="caption">Compressed encoding (SEC 1)</span><span class="worked__value">{{fig.demo.compressed}}</span></div>
+              <div><span class="caption">Digest, scalar variant</span><span class="worked__value">{{fig.demo.digestScalar}}</span></div>
+              <div><span class="caption">Digest, Pedersen variant</span><span class="worked__value">{{fig.demo.digestPedersen}}</span></div>
+              <div><span class="caption">SHA-256, for comparison</span><span class="worked__value">{{fig.demo.digestSha256}}</span></div>
+            </div>
+            <p>
+              Flipping input bit {{fig.demo.flipIndex}} changes <span class="tabular">{{fig.demo.distanceScalar}}</span>
+              output bits of the scalar digest, <span class="tabular">{{fig.demo.distancePedersen}}</span> of the
+              Pedersen digest and <span class="tabular">{{fig.demo.distanceSha256}}</span> of the SHA-256 digest, out
+              of 256; an ideal hash changes 128 on average. Figure 3 repeats the computation for any message.
+            </p>
+
+            <figure class="chart-figure demo" data-demo aria-labelledby="fig3-title">
+              <div class="demo__controls" data-demo-controls hidden>
+                <div class="demo__row">
+                  <label class="text-field">
+                    <span class="caption">Message (UTF-8, up to 64 bytes)</span>
+                    <input type="text" data-demo-text value="{{fig.demo.message}}" maxlength="64" autocomplete="off" spellcheck="false" />
+                    <span class="text-field__note" data-demo-count></span>
+                  </label>
+                  <label class="text-field">
+                    <span class="caption">Input bit to flip</span>
+                    <input type="number" data-demo-flip value="{{fig.demo.flipIndex}}" min="0" max="79" step="1" />
+                    <span class="text-field__note">bit i is bit (i mod 8) of byte ⌊i / 8⌋, least significant first</span>
+                  </label>
+                </div>
+                <div class="demo__row">
+                  <fieldset class="choice">
+                    <legend>Hash function</legend>
+                    <div class="choice__options">
+                      <div class="choice__option">
+                        <input type="radio" id="demo-v-scalar" name="demo-v" value="scalar" data-demo-variant checked />
+                        <label for="demo-v-scalar">Toy hash, scalar</label>
+                      </div>
+                      <div class="choice__option">
+                        <input type="radio" id="demo-v-pedersen" name="demo-v" value="pedersen" data-demo-variant />
+                        <label for="demo-v-pedersen">Toy hash, Pedersen</label>
+                      </div>
+                      <div class="choice__option">
+                        <input type="radio" id="demo-v-sha256" name="demo-v" value="sha256" data-demo-variant />
+                        <label for="demo-v-sha256">SHA-256</label>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <button type="button" class="form-button" data-demo-random-bit>Flip a random bit</button>
+                </div>
+              </div>
+              <div class="chart-figure__canvas" data-demo-output><!-- @figure id=demo --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>The toy hash, computed live
+                </p>
+                <p>
+                  The message is encoded in UTF-8, mapped to its curve point and reduced to its 256-bit digest,
+                  shown in hexadecimal and as a 16 × 16 grid of bits (ink for ones). One input bit is then flipped
+                  and the second digest is shown with the changed output bits marked in red, together with their
+                  number. For the scalar variant the panel also lists two messages that collide with the input for
+                  structural reasons, discussed in §5. Without scripting the panel shows the worked example above.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-demo-status aria-live="polite"></p>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Statistical study</h2>
+            <p>
+              Every test below is a test of the same null hypothesis: the digest of a random message is a uniformly
+              random 256-bit string, independent of the message and of the other digests. Messages are 32 random
+              bytes from a seeded generator, so that every figure is reproducible from the seed it prints. A pool of
+              <span class="tabular">{{fig.params.n}}</span> messages (seed {{fig.params.seedPool}}) feeds the
+              frequency, weight, runs and collision tests; the avalanche test uses
+              <span class="tabular">{{fig.params.avalanchePairs}}</span> message pairs (seed
+              {{fig.params.seedAvalanche}}); the strict-avalanche matrix uses
+              <span class="tabular">{{fig.params.sacTrials}}</span> messages per input bit, that is
+              <span class="tabular">{{fig.params.sacHashes}}</span> digests (seed {{fig.params.seedSac}}). Each figure
+              can be switched between the two variants of the toy hash and SHA-256, and redrawn in the browser on a
+              fresh sample of reduced size.
+            </p>
+
+            <h3 id="s4-1">4.1 Uniformity of the output bits</h3>
+            <p>
+              For each output bit position <span data-tex>j</span>, the number of ones <span data-tex>c_j</span>
+              over <span data-tex>n</span> digests is binomial <span data-tex>\mathrm{Bin}(n, \tfrac12)</span>
+              under the null hypothesis. The standardised counts
+              <span data-tex>z_j = (c_j - n/2) / \sqrt{n/4}</span> are then approximately standard normal, and
+              their sum of squares is approximately <span data-tex>\chi^2</span> with 256 degrees of freedom.
+              Figure 4 plots the 256 values of <span data-tex>z_j</span> on the normal probability paper of this
+              site, where a sample of standard normal variates lies on the line of slope one through the origin,
+              and below them as a strip in bit order.
+            </p>
+
+            <figure class="chart-figure" data-fig="bitFrequency" data-fig-kind="bitFrequency" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=bitFrequency --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig4-h-scalar" name="fig4-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig4-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig4-h-pedersen" name="fig4-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig4-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig4-h-sha256" name="fig4-h" value="sha256" data-fig-series-choice />
+                      <label for="fig4-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>Standardised frequency of ones at each output bit position
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Above, the 256 z-scores on normal probability paper, with their least-squares line (slope
+                  <span class="tabular" data-fig-stat="slope">{{fig.bitFrequency.scalar.slope}}</span>, intercept
+                  <span class="tabular" data-fig-stat="intercept">{{fig.bitFrequency.scalar.intercept}}</span>,
+                  correlation <span class="tabular" data-fig-stat="r">{{fig.bitFrequency.scalar.r}}</span>); below,
+                  the same values in bit order with the ±1.96 and ±3 bands. The monobit test on the pooled
+                  <span class="tabular" data-fig-stat="bits">{{fig.bitFrequency.scalar.bits}}</span> bits gives a
+                  proportion of ones of <span class="tabular" data-fig-stat="onesFraction">{{fig.bitFrequency.scalar.onesFraction}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>χ²(256)</dt><dd data-fig-stat="statistic">{{fig.bitFrequency.scalar.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.bitFrequency.scalar.p}}</dd></div>
+                  <div><dt>max |z|</dt><dd data-fig-stat="maxAbsZ">{{fig.bitFrequency.scalar.maxAbsZ}}</dd></div>
+                  <div><dt>|z| &gt; 1.96 (exp. 12.8)</dt><dd data-fig-stat="beyondTwoSigma">{{fig.bitFrequency.scalar.beyondTwoSigma}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.bitFrequency.scalar.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.bitFrequency.scalar.n}}</span> digests, monobit p =
+                  <span class="tabular" data-fig-stat="monobitP">{{fig.bitFrequency.scalar.monobitP}}</span>, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.bitFrequency.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-2">4.2 Uniformity of the output bytes</h3>
+            <p>
+              The <span class="tabular">{{fig.byteFrequency.scalar.bytes}}</span> bytes of the pooled digests
+              should be spread evenly over the 256 byte values, <span class="tabular">{{fig.byteFrequency.scalar.expected}}</span>
+              each. Pearson's statistic <span data-tex>\sum_v (O_v - E)^2 / E</span> is approximately
+              <span data-tex>\chi^2</span> with 255 degrees of freedom under the null hypothesis.
+            </p>
+
+            <figure class="chart-figure" data-fig="byteFrequency" data-fig-kind="byteFrequency" aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=byteFrequency --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig5-h-scalar" name="fig5-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig5-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig5-h-pedersen" name="fig5-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig5-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig5-h-sha256" name="fig5-h" value="sha256" data-fig-series-choice />
+                      <label for="fig5-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>Frequency of the 256 byte values in the digests
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars are the observed counts; the flat step is the expected count under uniformity. Counts range
+                  from <span class="tabular" data-fig-stat="min">{{fig.byteFrequency.scalar.min}}</span> to
+                  <span class="tabular" data-fig-stat="max">{{fig.byteFrequency.scalar.max}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>χ²(255)</dt><dd data-fig-stat="statistic">{{fig.byteFrequency.scalar.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.byteFrequency.scalar.p}}</dd></div>
+                  <div><dt>Bytes</dt><dd data-fig-stat="bytes">{{fig.byteFrequency.scalar.bytes}}</dd></div>
+                  <div><dt>Expected per value</dt><dd data-fig-stat="expected">{{fig.byteFrequency.scalar.expected}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.byteFrequency.scalar.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.byteFrequency.scalar.n}}</span> digests, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.byteFrequency.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-3">4.3 Hamming weight of a digest</h3>
+            <p>
+              The number of ones in a digest of 256 independent fair bits is
+              <span data-tex>\mathrm{Bin}(256, \tfrac12)</span>, with mean 128 and standard deviation 8. The
+              histogram of the weights is compared with that law by a chi-square test after merging the tails into
+              bins of expected count at least five.
+            </p>
+
+            <figure class="chart-figure" data-fig="hammingWeight" data-fig-kind="hammingWeight" aria-labelledby="fig6-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=hammingWeight --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig6-h-scalar" name="fig6-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig6-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig6-h-pedersen" name="fig6-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig6-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig6-h-sha256" name="fig6-h" value="sha256" data-fig-series-choice />
+                      <label for="fig6-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>Hamming weight of the digests against Bin(256, ½)
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars are observed counts for each weight between 88 and 168 (values outside this range have
+                  negligible expected counts); the step line is the binomial expectation.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean (exp. 128)</dt><dd data-fig-stat="mean">{{fig.hammingWeight.scalar.mean}}</dd></div>
+                  <div><dt>SD (exp. 8)</dt><dd data-fig-stat="sd">{{fig.hammingWeight.scalar.sd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.hammingWeight.scalar.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.hammingWeight.scalar.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.hammingWeight.scalar.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.hammingWeight.scalar.n}}</span> digests,
+                  <span class="tabular" data-fig-stat="df">{{fig.hammingWeight.scalar.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.hammingWeight.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-4">4.4 Avalanche effect and the strict avalanche criterion</h3>
+            <p>
+              A hash should change about half of its output bits when a single input bit changes, and no output bit
+              should be predictable from the flipped input bit. Figure 7 records, for
+              <span class="tabular">{{fig.avalanche.scalar.n}}</span> random messages, the Hamming distance between
+              the digests of the message and of the message with one random bit flipped; under the null hypothesis
+              the distance is again <span data-tex>\mathrm{Bin}(256, \tfrac12)</span>. Figure 8 refines the
+              question to every pair of input and output bits: the strict avalanche criterion requires that output
+              bit <span data-tex>j</span> flip with probability one half whenever input bit <span data-tex>i</span>
+              is flipped, for all <span data-tex>i</span> and <span data-tex>j</span> [<a href="#ref-100">100</a>].
+            </p>
+
+            <figure class="chart-figure" data-fig="avalanche" data-fig-kind="avalanche" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=avalanche --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-h-scalar" name="fig7-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig7-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-h-pedersen" name="fig7-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig7-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-h-sha256" name="fig7-h" value="sha256" data-fig-series-choice />
+                      <label for="fig7-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>Avalanche: output bits changed by one input-bit flip
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars are observed counts of the Hamming distance between the two digests of each pair; the step
+                  line is the expectation under Bin(256, ½). No pair left the digest unchanged
+                  (<span class="tabular" data-fig-stat="unchanged">{{fig.avalanche.scalar.unchanged}}</span> of
+                  <span class="tabular" data-fig-stat="n">{{fig.avalanche.scalar.n}}</span>).
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean (exp. 128)</dt><dd data-fig-stat="mean">{{fig.avalanche.scalar.mean}}</dd></div>
+                  <div><dt>SD (exp. 8)</dt><dd data-fig-stat="sd">{{fig.avalanche.scalar.sd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.avalanche.scalar.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.avalanche.scalar.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.avalanche.scalar.series}}</span>,
+                  <span class="tabular" data-fig-stat="df">{{fig.avalanche.scalar.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.avalanche.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="sac" data-fig-kind="sac" aria-labelledby="fig8-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=sac --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-h-scalar" name="fig8-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig8-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-h-pedersen" name="fig8-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig8-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-h-sha256" name="fig8-h" value="sha256" data-fig-series-choice />
+                      <label for="fig8-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample (8 trials)
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig8-title">
+                  <span class="pplot__fig-no">Figure 8.</span>The strict-avalanche matrix, 256 input bits by 256 output bits
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Left, each pixel is the proportion of trials in which output bit <span data-tex>j</span> (column)
+                  changed when input bit <span data-tex>i</span> (row) was flipped, from paper for never to ink
+                  for always; an ideal hash is a flat mid-grey. Right, the distribution of the
+                  <span class="tabular" data-fig-stat="cells">{{fig.sac.scalar.cells}}</span> cell counts against
+                  the binomial law of <span class="tabular" data-fig-stat="trials">{{fig.sac.scalar.trials}}</span>
+                  fair trials.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean (exp. 0.5)</dt><dd data-fig-stat="mean">{{fig.sac.scalar.mean}}</dd></div>
+                  <div><dt>Min · max</dt><dd><span data-fig-stat="min">{{fig.sac.scalar.min}}</span> · <span data-fig-stat="max">{{fig.sac.scalar.max}}</span></dd></div>
+                  <div><dt>max |z|</dt><dd data-fig-stat="maxAbsZ">{{fig.sac.scalar.maxAbsZ}}</dd></div>
+                  <div><dt>|z| &gt; 1.96 (exp. <span data-fig-stat="expectedBeyondTwoSigma">{{fig.sac.scalar.expectedBeyondTwoSigma}}</span>%)</dt><dd><span data-fig-stat="beyondTwoSigma">{{fig.sac.scalar.beyondTwoSigma}}</span>%</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.sac.scalar.series}}</span>,
+                  <span class="tabular" data-fig-stat="hashes">{{fig.sac.scalar.hashes}}</span> digests, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.sac.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-5">4.5 Independence within a digest</h3>
+            <p>
+              Uniform bits may still be dependent. The runs test of NIST SP 800-22 counts the maximal blocks of
+              identical bits in each 256-bit digest: too few runs betray clustering, too many an oscillation. Each
+              digest yields a p-value. For long sequences these p-values are uniform on
+              <span data-tex>[0, 1]</span> under the null hypothesis, but for a 256-bit string the number of runs
+              takes few distinct values, so the p-value is a discrete variable whose exact law can be computed by
+              counting the strings with <span data-tex>k</span> ones and <span data-tex>r</span> runs,
+              <span data-tex>2\binom{k-1}{m-1}\binom{n-k-1}{m-1}</span> for <span data-tex>r = 2m</span> and
+              the analogous sum for odd <span data-tex>r</span>, each with probability <span data-tex>2^{-n}</span>.
+              Figure 9 compares the histogram of p-values over ten bins with that exact law by a chi-square test;
+              a flat reference would wrongly reject even SHA-256. The proportion of digests with
+              <span data-tex>p \ge 0.01</span> is compared with the interval
+              <span data-tex>0.99 \pm 3\sqrt{0.0099 / n}</span> used by the NIST suite. The same section tests
+              adjacent bits directly: the 2 × 2 table of pairs <span data-tex>(b_j, b_{j+1})</span> pooled over all
+              digests, with its chi-square statistic on one degree of freedom and the lag-one correlation
+              [<a href="#ref-92">92</a>, §2.3].
+            </p>
+
+            <figure class="chart-figure" data-fig="runs" data-fig-kind="runs" aria-labelledby="fig9-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=runs --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig9-h-scalar" name="fig9-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig9-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig9-h-pedersen" name="fig9-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig9-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig9-h-sha256" name="fig9-h" value="sha256" data-fig-series-choice />
+                      <label for="fig9-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig9-title">
+                  <span class="pplot__fig-no">Figure 9.</span>Runs test on each digest: distribution of the p-values
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars count the digests whose runs-test p-value falls in each decile; the step is the exact
+                  expectation for 256-bit strings of independent fair bits, uneven because the runs statistic is
+                  discrete. The mean number of runs per digest is
+                  <span class="tabular" data-fig-stat="meanRuns">{{fig.runs.scalar.meanRuns}}</span> against
+                  <span class="tabular" data-fig-stat="expectedRuns">{{fig.runs.scalar.expectedRuns}}</span>
+                  expected (1 + 255/2). Adjacent bits: table
+                  (<span class="tabular" data-fig-stat="n00">{{fig.runs.scalar.n00}}</span>,
+                  <span class="tabular" data-fig-stat="n01">{{fig.runs.scalar.n01}}</span>,
+                  <span class="tabular" data-fig-stat="n10">{{fig.runs.scalar.n10}}</span>,
+                  <span class="tabular" data-fig-stat="n11">{{fig.runs.scalar.n11}}</span>) for the pairs 00, 01,
+                  10, 11; χ²(1) = <span class="tabular" data-fig-stat="adjacentStatistic">{{fig.runs.scalar.adjacentStatistic}}</span>,
+                  p = <span class="tabular" data-fig-stat="adjacentP">{{fig.runs.scalar.adjacentP}}</span>, lag-one
+                  correlation <span class="tabular" data-fig-stat="lag1">{{fig.runs.scalar.lag1}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Fit to exact law, χ²(9)</dt><dd data-fig-stat="uniformityStatistic">{{fig.runs.scalar.uniformityStatistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="uniformityP">{{fig.runs.scalar.uniformityP}}</dd></div>
+                  <div><dt>p ≥ 0.01 (%)</dt><dd data-fig-stat="passing">{{fig.runs.scalar.passing}}</dd></div>
+                  <div><dt>NIST interval (%)</dt><dd><span data-fig-stat="passingLow">{{fig.runs.scalar.passingLow}}</span>–<span data-fig-stat="passingHigh">{{fig.runs.scalar.passingHigh}}</span></dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.runs.scalar.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.runs.scalar.n}}</span> digests, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.runs.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-6">4.6 Collisions and the birthday bound</h3>
+            <p>
+              Collisions of a 256-bit digest cannot be observed directly, so the digests are truncated to their
+              leading <span data-tex>t</span> bits. Among <span data-tex>n</span> uniform values on
+              <span data-tex>t</span> bits the expected number of colliding pairs is
+              <span data-tex>\binom{n}{2} / 2^{t}</span>, and the probability that a sample of
+              <span data-tex>m</span> values contains a repeat is
+              <span data-tex>1 - \prod_{i &lt; m} (1 - i / 2^{t})</span>, which passes one half near
+              <span data-tex>m \approx 1.18 \sqrt{2^{t}}</span> [<a href="#ref-69">69</a>, Fact 2.27]. Table 1 compares expected and observed pairs
+              for four truncations; Figure 10 draws the probability curve for
+              <span data-tex>t</span> = {{fig.collisions.scalar.bits}}, estimated from
+              <span class="tabular">{{fig.collisions.scalar.subsets}}</span> random subsets of each size taken from
+              the pool.
+            </p>
+
+            <div class="data-table--scroll">
+              <table class="data-table">
+                <caption>Table 1. Colliding pairs among {{fig.collisions.scalar.n}} digests truncated to t bits: expected C(n, 2)/2ᵗ against observed, for each hash function.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">t (bits)</th>
+                    <th scope="col" class="is-number">Expected pairs</th>
+                    <th scope="col" class="is-number">Toy, scalar</th>
+                    <th scope="col" class="is-number">Toy, Pedersen</th>
+                    <th scope="col" class="is-number">SHA-256</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">12</th><td class="is-number">{{fig.collisions.scalar.t12expected}}</td><td class="is-number">{{fig.collisions.scalar.t12observed}}</td><td class="is-number">{{fig.collisions.pedersen.t12observed}}</td><td class="is-number">{{fig.collisions.sha256.t12observed}}</td></tr>
+                  <tr><th scope="row">16</th><td class="is-number">{{fig.collisions.scalar.t16expected}}</td><td class="is-number">{{fig.collisions.scalar.t16observed}}</td><td class="is-number">{{fig.collisions.pedersen.t16observed}}</td><td class="is-number">{{fig.collisions.sha256.t16observed}}</td></tr>
+                  <tr><th scope="row">20</th><td class="is-number">{{fig.collisions.scalar.t20expected}}</td><td class="is-number">{{fig.collisions.scalar.t20observed}}</td><td class="is-number">{{fig.collisions.pedersen.t20observed}}</td><td class="is-number">{{fig.collisions.sha256.t20observed}}</td></tr>
+                  <tr><th scope="row">24</th><td class="is-number">{{fig.collisions.scalar.t24expected}}</td><td class="is-number">{{fig.collisions.scalar.t24observed}}</td><td class="is-number">{{fig.collisions.pedersen.t24observed}}</td><td class="is-number">{{fig.collisions.sha256.t24observed}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <figure class="chart-figure" data-fig="collisions" data-fig-kind="collisions" aria-labelledby="fig10-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=collisions --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Hash function</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig10-h-scalar" name="fig10-h" value="scalar" data-fig-series-choice checked />
+                      <label for="fig10-h-scalar">Toy hash, scalar</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig10-h-pedersen" name="fig10-h" value="pedersen" data-fig-series-choice />
+                      <label for="fig10-h-pedersen">Toy hash, Pedersen</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig10-h-sha256" name="fig10-h" value="sha256" data-fig-series-choice />
+                      <label for="fig10-h-sha256">SHA-256</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig10-title">
+                  <span class="pplot__fig-no">Figure 10.</span>Probability of a collision among m digests truncated to {{fig.collisions.scalar.bits}} bits
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  The line is the exact birthday probability; each point is the proportion of random subsets of
+                  size <span data-tex>m</span> that contained a repeated value, with a 95% binomial error bar. The
+                  theoretical curve crosses one half at
+                  <span data-tex>m = </span><span class="tabular" data-fig-stat="halfPoint">{{fig.collisions.scalar.halfPoint}}</span>;
+                  the first observed proportion at or above one half occurs at
+                  <span data-tex>m = </span><span class="tabular" data-fig-stat="empiricalHalf">{{fig.collisions.scalar.empiricalHalf}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Truncation t</dt><dd data-fig-stat="bits">{{fig.collisions.scalar.bits}}</dd></div>
+                  <div><dt>Subsets per m</dt><dd data-fig-stat="subsets">{{fig.collisions.scalar.subsets}}</dd></div>
+                  <div><dt>Pairs at t = 16, exp.</dt><dd data-fig-stat="t16expected">{{fig.collisions.scalar.t16expected}}</dd></div>
+                  <div><dt>Pairs at t = 16, obs.</dt><dd data-fig-stat="t16observed">{{fig.collisions.scalar.t16observed}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.collisions.scalar.series}}</span>, pool of
+                  <span class="tabular" data-fig-stat="n">{{fig.collisions.scalar.n}}</span> digests, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.collisions.scalar.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-7">4.7 Preimage resistance and the cost of the discrete logarithm</h3>
+            <p>
+              Inverting the toy hash means recovering the scalar from the point, the discrete logarithm problem. It
+              cannot be observed on secp256k1, so it is measured where it can be solved: on the curves
+              <span data-tex>y^2 = x^3 + 7</span> over the {{fig.ecdlp.curves}} primes nearest to
+              <span data-tex>2^7, \dots, 2^{14}</span>, with a random base point and
+              {{fig.ecdlp.challenges}} random challenges each. Exhaustive search costs about half the group order;
+              Shanks's baby-step giant-step costs about <span data-tex>2\sqrt{n}</span> operations and
+              <span data-tex>\sqrt{n}</span> memory, and Pollard's rho the same time with no memory [<a href="#ref-87">87</a>], which
+              no generic algorithm can beat [<a href="#ref-95">95</a>]. Figure 11 shows the measured costs growing as
+              <span data-tex>n</span> and <span data-tex>\sqrt{n}</span> (on the largest curve, of order
+              {{fig.ecdlp.largestOrder}}, exhaustive search averaged {{fig.ecdlp.largestBrute}} operations and
+              baby-step giant-step {{fig.ecdlp.largestBsgs}}), and extends the lines to the order of secp256k1,
+              where <span data-tex>\sqrt{n} \approx 2^{128}</span>.
+            </p>
+
+            <figure class="chart-figure" aria-labelledby="fig11-title">
+              <div class="chart-figure__canvas"><!-- @figure id=ecdlp --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig11-title">
+                  <span class="pplot__fig-no">Figure 11.</span>Cost of the discrete logarithm against the order of the group
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Filled points: mean operations of baby-step giant-step; open points: mean operations of
+                  exhaustive search; dashed lines: <span data-tex>\sqrt{n}</span> and <span data-tex>n/2</span>. The
+                  measured ratios are <span class="tabular">{{fig.ecdlp.bsgsRatio}}</span>
+                  <span data-tex>\sqrt{n}</span> and <span class="tabular">{{fig.ecdlp.bruteRatio}}</span>
+                  <span data-tex>n</span>. The right panel repeats the axes up to <span data-tex>2^{256}</span>,
+                  marking, by two nearly coincident circles, the two largest publicly solved prime-field instances, of
+                  112 bits (a generic curve, 2009) and 114 bits (a Barreto–Naehrig curve, 2017), and the
+                  <span data-tex>2^{128}</span> operations that secp256k1 would demand. Primes
+                  {{fig.ecdlp.smallestPrime}}–{{fig.ecdlp.largestPrime}}, seed {{fig.params.seedEcdlp}}.
+                </p>
+              </figcaption>
+            </figure>
+
+            <h3 id="s4-8">4.8 Summary of the tests</h3>
+            <div class="data-table--scroll">
+              <table class="data-table">
+                <caption>Table 2. The tests of §4 on the three hash functions, at the sizes and seeds stated above. A p-value below 0.05 would reject the null hypothesis of an ideal hash at the 5% level.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Test</th>
+                    <th scope="col">Statistic</th>
+                    <th scope="col" class="is-number">Toy, scalar</th>
+                    <th scope="col" class="is-number">Toy, Pedersen</th>
+                    <th scope="col" class="is-number">SHA-256</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Bit frequency</th><td>χ²(256) p-value</td><td class="is-number">{{fig.bitFrequency.scalar.p}}</td><td class="is-number">{{fig.bitFrequency.pedersen.p}}</td><td class="is-number">{{fig.bitFrequency.sha256.p}}</td></tr>
+                  <tr><th scope="row">Monobit (pooled bits)</th><td>p-value</td><td class="is-number">{{fig.bitFrequency.scalar.monobitP}}</td><td class="is-number">{{fig.bitFrequency.pedersen.monobitP}}</td><td class="is-number">{{fig.bitFrequency.sha256.monobitP}}</td></tr>
+                  <tr><th scope="row">Byte frequency</th><td>χ²(255) p-value</td><td class="is-number">{{fig.byteFrequency.scalar.p}}</td><td class="is-number">{{fig.byteFrequency.pedersen.p}}</td><td class="is-number">{{fig.byteFrequency.sha256.p}}</td></tr>
+                  <tr><th scope="row">Hamming weight</th><td>binned χ² p-value</td><td class="is-number">{{fig.hammingWeight.scalar.p}}</td><td class="is-number">{{fig.hammingWeight.pedersen.p}}</td><td class="is-number">{{fig.hammingWeight.sha256.p}}</td></tr>
+                  <tr><th scope="row">Avalanche distance</th><td>binned χ² p-value</td><td class="is-number">{{fig.avalanche.scalar.p}}</td><td class="is-number">{{fig.avalanche.pedersen.p}}</td><td class="is-number">{{fig.avalanche.sha256.p}}</td></tr>
+                  <tr><th scope="row">Avalanche mean</th><td>mean distance (exp. 128)</td><td class="is-number">{{fig.avalanche.scalar.mean}}</td><td class="is-number">{{fig.avalanche.pedersen.mean}}</td><td class="is-number">{{fig.avalanche.sha256.mean}}</td></tr>
+                  <tr><th scope="row">Strict avalanche matrix</th><td>cells with |z| &gt; 1.96 (exp. {{fig.sac.scalar.expectedBeyondTwoSigma}}%)</td><td class="is-number">{{fig.sac.scalar.beyondTwoSigma}}%</td><td class="is-number">{{fig.sac.pedersen.beyondTwoSigma}}%</td><td class="is-number">{{fig.sac.sha256.beyondTwoSigma}}%</td></tr>
+                  <tr><th scope="row">Runs p-values vs exact law</th><td>χ²(9) p-value</td><td class="is-number">{{fig.runs.scalar.uniformityP}}</td><td class="is-number">{{fig.runs.pedersen.uniformityP}}</td><td class="is-number">{{fig.runs.sha256.uniformityP}}</td></tr>
+                  <tr><th scope="row">Adjacent-bit independence</th><td>χ²(1) p-value</td><td class="is-number">{{fig.runs.scalar.adjacentP}}</td><td class="is-number">{{fig.runs.pedersen.adjacentP}}</td><td class="is-number">{{fig.runs.sha256.adjacentP}}</td></tr>
+                  <tr><th scope="row">Collisions at t = 16</th><td>observed pairs (exp. {{fig.collisions.scalar.t16expected}})</td><td class="is-number">{{fig.collisions.scalar.t16observed}}</td><td class="is-number">{{fig.collisions.pedersen.t16observed}}</td><td class="is-number">{{fig.collisions.sha256.t16observed}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Of the 21 p-values in Table 2, twenty lie above 0.05 and one, the binned chi-square test of the
+              Pedersen Hamming weights, is {{fig.hammingWeight.pedersen.p}}. Three remarks put this value in
+              proportion. First, with 21 tests the chance that at least one p-value falls below 0.05 under
+              <span data-tex>H_0</span> is about 66%, and the chance that the smallest of them falls below 0.001 is
+              about 2%, so one small value is weak evidence unless it recurs; a Bonferroni threshold of
+              0.05/21, about 0.0024, would still reject this one if it stood alone. Second, the location and scale
+              of the Pedersen weights are as expected: a mean of {{fig.hammingWeight.pedersen.mean}} against 128,
+              with a standard error of 0.13, and a standard deviation of {{fig.hammingWeight.pedersen.sd}} against 8;
+              the discrepancy lies in the shape of the binned histogram, where a few bins are over- or
+              under-populated. Third, the result does not recur on fresh pools. This replication was designed after
+              the p-value of the Pedersen Hamming weights had been observed, so it is a post hoc check of that single
+              result and not one of the pre-planned tests of Table 2; its six seeds were chosen before it was run
+              and none was changed afterwards. Table 3 repeats the
+              Hamming-weight test, together with the count of colliding pairs, on six fresh pools of
+              {{fig.params.replicationN}} messages for each hash function: the Pedersen p-values range from
+              {{fig.replication.pedersen.hwPMin}} to {{fig.replication.pedersen.hwPMax}}, and the "Draw new sample"
+              control of Figure 6 lets the reader draw further pools. We therefore do not reject the null hypothesis
+              for any of the three functions, and we keep the published pool seed rather than exchange it for one that
+              gives a tidier table: that seed was fixed, as the date of the work, before any result was seen.
+            </p>
+            <p>
+              Two further rows deserve a note. The strict-avalanche row reports about 6% of cells beyond ±1.96
+              standard deviations for all three functions, SHA-256 included, where the normal approximation would
+              suggest 5%; the statistic is discrete, and the exact two-sided tail of
+              <span data-tex>\mathrm{Bin}(48, \tfrac12)</span> beyond that threshold is
+              {{fig.sac.scalar.expectedBeyondTwoSigma}}%, with which all three agree. The collision row shows the
+              scalar variant with {{fig.collisions.scalar.t16observed}} colliding pairs at 16 bits against
+              {{fig.collisions.scalar.t16expected}} expected, about two standard deviations below: since the
+              indicators of distinct pairs are uncorrelated, the count of colliding pairs among
+              <span data-tex>n</span> digests has variance <span data-tex>\binom{n}{2} 2^{-t} (1 - 2^{-t})</span>,
+              a standard deviation of {{fig.replication.sd16}} here. The six replications of Table 3 give counts
+              between {{fig.replication.scalar.t16Min}} and {{fig.replication.scalar.t16Max}} for the scalar
+              variant, on both sides of the expectation, so this too is sampling variation.
+            </p>
+
+            <div class="data-table--scroll">
+              <table class="data-table data-table--compact">
+                <caption>Table 3. Replication on six fresh pools of {{fig.params.replicationN}} messages (seeds {{fig.params.replicationSeeds}}): p-value of the binned chi-square test of the Hamming weights, and colliding pairs among the digests truncated to 12 and 16 bits, expected {{fig.replication.expected12}} ± {{fig.replication.sd12}} and {{fig.replication.expected16}} ± {{fig.replication.sd16}}.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" rowspan="2">Seed</th>
+                    <th scope="colgroup" colspan="3">Hamming weight, p-value</th>
+                    <th scope="colgroup" colspan="3">Colliding pairs, t = 12</th>
+                    <th scope="colgroup" colspan="3">Colliding pairs, t = 16</th>
+                  </tr>
+                  <tr>
+                    <th scope="col" class="is-number">Scalar</th>
+                    <th scope="col" class="is-number">Pedersen</th>
+                    <th scope="col" class="is-number">SHA-256</th>
+                    <th scope="col" class="is-number">Scalar</th>
+                    <th scope="col" class="is-number">Pedersen</th>
+                    <th scope="col" class="is-number">SHA-256</th>
+                    <th scope="col" class="is-number">Scalar</th>
+                    <th scope="col" class="is-number">Pedersen</th>
+                    <th scope="col" class="is-number">SHA-256</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">1</th><td class="is-number">{{fig.replication.scalar.s1.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s1.hwP}}</td><td class="is-number">{{fig.replication.sha256.s1.hwP}}</td><td class="is-number">{{fig.replication.scalar.s1.t12}}</td><td class="is-number">{{fig.replication.pedersen.s1.t12}}</td><td class="is-number">{{fig.replication.sha256.s1.t12}}</td><td class="is-number">{{fig.replication.scalar.s1.t16}}</td><td class="is-number">{{fig.replication.pedersen.s1.t16}}</td><td class="is-number">{{fig.replication.sha256.s1.t16}}</td></tr>
+                  <tr><th scope="row">2</th><td class="is-number">{{fig.replication.scalar.s2.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s2.hwP}}</td><td class="is-number">{{fig.replication.sha256.s2.hwP}}</td><td class="is-number">{{fig.replication.scalar.s2.t12}}</td><td class="is-number">{{fig.replication.pedersen.s2.t12}}</td><td class="is-number">{{fig.replication.sha256.s2.t12}}</td><td class="is-number">{{fig.replication.scalar.s2.t16}}</td><td class="is-number">{{fig.replication.pedersen.s2.t16}}</td><td class="is-number">{{fig.replication.sha256.s2.t16}}</td></tr>
+                  <tr><th scope="row">3</th><td class="is-number">{{fig.replication.scalar.s3.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s3.hwP}}</td><td class="is-number">{{fig.replication.sha256.s3.hwP}}</td><td class="is-number">{{fig.replication.scalar.s3.t12}}</td><td class="is-number">{{fig.replication.pedersen.s3.t12}}</td><td class="is-number">{{fig.replication.sha256.s3.t12}}</td><td class="is-number">{{fig.replication.scalar.s3.t16}}</td><td class="is-number">{{fig.replication.pedersen.s3.t16}}</td><td class="is-number">{{fig.replication.sha256.s3.t16}}</td></tr>
+                  <tr><th scope="row">4</th><td class="is-number">{{fig.replication.scalar.s4.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s4.hwP}}</td><td class="is-number">{{fig.replication.sha256.s4.hwP}}</td><td class="is-number">{{fig.replication.scalar.s4.t12}}</td><td class="is-number">{{fig.replication.pedersen.s4.t12}}</td><td class="is-number">{{fig.replication.sha256.s4.t12}}</td><td class="is-number">{{fig.replication.scalar.s4.t16}}</td><td class="is-number">{{fig.replication.pedersen.s4.t16}}</td><td class="is-number">{{fig.replication.sha256.s4.t16}}</td></tr>
+                  <tr><th scope="row">5</th><td class="is-number">{{fig.replication.scalar.s5.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s5.hwP}}</td><td class="is-number">{{fig.replication.sha256.s5.hwP}}</td><td class="is-number">{{fig.replication.scalar.s5.t12}}</td><td class="is-number">{{fig.replication.pedersen.s5.t12}}</td><td class="is-number">{{fig.replication.sha256.s5.t12}}</td><td class="is-number">{{fig.replication.scalar.s5.t16}}</td><td class="is-number">{{fig.replication.pedersen.s5.t16}}</td><td class="is-number">{{fig.replication.sha256.s5.t16}}</td></tr>
+                  <tr><th scope="row">6</th><td class="is-number">{{fig.replication.scalar.s6.hwP}}</td><td class="is-number">{{fig.replication.pedersen.s6.hwP}}</td><td class="is-number">{{fig.replication.sha256.s6.hwP}}</td><td class="is-number">{{fig.replication.scalar.s6.t12}}</td><td class="is-number">{{fig.replication.pedersen.s6.t12}}</td><td class="is-number">{{fig.replication.sha256.s6.t12}}</td><td class="is-number">{{fig.replication.scalar.s6.t16}}</td><td class="is-number">{{fig.replication.pedersen.s6.t16}}</td><td class="is-number">{{fig.replication.sha256.s6.t16}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> What statistics cannot see</h2>
+            <p>
+              The scalar variant passes every test of §4 as convincingly as SHA-256, and yet it is broken as a hash
+              function. Its digest is the <span data-tex>x</span>-coordinate of <span data-tex>k \cdot G</span>,
+              and two facts about the group give second preimages for free. First,
+              <span data-tex>(n - k) \cdot G = -(k \cdot G)</span> has the same <span data-tex>x</span>-coordinate,
+              so the message encoding <span data-tex>n - k</span> collides with the message encoding
+              <span data-tex>k</span>. Second, <span data-tex>n \cdot G = O</span>, so the message encoding
+              <span data-tex>k + n</span> collides as well. For the worked example of §3.1 the two colliding
+              messages are
+            </p>
+            <div class="worked">
+              <div><span class="caption">Negation message, 32 bytes, digest {{fig.demo.negationEqual}}</span><span class="worked__value">{{fig.demo.negationHex}}</span></div>
+              <div><span class="caption">Wrap message, 33 bytes, digest {{fig.demo.wrapEqual}}</span><span class="worked__value">{{fig.demo.wrapHex}}</span></div>
+            </div>
+            <p>
+              Both variants are also additively homomorphic: the point of the byte-wise sum of two messages is the
+              sum of their points, so a digest leaks relations between messages that a random oracle would hide.
+              None of these properties leaves a statistical trace in random samples, because the colliding messages
+              and the related messages are vanishingly rare among random inputs; they are found by algebra, not by
+              sampling. This is the central lesson of the exercise: statistical tests are necessary, since a hash
+              that fails them is certainly unfit, but they are never sufficient, since security is a statement about
+              every adversary and not about the average input; the NIST test suite says as much of itself
+              [<a href="#ref-92">92</a>].
+            </p>
+            <p>
+              The Pedersen variant repairs collision resistance, and the argument is short. A collision
+              <span data-tex>\sum_i b_i G_i = \sum_i b_i' G_i</span> between two distinct messages of the same length
+              gives <span data-tex>\sum_i (b_i - b_i') G_i = O</span>, a non-trivial linear relation among generators
+              whose mutual discrete logarithms are unknown; an adversary who finds collisions can therefore compute
+              discrete logarithms, which is the argument of Pedersen for the binding of his commitment
+              [<a href="#ref-86">86</a>], of Chaum, van Heijst and Pfitzmann for the first collision-free hash based on the
+              discrete logarithm [<a href="#ref-35">35</a>], and of Bellare and Micciancio for their incremental hash MuHASH, with a
+              loss of a factor two [<a href="#ref-10">10</a>]; the Zcash specification states it in one line, a collision
+              "trivially gives a discrete logarithm relation" [<a href="#ref-61">61</a>, §4.1.8]. The reduction holds for inputs
+              of a fixed length and requires generators derived without a known relation, hence the hash-to-curve
+              step; RFC 9380 declines to specify the try-and-increment method used here and marks it
+              "NOT RECOMMENDED", because its running time depends on the input and such methods "have been a
+              perennial cause of side-channel vulnerabilities" [<a href="#ref-52">52</a>, §1]; it is used knowingly, on public
+              inputs, for a toy. What the reduction does not give is pseudorandomness. The construction remains
+              additively homomorphic, a property Bellare and Micciancio present as the feature of incrementality;
+              they prove collision-freeness alone, in the random-oracle model for the inner function, and warn that
+              this is not standard provable security [<a href="#ref-10">10</a>]. The halo2 book makes the same point
+              about Zcash's Sinsemilla, which "is not designed to be used where a random oracle, PRF, or
+              preimage-resistant hash is required" [<a href="#ref-105">105</a>], and Bottinelli catalogues the practical pitfalls of
+              Pedersen hashes, among them keeping only the <span data-tex>x</span>-coordinate, which identifies
+              <span data-tex>P</span> with <span data-tex>-P</span> [<a href="#ref-23">23</a>]: here that cannot be exploited,
+              because negative byte values are not in the domain, but it halves the output space to
+              <span data-tex>(n - 1)/2</span> values and so lowers the birthday bound to about
+              <span data-tex>2^{127.5}</span>. ECOH, a SHA-3 candidate built entirely on elliptic-curve arithmetic
+              [<a href="#ref-27">27</a>], fell to a second-preimage attack costing <span data-tex>2^{143}</span> operations for its
+              256-bit version, far below the <span data-tex>2^{256}</span> of an ideal hash [<a href="#ref-60">60</a>]: algebraic
+              structure is a liability for a general-purpose hash. The production descendants of the toy are the
+              Pedersen hash of Zcash Sapling, on the Jubjub curve with 3-bit windows, and Sinsemilla, on the Pallas
+              curve with 10-bit chunks [<a href="#ref-61">61</a>, §5.4.1.7, §5.4.1.9], both specified as collision-resistant for
+              fixed-length inputs and for nothing else (§6.3).
+            </p>
+            <p>
+              The cost is the other difference. In the same environment the toy hash runs at about
+              <span class="tabular">{{fig.speed.scalar}}</span> digests per second for the scalar variant and
+              <span class="tabular">{{fig.speed.pedersen}}</span> for the Pedersen variant, against
+              <span class="tabular">{{fig.speed.sha256}}</span> for SHA-256, a factor of about
+              <span class="tabular">{{fig.speed.ratio}}</span>. A digest of a 32-byte message costs up to 32 point
+              additions and one inversion on 256-bit integers, each addition about a dozen modular multiplications
+              of 256-bit numbers, where SHA-256 processes the same message with 64 rounds of additions, rotations and
+              logical operations on 32-bit words. The gap is intrinsic to the arithmetic, not to the implementation,
+              and it is the reason the algebraic hashes of §6.3 are used only where their homomorphic structure buys
+              something, inside zero-knowledge circuits.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Cryptography and statistics in the most famous blockchains</h2>
+            <p>
+              Cryptography gives a blockchain its objects, hashes, signatures, commitments and proofs, and
+              statistics gives it its security arguments: proof of work is a race between Poisson processes, proof
+              of stake is a lottery, the privacy of a coin is judged by how well its decoys imitate real spending,
+              and the failures that have cost real money have often been failures of randomness. This section
+              surveys the systems most often described as the most famous, Bitcoin and Ethereum at length and then
+              Zcash, Monero, Algorand, Cardano and Solana, and closes with three themes that cut across them. Facts
+              are taken from the specifications, papers and announcements listed in the references; dates are those
+              of mainnet activations as recorded there, and estimates that differ between sources are reported with
+              both values.
+            </p>
+
+            <h3 id="s6-1">6.1 Bitcoin</h3>
+            <p>
+              Bitcoin's cryptography is a small set of primitives used with discipline. Transactions are authorised
+              by ECDSA signatures on secp256k1 [<a href="#ref-4">4</a>]; since the Taproot upgrade, which activated at block
+              height 709,632 on 14 November 2021 after a signalling period with a 90% miner threshold [<a href="#ref-102">102</a>],
+              outputs can also be spent with the Schnorr signatures of BIP 340, 64-byte signatures over 32-byte
+              x-only public keys whose linearity makes them easy to combine [<a href="#ref-101">101</a>]. On that linearity rest
+              MuSig2, a two-round multi-signature whose output is a single ordinary BIP 340 signature [<a href="#ref-78">78</a>], and
+              FROST, a two-round threshold Schnorr scheme standardised by the IRTF in 2024 with a secp256k1
+              ciphersuite [<a href="#ref-38">38</a>]. Hashing is SHA-256 applied twice, "double SHA-256", for block headers,
+              transaction identifiers and the Merkle tree that commits to the transactions of a block, and SHA-256
+              followed by RIPEMD-160 for addresses [<a href="#ref-15">15</a>, <a href="#ref-17">17</a>].
+            </p>
+            <p>
+              The statistical heart of the protocol is proof of work. A header is valid when its double SHA-256
+              hash, read as a 256-bit integer, is at or below a target encoded in the header [<a href="#ref-17">17</a>]. Each hash
+              attempt succeeds independently with the same small probability, so block discovery is, to a first
+              approximation, a Poisson process whose rate is the network hash rate divided by the difficulty, and
+              the times between blocks are exponential. Every 2016 blocks the target is rescaled by the ratio of the
+              time the last 2016 blocks actually took to the two weeks they should have taken at one block per 600
+              seconds, the ratio being clamped to the interval from one quarter to four [<a href="#ref-15">15</a>, <a href="#ref-16">16</a>].
+              Bowden and co-authors examined the arrival data and showed that a homogeneous Poisson process does not
+              fit them, and proposed a refined model that accounts for the periods of constant difficulty and for the
+              evolution of the difficulty over time [<a href="#ref-24">24</a>].
+            </p>
+            <p>
+              The race analysed in the original paper is the clearest example of statistics as a security argument
+              [<a href="#ref-77">77</a>, §11]: an attacker holding a fraction <span data-tex>q</span> of the hash rate, trying to
+              replace a transaction buried under <span data-tex>z</span> blocks, progresses as a Poisson variable
+              with mean <span data-tex>\lambda = z\,q/p</span> while the honest chain grows, and catches up from a
+              deficit of <span data-tex>d</span> blocks with probability <span data-tex>(q/p)^d</span>, as in the
+              gambler's ruin problem, giving
+            </p>
+            <div class="equation" id="eq-nakamoto">
+              <div data-tex-display>
+                P = 1 - \sum_{k=0}^{z} \frac{\lambda^k e^{-\lambda}}{k!} \Big( 1 - (q/p)^{z-k} \Big), \qquad p = 1 - q.
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              Figure 12 evaluates equation (4). With a tenth of the hash rate the attacker's chance falls below
+              {{fig.nakamoto.q10z6}} after {{fig.nakamoto.markZ}} confirmations, the depth conventionally treated as
+              final; with three tenths it is still {{fig.nakamoto.q30z6}} at the same depth and
+              {{fig.nakamoto.q30z20}} after twenty. Rosenfeld replaced the Poisson approximation by the exact
+              negative-binomial law of the attacker's progress and found the original table slightly optimistic: for
+              <span data-tex>q</span> = 10% the probability of success drops below 0.1% at six confirmations rather
+              than five [<a href="#ref-91">91</a>]; Grunspan and Pérez-Marco obtained a closed form through the regularised
+              incomplete beta function and proved that the probability decays exponentially in the number of
+              confirmations [<a href="#ref-59">59</a>]. Honest majority is not the only assumption at stake. Eyal and Sirer showed
+              that a miner who withholds blocks strategically earns more than its fair share as soon as its share
+              <span data-tex>\alpha</span> of the hash rate exceeds <span data-tex>(1 - \gamma)/(3 - 2\gamma)</span>,
+              where <span data-tex>\gamma</span> is the fraction of honest miners that build on the attacker's block
+              in a tie; the threshold is one third for <span data-tex>\gamma = 0</span>, vanishes for
+              <span data-tex>\gamma = 1</span>, and random tie-breaking restores it to one quarter [<a href="#ref-51">51</a>].
+            </p>
+
+            <figure class="chart-figure" aria-labelledby="fig12-title">
+              <div class="chart-figure__canvas"><!-- @figure id=nakamoto --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig12-title">
+                  <span class="pplot__fig-no">Figure 12.</span>Probability that an attacker overtakes the honest chain
+                </p>
+                <p>
+                  Each curve is equation (4) for an attacker holding the fraction <span data-tex>q</span> of the
+                  hash rate, against the number of confirmations <span data-tex>z</span>, on a logarithmic
+                  probability scale; the dotted ruling marks <span data-tex>z</span> = {{fig.nakamoto.markZ}}. At one
+                  confirmation the probabilities are {{fig.nakamoto.q10z1}}, {{fig.nakamoto.q20z1}},
+                  {{fig.nakamoto.q30z1}} and {{fig.nakamoto.q45z1}} for <span data-tex>q</span> = 0.1, 0.2, 0.3 and
+                  0.45.
+                </p>
+              </figcaption>
+            </figure>
+
+            <p>
+              Statistics has also been turned against Bitcoin's signatures. ECDSA needs a fresh, uniformly random
+              nonce for every signature: a repeated nonce reveals the private key outright, and a merely biased one
+              reveals it given enough signatures. In August 2013 Bitcoin.org warned that the Android component
+              responsible for secure random numbers "contains critical weaknesses" that rendered all Android wallets
+              generated to date vulnerable to theft, and asked users to rotate their keys [<a href="#ref-19">19</a>]; Google
+              traced the flaw to improper initialisation of the platform's pseudorandom generator [<a href="#ref-64">64</a>].
+              Brengel and Rossow later scanned the blockchain for repeated nonces and found that attackers had
+              exploited them to take 412.80 BTC [<a href="#ref-26">26</a>], and Breitner and Heninger, with lattice algorithms for
+              the hidden number problem, computed hundreds of Bitcoin private keys from signatures whose nonces were
+              merely non-uniform [<a href="#ref-25">25</a>]. The standard remedy is to derive the nonce deterministically from the
+              key and the message, as RFC 6979 specifies, since "even slight biases in that process may be turned
+              into attacks on the signature schemes" [<a href="#ref-88">88</a>]; BIP 340 goes further with synthetic nonces that
+              combine the deterministic derivation with auxiliary randomness [<a href="#ref-101">101</a>].
+            </p>
+            <p>
+              Statistics is, finally, the instrument of forensic analysis. Meiklejohn and co-authors clustered
+              12,056,684 public keys into 3,384,179 clusters with two heuristics, that the inputs of a transaction
+              are controlled by one user and that change addresses can be recognised, and attached names to 2,197
+              clusters by transacting with services [<a href="#ref-68">68</a>]. Vičič and Tošić tested the first digits of
+              transaction values against Benford's law and found that the aggregated values of the well-known
+              projects conform to it, while most of the non-conforming coins had documented anomalous incidents
+              [<a href="#ref-99">99</a>].
+            </p>
+
+            <h3 id="s6-2">6.2 Ethereum</h3>
+            <p>
+              Ethereum shares Bitcoin's curve but not its hash: an account is identified by the last 20 bytes of the
+              Keccak-256 hash of the secp256k1 public key [<a href="#ref-48">48</a>]. Keccak-256 is the function submitted to
+              the SHA-3 competition; the standardised SHA3-256 of FIPS 202 differs from it only by a two-bit
+              domain-separation suffix appended to the message before padding [<a href="#ref-79">79</a>, §6.1], which is why the two
+              give different digests for the same input. Since the Merge, executed on 15 September 2022, Ethereum has
+              been secured by proof of stake [<a href="#ref-49">49</a>]: validators who have deposited stake are chosen to propose and
+              attest blocks under Gasper, which combines the finality gadget Casper FFG with the fork-choice rule
+              LMD GHOST [<a href="#ref-31">31</a>]. Attestations are BLS signatures [<a href="#ref-20">20</a>] on the pairing-friendly curve BLS12-381
+              [<a href="#ref-43">43</a>]; because BLS signatures can be aggregated, the thousands of attestations of a slot are
+              verified as one.
+            </p>
+            <p>
+              Proof of stake replaces a race by a lottery, and a lottery needs randomness that no participant can
+              steer. Ethereum's source is RANDAO: each proposer reveals a BLS signature over the epoch number, which
+              is deterministic and therefore unpredictable only to others, and the beacon state mixes its hash into a
+              running value by exclusive or [<a href="#ref-43">43</a>]. A proposer in the last slot of an epoch can withhold its
+              block and thereby choose between two mixes, "one bit of influence"; <span data-tex>k</span> consecutive
+              end-of-epoch proposers choose among <span data-tex>2^k</span> [<a href="#ref-41">41</a>]. Alpturer and Weinberg
+              computed the optimal strategy and found the gain small: a strategic participant with 5% of the stake
+              can propose 5.048% of the blocks, and one with 20% can propose 20.68% [<a href="#ref-3">3</a>]. The randomness
+              drives the committee shuffle: validators are assigned to committees of target size 128 by a
+              swap-or-not shuffle, a size chosen so that the probability of an adversary holding a third of the stake
+              capturing two thirds of a committee, a binomial tail, falls below <span data-tex>2^{-40}</span>
+              [<a href="#ref-41">41</a>, <a href="#ref-43">43</a>].
+            </p>
+            <p>
+              Data availability is the other place where Ethereum reasons probabilistically. EIP-4844, activated in
+              the Dencun upgrade on 13 March 2024 [<a href="#ref-45">45</a>], introduced blob transactions: 4096 field elements of 32
+              bytes each, committed with the polynomial commitments of Kate, Zaverucha and Goldberg [<a href="#ref-30">30</a>, <a href="#ref-62">62</a>], whose trusted setup was produced by a ceremony of 141,416 contributions over 208 days and
+              is secure as long as a single participant was honest [<a href="#ref-44">44</a>]. Blobs are meant to be sampled,
+              not downloaded. Al-Bassam, Sonnino and Buterin showed that if a block of
+              <span data-tex>k \times k</span> shares is extended by a Reed–Solomon code to
+              <span data-tex>2k \times 2k</span>, withholding it requires hiding at least
+              <span data-tex>(k + 1)^2</span> shares, so that a client sampling <span data-tex>s</span> shares at
+              random misses the withholding with probability at most about <span data-tex>(3/4)^s</span>
+              [<a href="#ref-1">1</a>]. PeerDAS, specified in EIP-7594 and activated in the Fusaka upgrade on 3 December 2025,
+              implements this with nodes that each custody a few of 128 columns and sample eight per slot, so that
+              with ten thousand nodes the probability that a withheld blob is accepted as available by even 2% of
+              them is bounded by about <span data-tex>10^{-20}</span> [<a href="#ref-46">46</a>, <a href="#ref-93">93</a>].
+            </p>
+            <p>
+              Much of Ethereum's computation now happens in rollups that post succinct proofs: Groth16, a
+              pairing-based SNARK with three-element proofs [<a href="#ref-58">58</a>]; PLONK, a universal SNARK with one setup for
+              all circuits [<a href="#ref-53">53</a>]; and STARKs, which need no trusted setup and rest on the FRI proximity test for
+              Reed–Solomon codes [<a href="#ref-11">11</a>, <a href="#ref-12">12</a>]. The same concern now shapes the state tree. Verkle trees,
+              vector-commitment trees with very short proofs, were the planned replacement for the hexary
+              Merkle–Patricia trie, but EIP-7864 proposes instead a binary tree over a hash function, because the
+              Verkle design "relies on elliptic curves that aren't post-quantum secure" [<a href="#ref-29">29</a>]; the Foundation's
+              post-quantum roadmap plans to replace BLS validator signatures by the hash-based leanXMSS and states
+              that the layer-1 upgrades could be completed by 2029 [<a href="#ref-47">47</a>, <a href="#ref-50">50</a>].
+            </p>
+
+            <h3 id="s6-3">6.3 Zcash</h3>
+            <p>
+              Zcash is the closest relative of the toy of §3. Its shielded transactions prove, in zero knowledge, that
+              a spend is valid without revealing sender, receiver or amount. Sapling, activated at block 419,200 on
+              29 October 2018, used Groth16 proofs over BLS12-381 [<a href="#ref-61">61</a>, <a href="#ref-104">104</a>, <a href="#ref-106">106</a>]; NU5,
+              activated at height 1,687,104 on 31 May 2022, introduced the Orchard protocol with the Halo 2 proving
+              system, which needs no trusted setup [<a href="#ref-42">42</a>, <a href="#ref-107">107</a>]. Inside those circuits ordinary hash
+              functions are expensive, so Zcash uses algebraic ones. The Sapling Pedersen hash is a sum of points of
+              the Jubjub curve indexed by 3-bit windows of the message, "an algebraic hash function with collision
+              resistance (for fixed input length) derived from assumed hardness of the Discrete Logarithm Problem on
+              the Jubjub curve", built on the work of Chaum, van Heijst and Pfitzmann among others
+              [<a href="#ref-61">61</a>, §5.4.1.7]; Orchard's Sinsemilla does the same on the Pallas curve with 10-bit chunks drawn
+              from a table of 1024 precomputed generators, so as to exploit the lookup arguments of Halo 2
+              [<a href="#ref-61">61</a>, §5.4.1.9]. The specification names the only property claimed, collision resistance
+              between inputs of fixed length, and adds that "no other security properties commonly associated with
+              hash functions are needed"; the halo2 book is blunter: Sinsemilla "is not designed to be used where a
+              random oracle, PRF, or preimage-resistant hash is required" [<a href="#ref-105">105</a>]. The Pedersen variant of §3 is
+              this construction with 8-bit chunks on secp256k1, and §5 is the reason for the caveat.
+            </p>
+
+            <h3 id="s6-4">6.4 Monero</h3>
+            <p>
+              Monero hides the sender with ring signatures: an input is signed by one of a ring of possible outputs,
+              the real one and a number of decoys, and a key image prevents double spending without revealing which
+              member signed. The scheme descends from the one-time ring signatures of the CryptoNote protocol
+              [<a href="#ref-98">98</a>]; amounts were hidden from January 2017 by Ring Confidential Transactions, which embed
+              Pedersen commitments in the ring signature [<a href="#ref-84">84</a>], with range proofs given since October 2018 by
+              Bulletproofs, whose size grows only logarithmically in the number of bits proved [<a href="#ref-28">28</a>, <a href="#ref-71">71</a>]. The upgrade of August 2022, at block 2,688,888, adopted the shorter Bulletproofs+
+              and raised the ring size from 11 to 16 [<a href="#ref-37">37</a>, <a href="#ref-72">72</a>], and the ring signature in
+              use is CLSAG, a concise linkable ring signature with smaller signatures than its predecessor
+              [<a href="#ref-57">57</a>].
+            </p>
+            <p>
+              Whether the decoys hide anything is a statistical question, and it was answered empirically. Möser
+              and co-authors found that about 62% of the inputs with one or more decoys before RingCT could be
+              traced by "chain-reaction" elimination, because decoys provably spent elsewhere could be excluded, and
+              that the real input could be guessed with 80% accuracy as simply the newest member of the ring, since
+              decoys were drawn from a distribution unlike that of real spending [<a href="#ref-76">76</a>]. They fitted the age of
+              spent outputs, on a logarithmic time scale, with a gamma distribution of shape 19.28 and rate 1.61 and
+              proposed sampling decoys from it; Monero adopted the gamma sampler in version 0.13.0 in October 2018
+              [<a href="#ref-71">71</a>], and a post-mortem published in 2023 documented an off-by-one error that had prevented
+              the sampler from ever choosing an output exactly ten blocks old, a statistical fingerprint in its own
+              right [<a href="#ref-73">73</a>]. The next step, Full-Chain Membership Proofs, replaces the ring of 16 by a proof
+              that the spent output is any output on the chain [<a href="#ref-85">85</a>]; as of October 2026 it is being exercised on
+              a beta stress-test network, with no mainnet date announced [<a href="#ref-74">74</a>].
+            </p>
+
+            <h3 id="s6-5">6.5 Algorand and Cardano</h3>
+            <p>
+              Proof-of-stake protocols that elect leaders privately rely on verifiable random functions, "the
+              public key version of a keyed cryptographic hash" in the words of RFC 9381: the holder of a secret key
+              evaluates a pseudorandom function on an input and produces a proof that anyone can check against the
+              public key [<a href="#ref-56">56</a>]. Algorand selects its committees by cryptographic sortition. Every unit of
+              stake is a sub-user selected with probability <span data-tex>p = \tau / W</span>, where
+              <span data-tex>\tau</span> is the expected committee size and <span data-tex>W</span> the total stake,
+              and a user who owns <span data-tex>w</span> units learns from the VRF output how many of them were
+              selected, a number distributed as <span data-tex>B(k; w, p)</span>, the binomial law; because the
+              binomial law is additive in its weight, splitting stake among Sybil identities does not change the
+              expected number of seats [<a href="#ref-55">55</a>]. Cardano's Ouroboros, the first proof-of-stake protocol with a
+              rigorous security proof [<a href="#ref-63">63</a>], became Ouroboros Praos, in which each slot's leader is decided
+              privately by comparing a VRF output with a threshold: a stakeholder with relative stake
+              <span data-tex>\alpha</span> leads a slot with probability
+              <span data-tex>\varphi_f(\alpha) = 1 - (1 - f)^{\alpha}</span>, where <span data-tex>f</span> is the
+              active slots coefficient, and this function has the "independent aggregation" property
+              <span data-tex>1 - \varphi(\sum_i \alpha_i) = \prod_i (1 - \varphi(\alpha_i))</span>, so that the chance
+              of election does not depend on whether stake is held as one party or as many [<a href="#ref-39">39</a>]. On the
+              Cardano mainnet <span data-tex>f</span> = 0.05 with one-second slots [<a href="#ref-32">32</a>]: a slot is
+              active with probability one twentieth, one block every twenty seconds on average, and a pool with
+              stake <span data-tex>\alpha</span> is elected with probability <span data-tex>1 - 0.95^{\alpha}</span>
+              per slot.
+            </p>
+
+            <h3 id="s6-6">6.6 Solana</h3>
+            <p>
+              Solana's distinctive primitive is Proof of History, a clock made of hashing: a single core runs
+              SHA-256 in sequence, each output the next input, recording the output and the count at intervals, so
+              that the length of the chain is a verifiable lower bound on the time elapsed and the verification can
+              be run in parallel [<a href="#ref-103">103</a>]. It is a delay function in the informal sense, built from a sequential
+              hash rather than from the algebraic constructions of §6.7, and the order it imposes on events is used
+              before consensus is reached. Votes are cast under Tower BFT, in which a validator's successive votes
+              carry exponentially growing lockouts, so that reverting an old vote becomes prohibitively expensive
+              [<a href="#ref-5">5</a>]; transactions are signed with Ed25519, 64 bytes per signer [<a href="#ref-96">96</a>].
+            </p>
+
+            <h3 id="s6-7">6.7 Cross-cutting themes</h3>
+            <p>
+              <strong>Randomness as a shared resource.</strong> Leader election, committee sampling and the
+              lotteries of §6.5 are fair only if their seed cannot be biased. Commit-and-reveal schemes such as
+              RANDAO leave the last revealer a choice, quantified above; two constructions remove it. In a threshold
+              beacon such as drand, <span data-tex>n</span> nodes jointly hold a BLS key on BLS12-381, with threshold
+              <span data-tex>t = f + 1</span> for at most <span data-tex>f</span> faulty nodes, and sign each round
+              number; because a BLS signature is unique, the output of a round is fixed once <span data-tex>t</span>
+              shares exist and no smaller group can predict it [<a href="#ref-40">40</a>]. A verifiable delay function, as defined by
+              Boneh, Bonneau, Bünz and Fisch, needs a prescribed number of sequential steps to evaluate and yet
+              yields a unique output that is quickly verifiable, so that a seed committed before the delay cannot be
+              adjusted to its outcome [<a href="#ref-21">21</a>]. Hashing to a curve, which the toy of §3 did by trial and error, is
+              standardised for these systems: RFC 9380 specifies constant-time maps for BLS12-381 and secp256k1 and
+              marks try-and-increment as not recommended [<a href="#ref-52">52</a>].
+            </p>
+            <p>
+              <strong>The post-quantum transition.</strong> Every signature in this survey, ECDSA and Schnorr on
+              secp256k1, Ed25519, BLS and the VRFs, rests on a discrete logarithm, and Shor's algorithm computes
+              discrete logarithms in polynomial time on a quantum computer [<a href="#ref-94">94</a>]. NIST published the first
+              post-quantum standards on 13 August 2024, ML-KEM for key establishment and ML-DSA and SLH-DSA for
+              signatures [<a href="#ref-80">80</a>, <a href="#ref-81">81</a>, <a href="#ref-82">82</a>], selected the code-based HQC for a further
+              encryption standard in March 2025 [<a href="#ref-83">83</a>], and in a draft transition plan proposed that ECDSA, EdDSA
+              and RSA be deprecated after 2030 at 112 bits of security and disallowed after 2035 at every strength
+              [<a href="#ref-75">75</a>]. The resource estimates have fallen quickly. Roetteler and co-authors put Shor's algorithm
+              for a 256-bit curve at 2,330 logical qubits in 2017 [<a href="#ref-89">89</a>]; Chevignard, Fouque and
+              Schrottenloher reduced the count to 1,193 in 2026 [<a href="#ref-36">36</a>]; and Babbush and co-authors, in a
+              paper by Google Quantum AI, the Ethereum Foundation and Stanford, estimated in March 2026 that the
+              256-bit ECDLP runs with fewer than 1,200 logical qubits and 90 million Toffoli gates, on fewer than
+              half a million physical qubits at an error rate of one in a thousand, in about nine minutes
+              [<a href="#ref-6">6</a>]. By comparison, Gidney's 2025 estimate for RSA-2048 is under a week on fewer than a
+              million noisy qubits [<a href="#ref-54">54</a>]. The exposure is measurable on chain: about 1.7 million bitcoin lie in
+              outputs that publish their public key directly, and about 6.9 million in all once reused addresses
+              are counted [<a href="#ref-6">6</a>], where an earlier Deloitte analysis had counted over 4 million, about a
+              quarter of the supply [<a href="#ref-7">7</a>]. Bitcoin's response is BIP 360, a draft soft fork for a new output
+              type, Pay-to-Merkle-Root, with the post-quantum signature algorithms themselves deferred to a later
+              proposal [<a href="#ref-8">8</a>]; Ethereum's is the roadmap of §6.2 [<a href="#ref-47">47</a>]; Algorand already signs its state
+              proofs with the lattice-based Falcon scheme [<a href="#ref-2">2</a>].
+            </p>
+            <p>
+              <strong>Statistics as a weapon.</strong> The thread that runs through this survey is that the quality
+              of randomness is at once a security assumption and an attack surface. The Android generator of 2013
+              and the biased nonces of 2019 broke signatures that were mathematically sound; Monero's decoys were
+              defeated by an age distribution; RANDAO's bias is a few hundredths of a percentage point that an
+              adversary can nevertheless compute and collect; and the toy hash of §3 passes every statistical test
+              while admitting collisions by algebra. The tests of §4 are therefore necessary and never sufficient,
+              exactly as the NIST suite says of itself [<a href="#ref-92">92</a>], and the designers of the systems above have
+              increasingly replaced "random enough" by "unique and verifiable": deterministic nonces, threshold
+              signatures, verifiable random functions and delay functions.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Conclusion</h2>
+            <p>
+              The question of §1 has two answers. Statistically, a hash built from secp256k1 arithmetic is
+              indistinguishable, in these experiments, from an ideal hash. Over {{fig.params.n}} digests its bit
+              frequencies, byte frequencies, Hamming weights, runs and adjacent-bit correlations agree with the
+              hypothesis of independent fair bits as closely as those of SHA-256; one flipped input bit changes
+              {{fig.avalanche.scalar.mean}} output bits on average, against 128 expected; every cell of the
+              strict-avalanche matrix is consistent with one half; and truncated digests collide at the birthday
+              rate. The 21 p-values of Table 2 contain a single value below 0.05, which Table 3 shows not to
+              replicate. Cryptographically, the scalar variant is nonetheless broken by construction: the negation
+              and wrap-around symmetries of the group give a second preimage for every message at no cost, and the
+              additive homomorphism leaks relations between messages. The Pedersen variant repairs collision
+              resistance by a reduction to the discrete logarithm but remains homomorphic, which is why its
+              production descendants in Zcash are specified for collision resistance alone.
+            </p>
+            <p>
+              Statistical tests are thus necessary, since a function that fails them is unfit, but never
+              sufficient, since they sample the average input and security is a statement about the input an
+              adversary chooses. The same lesson organises the survey: the blockchains use statistics to argue
+              security, from Nakamoto's Poisson race to Algorand's binomial sortition and Ethereum's sampled
+              availability, and they have been attacked through statistics, from biased nonces to distinguishable
+              decoys. The direction of the last decade is to replace randomness that must be trusted by randomness
+              that can be verified, and signatures whose security rests on the discrete logarithm by signatures that
+              will survive a quantum computer.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure is computed at build time from the seeds printed in its caption and can be recomputed by
+              anyone from the repository: <code>npm test</code> runs the test suite, including the published test
+              vectors of secp256k1 and SHA-256 and the NIST worked examples, and <code>npm run build</code> rebuilds
+              the page, recomputing the experiments in about {{fig.params.computeSeconds}} seconds (last computed
+              {{fig.params.computedAt}}); the results are cached under <code>node_modules/.cache/hw01/</code> under a
+              key derived from the parameters and the source of the libraries, so that a change to either recomputes
+              everything. The pools of §4 use the seeds {{fig.params.seedPool}} (frequency, weight, runs and
+              collision tests), {{fig.params.seedAvalanche}} (avalanche pairs) and {{fig.params.seedSac}}
+              (strict-avalanche matrix), and the small-curve experiment of Figure 11 the seed
+              {{fig.params.seedEcdlp}}; these seeds were fixed before any result was seen and none was changed
+              afterwards. The replication of Table 3, with the seeds {{fig.params.replicationSeeds}}, was designed
+              after the Pedersen Hamming-weight p-value of {{fig.hammingWeight.pedersen.p}} had been observed, as a
+              post hoc check of that single result; its seeds were chosen before the replication was run and none was
+              changed afterwards. An earlier exploratory rerun at <span data-tex>n = 3000</span> and a scratch run on
+              20 seeds, neither of which is published, also showed no recurrence. The browser controls redraw figures on fresh seeds at
+              reduced sample sizes and report the seed used, so that a reader can check for themselves that the one
+              small p-value of Table 2 does not recur. With 21 tests at the 5% level about one rejection is expected
+              under the null hypothesis; the reading of §4.8 follows that arithmetic rather than any single value.
+            </p>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/secp256k1.js">src/lib/secp256k1.js</a>: field and curve arithmetic from the definitions.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/ec-hash.js">src/lib/ec-hash.js</a>: the toy hash, its two generator families and the structural collisions.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/sha256.js">src/lib/sha256.js</a>: SHA-256 from FIPS 180-4.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/stats.js">src/lib/stats.js</a>: chi-square, binomial, the NIST frequency and runs tests, the birthday bound and equation (4).</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/ec-hash-study.js">src/lib/ec-hash-study.js</a>: the experiments of §4.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/01/figures.js">homework/01/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number. Living documents
+              (specifications, source code, web pages) carry the date on which they were read; all were read on
+              8 October 2026.
+            </p>
+            <ol>
+              <li id="ref-1">Al-Bassam, M., Sonnino, A. and Buterin, V. (2018). <cite>Fraud and Data Availability Proofs: Maximising Light Client Security and Scaling Blockchains with Dishonest Majorities</cite>. arXiv:1809.09044. <a class="ref-link" href="https://arxiv.org/abs/1809.09044">https://arxiv.org/abs/1809.09044</a></li>
+              <li id="ref-2">Algorand Developer Portal. <cite>State Proofs</cite>. <a class="ref-link" href="https://dev.algorand.co/concepts/protocol/state-proofs/">https://dev.algorand.co/concepts/protocol/state-proofs/</a> (accessed 8 October 2026)</li>
+              <li id="ref-3">Alpturer, K. and Weinberg, S. M. (2024). <cite>Optimal RANDAO Manipulation in Ethereum</cite>. 6th Conference on Advances in Financial Technologies (AFT 2024), LIPIcs 316, article 10. <a class="ref-link" href="https://doi.org/10.4230/LIPIcs.AFT.2024.10">https://doi.org/10.4230/LIPIcs.AFT.2024.10</a></li>
+              <li id="ref-4">Antonopoulos, A. M. and Harding, D. A. (2023). <cite>Mastering Bitcoin: Programming the Open Blockchain</cite>, 3rd ed., chapter 4, "Keys and Addresses". O'Reilly Media. Open-source text: <a class="ref-link" href="https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch04_keys.adoc">https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch04_keys.adoc</a> (accessed 8 October 2026)</li>
+              <li id="ref-5">Anza. <cite>Tower BFT</cite>. Solana validator documentation, implemented proposals. <a class="ref-link" href="https://docs.anza.xyz/implemented-proposals/tower-bft">https://docs.anza.xyz/implemented-proposals/tower-bft</a> (accessed 8 October 2026)</li>
+              <li id="ref-6">Babbush, R., Zalcman, A., Gidney, C., Broughton, M., Khattar, T., Neven, H., Bergamaschi, T., Drake, J. and Boneh, D. (2026). <cite>Securing Elliptic Curve Cryptocurrencies against Quantum Vulnerabilities: Resource Estimates and Mitigations</cite>. arXiv:2603.28846, v2 of 15 April 2026. <a class="ref-link" href="https://arxiv.org/abs/2603.28846">https://arxiv.org/abs/2603.28846</a></li>
+              <li id="ref-7">Barmes, I., Bosch, B. and Haalstra, O. (n.d.). <cite>Quantum computers and the Bitcoin blockchain</cite>. Deloitte Netherlands. <a class="ref-link" href="https://www.deloitte.com/nl/en/services/risk-advisory/perspectives/quantum-computers-and-the-bitcoin-blockchain.html">https://www.deloitte.com/nl/en/services/risk-advisory/perspectives/quantum-computers-and-the-bitcoin-blockchain.html</a> (undated page; accessed 8 October 2026)</li>
+              <li id="ref-8">Beast, H., Heilman, E. and Foxen Duke, I. <cite>BIP 360: Pay-to-Merkle-Root (P2MR)</cite>. Bitcoin Improvement Proposal, status Draft. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0360.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0360.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-9">Bellare, M. and Rogaway, P. (1993). <cite>Random oracles are practical: a paradigm for designing efficient protocols</cite>. Proceedings of the 1st ACM Conference on Computer and Communications Security (CCS '93), pp. 62–73. <a class="ref-link" href="https://doi.org/10.1145/168588.168596">https://doi.org/10.1145/168588.168596</a></li>
+              <li id="ref-10">Bellare, M. and Micciancio, D. (1997). <cite>A New Paradigm for Collision-free Hashing: Incrementality at Reduced Cost</cite>. Advances in Cryptology, EUROCRYPT '97, LNCS 1233, pp. 163–192. <a class="ref-link" href="https://doi.org/10.1007/3-540-69053-0_13">https://doi.org/10.1007/3-540-69053-0_13</a>; full version <a class="ref-link" href="https://cseweb.ucsd.edu/~mihir/papers/inchash.pdf">https://cseweb.ucsd.edu/~mihir/papers/inchash.pdf</a></li>
+              <li id="ref-11">Ben-Sasson, E., Bentov, I., Horesh, Y. and Riabzev, M. (2018a). <cite>Scalable, transparent, and post-quantum secure computational integrity</cite>. Cryptology ePrint Archive, paper 2018/046. <a class="ref-link" href="https://eprint.iacr.org/2018/046">https://eprint.iacr.org/2018/046</a></li>
+              <li id="ref-12">Ben-Sasson, E., Bentov, I., Horesh, Y. and Riabzev, M. (2018b). <cite>Fast Reed–Solomon Interactive Oracle Proofs of Proximity</cite>. 45th International Colloquium on Automata, Languages and Programming (ICALP 2018), LIPIcs, article 14. <a class="ref-link" href="https://doi.org/10.4230/LIPIcs.ICALP.2018.14">https://doi.org/10.4230/LIPIcs.ICALP.2018.14</a></li>
+              <li id="ref-13">Bernstein, D. J., Engels, S., Lange, T., Niederhagen, R., Paar, C., Schwabe, P. and Zimmermann, R. (2016). <cite>Faster elliptic-curve discrete logarithms on FPGAs</cite>. Cryptology ePrint Archive, paper 2016/382. <a class="ref-link" href="https://eprint.iacr.org/2016/382">https://eprint.iacr.org/2016/382</a></li>
+              <li id="ref-14">Bernstein, D. J. and Lange, T. <cite>SafeCurves: choosing safe curves for elliptic-curve cryptography</cite>, version 2017.01.22. <a class="ref-link" href="https://safecurves.cr.yp.to">https://safecurves.cr.yp.to</a> (accessed 8 October 2026)</li>
+              <li id="ref-15">Bitcoin Core (2026). Source code, master branch: <cite>src/pow.cpp</cite>, <cite>src/consensus/params.h</cite>, <cite>src/kernel/chainparams.cpp</cite>, <cite>src/hash.h</cite>. <a class="ref-link" href="https://github.com/bitcoin/bitcoin/blob/master/src/pow.cpp">https://github.com/bitcoin/bitcoin/blob/master/src/pow.cpp</a> (accessed 8 October 2026)</li>
+              <li id="ref-16">Bitcoin Project. <cite>Bitcoin Developer Guide: Block Chain</cite>. <a class="ref-link" href="https://developer.bitcoin.org/devguide/block_chain.html">https://developer.bitcoin.org/devguide/block_chain.html</a> (accessed 8 October 2026)</li>
+              <li id="ref-17">Bitcoin Project. <cite>Bitcoin Developer Reference: Block Chain</cite>. <a class="ref-link" href="https://developer.bitcoin.org/reference/block_chain.html">https://developer.bitcoin.org/reference/block_chain.html</a> (accessed 8 October 2026)</li>
+              <li id="ref-18">Bitcoin Wiki. <cite>Secp256k1</cite>. <a class="ref-link" href="https://en.bitcoin.it/wiki/Secp256k1">https://en.bitcoin.it/wiki/Secp256k1</a> (last edited 14 December 2025; accessed 8 October 2026)</li>
+              <li id="ref-19">Bitcoin.org (2013). <cite>Android Security Vulnerability</cite>. Alert of 11 August 2013. <a class="ref-link" href="https://bitcoin.org/en/alert/2013-08-11-android">https://bitcoin.org/en/alert/2013-08-11-android</a></li>
+              <li id="ref-20">Boneh, D., Lynn, B. and Shacham, H. (2001). <cite>Short signatures from the Weil pairing</cite>. Advances in Cryptology, ASIACRYPT 2001, LNCS, pp. 514–532. <a class="ref-link" href="https://doi.org/10.1007/3-540-45682-1_30">https://doi.org/10.1007/3-540-45682-1_30</a></li>
+              <li id="ref-21">Boneh, D., Bonneau, J., Bünz, B. and Fisch, B. (2018). <cite>Verifiable Delay Functions</cite>. Advances in Cryptology, CRYPTO 2018. Cryptology ePrint Archive, paper 2018/601. <a class="ref-link" href="https://eprint.iacr.org/2018/601">https://eprint.iacr.org/2018/601</a></li>
+              <li id="ref-22">Bos, J. W., Kaihara, M. E., Kleinjung, T., Lenstra, A. K. and Montgomery, P. L. (2012). <cite>Solving a 112-bit prime elliptic curve discrete logarithm problem on game consoles using sloppy reduction</cite>. International Journal of Applied Cryptography 2(3), 212–228. <a class="ref-link" href="https://doi.org/10.1504/IJACT.2012.045590">https://doi.org/10.1504/IJACT.2012.045590</a></li>
+              <li id="ref-23">Bottinelli, P. (2023). <cite>Breaking Pedersen Hashes in Practice</cite>. NCC Group Research Blog, 22 March 2023. <a class="ref-link" href="https://www.nccgroup.com/us/research-blog/breaking-pedersen-hashes-in-practice/">https://www.nccgroup.com/us/research-blog/breaking-pedersen-hashes-in-practice/</a></li>
+              <li id="ref-24">Bowden, R., Keeler, H. P., Krzesinski, A. E. and Taylor, P. G. (2020). <cite>Modeling and analysis of block arrival times in the Bitcoin blockchain</cite>. Stochastic Models 36(4), 602–637. <a class="ref-link" href="https://doi.org/10.1080/15326349.2020.1786404">https://doi.org/10.1080/15326349.2020.1786404</a>; preprint <cite>Block arrivals in the Bitcoin blockchain</cite>, arXiv:1801.07447 (2018), <a class="ref-link" href="https://arxiv.org/abs/1801.07447">https://arxiv.org/abs/1801.07447</a></li>
+              <li id="ref-25">Breitner, J. and Heninger, N. (2019). <cite>Biased Nonce Sense: Lattice Attacks against Weak ECDSA Signatures in Cryptocurrencies</cite>. Financial Cryptography and Data Security (FC 2019), LNCS, pp. 3–20. <a class="ref-link" href="https://doi.org/10.1007/978-3-030-32101-7_1">https://doi.org/10.1007/978-3-030-32101-7_1</a>; Cryptology ePrint Archive, paper 2019/023, <a class="ref-link" href="https://eprint.iacr.org/2019/023">https://eprint.iacr.org/2019/023</a></li>
+              <li id="ref-26">Brengel, M. and Rossow, C. (2018). <cite>Identifying Key Leakage of Bitcoin Users</cite>. Research in Attacks, Intrusions, and Defenses (RAID 2018). <a class="ref-link" href="https://christian-rossow.de/publications/btcsteal-raid2018.pdf">https://christian-rossow.de/publications/btcsteal-raid2018.pdf</a></li>
+              <li id="ref-27">Brown, D. R. L., Antipa, A., Campagna, M. and Struik, R. (2008). <cite>ECOH: the Elliptic Curve Only Hash</cite>. Submission to the NIST SHA-3 competition, catalogued with its cryptanalysis by the ECRYPT eHash project. <a class="ref-link" href="https://ehash.isec.tugraz.at/wiki/ECOH.html">https://ehash.isec.tugraz.at/wiki/ECOH.html</a> (accessed 8 October 2026)</li>
+              <li id="ref-28">Bünz, B., Bootle, J., Boneh, D., Poelstra, A., Wuille, P. and Maxwell, G. (2018). <cite>Bulletproofs: Short Proofs for Confidential Transactions and More</cite>. 39th IEEE Symposium on Security and Privacy. Cryptology ePrint Archive, paper 2017/1066. <a class="ref-link" href="https://eprint.iacr.org/2017/1066">https://eprint.iacr.org/2017/1066</a></li>
+              <li id="ref-29">Buterin, V., Ballet, G., Feist, D., Hagopian, I., Wedderburn, K., Jasoria, T., Singh, G., Ferrin, D., Merriam, P. and Herold, G. <cite>EIP-7864: Ethereum state using a unified binary tree</cite>. Ethereum Improvement Proposal, status Draft, created 20 January 2025. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-7864">https://eips.ethereum.org/EIPS/eip-7864</a> (accessed 8 October 2026)</li>
+              <li id="ref-30">Buterin, V., Feist, D., Loerakker, D., Kadianakis, G., Garnett, M., Taiwo, M. and Dietrichs, A. <cite>EIP-4844: Shard Blob Transactions</cite>. Ethereum Improvement Proposal, status Final, created 25 February 2022. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-4844">https://eips.ethereum.org/EIPS/eip-4844</a> (accessed 8 October 2026)</li>
+              <li id="ref-31">Buterin, V., Hernandez, D., Kamphefner, T., Pham, K., Qiao, Z., Ryan, D., Sin, J., Wang, Y. and Zhang, Y. X. (2020). <cite>Combining GHOST and Casper</cite>. arXiv:2003.03052. <a class="ref-link" href="https://arxiv.org/abs/2003.03052">https://arxiv.org/abs/2003.03052</a></li>
+              <li id="ref-32">Cardano (Input Output). <cite>Shelley genesis file, mainnet</cite>. <a class="ref-link" href="https://book.world.dev.cardano.org/environments/mainnet/shelley-genesis.json">https://book.world.dev.cardano.org/environments/mainnet/shelley-genesis.json</a> (accessed 8 October 2026)</li>
+              <li id="ref-33">Certicom Research (2009). <cite>SEC 1: Elliptic Curve Cryptography</cite>, version 2.0. Standards for Efficient Cryptography Group. <a class="ref-link" href="https://www.secg.org/sec1-v2.pdf">https://www.secg.org/sec1-v2.pdf</a></li>
+              <li id="ref-34">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>, version 2.0. Standards for Efficient Cryptography Group. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a></li>
+              <li id="ref-35">Chaum, D., van Heijst, E. and Pfitzmann, B. (1992). <cite>Cryptographically Strong Undeniable Signatures, Unconditionally Secure for the Signer</cite>. Advances in Cryptology, CRYPTO '91, LNCS 576, pp. 470–484. <a class="ref-link" href="https://doi.org/10.1007/3-540-46766-1_38">https://doi.org/10.1007/3-540-46766-1_38</a></li>
+              <li id="ref-36">Chevignard, C., Fouque, P.-A. and Schrottenloher, A. (2026). <cite>Reducing the Number of Qubits in Quantum Discrete Logarithms on Elliptic Curves</cite>. Advances in Cryptology, EUROCRYPT 2026. Cryptology ePrint Archive, paper 2026/280. <a class="ref-link" href="https://eprint.iacr.org/2026/280">https://eprint.iacr.org/2026/280</a></li>
+              <li id="ref-37">Chung, H., Han, K., Ju, C., Kim, M. and Seo, J. H. (2020). <cite>Bulletproofs+: Shorter Proofs for Privacy-Enhanced Distributed Ledger</cite>. Cryptology ePrint Archive, paper 2020/735. <a class="ref-link" href="https://eprint.iacr.org/2020/735">https://eprint.iacr.org/2020/735</a></li>
+              <li id="ref-38">Connolly, D., Komlo, C., Goldberg, I. and Wood, C. A. (2024). <cite>RFC 9591: The Flexible Round-Optimized Schnorr Threshold (FROST) Protocol for Two-Round Schnorr Signatures</cite>. IRTF, June 2024. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc9591.html">https://www.rfc-editor.org/rfc/rfc9591.html</a></li>
+              <li id="ref-39">David, B., Gaži, P., Kiayias, A. and Russell, A. (2018). <cite>Ouroboros Praos: An adaptively-secure, semi-synchronous proof-of-stake blockchain</cite>. Advances in Cryptology, EUROCRYPT 2018. Cryptology ePrint Archive, paper 2017/573. <a class="ref-link" href="https://eprint.iacr.org/2017/573">https://eprint.iacr.org/2017/573</a></li>
+              <li id="ref-40">drand. <cite>Cryptography</cite>. drand documentation. <a class="ref-link" href="https://docs.drand.love/docs/cryptography/">https://docs.drand.love/docs/cryptography/</a> (accessed 8 October 2026)</li>
+              <li id="ref-41">Edgington, B. (2026). <cite>Upgrading Ethereum</cite>, Capella edition, part 2, sections "Committees" and "Randomness". <a class="ref-link" href="https://eth2book.info/capella/part2/building_blocks/committees/">https://eth2book.info/capella/part2/building_blocks/committees/</a>; <a class="ref-link" href="https://eth2book.info/capella/part2/building_blocks/randomness/">https://eth2book.info/capella/part2/building_blocks/randomness/</a> (accessed 8 October 2026)</li>
+              <li id="ref-42">Electric Coin Company (2022). <cite>NU5 activates on mainnet, eliminating trusted setup and launching a new era for Zcash</cite>. 31 May 2022; now served by the Zcash Open Development Lab. <a class="ref-link" href="https://zodl.com/nu5-activates-on-mainnet-eliminating-trusted-setup-and-launching-a-new-era-for-zcash/">https://zodl.com/nu5-activates-on-mainnet-eliminating-trusted-setup-and-launching-a-new-era-for-zcash/</a></li>
+              <li id="ref-43">Ethereum consensus-specs. <cite>Phase 0: The Beacon Chain</cite>. Master branch. <a class="ref-link" href="https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/beacon-chain.md">https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/beacon-chain.md</a> (accessed 8 October 2026)</li>
+              <li id="ref-44">Ethereum Foundation (2024a). <cite>KZG Ceremony wrap-up</cite>. 23 January 2024. <a class="ref-link" href="https://blog.ethereum.org/2024/01/23/kzg-wrap">https://blog.ethereum.org/2024/01/23/kzg-wrap</a></li>
+              <li id="ref-45">Ethereum Foundation (2024b). <cite>Dencun Mainnet Announcement</cite>. 27 February 2024. <a class="ref-link" href="https://blog.ethereum.org/2024/02/27/dencun-mainnet-announcement">https://blog.ethereum.org/2024/02/27/dencun-mainnet-announcement</a></li>
+              <li id="ref-46">Ethereum Foundation (2025). <cite>Fusaka Mainnet Announcement</cite>. 6 November 2025. <a class="ref-link" href="https://blog.ethereum.org/2025/11/06/fusaka-mainnet-announcement">https://blog.ethereum.org/2025/11/06/fusaka-mainnet-announcement</a></li>
+              <li id="ref-47">Ethereum Foundation, Post-Quantum team (2026). <cite>pq.ethereum.org</cite>. <a class="ref-link" href="https://pq.ethereum.org/">https://pq.ethereum.org/</a> (last updated 27 June 2026; accessed 8 October 2026)</li>
+              <li id="ref-48">Ethereum.org. <cite>Ethereum accounts</cite>. Developer documentation. <a class="ref-link" href="https://ethereum.org/en/developers/docs/accounts/">https://ethereum.org/en/developers/docs/accounts/</a> (last updated 6 August 2026; accessed 8 October 2026)</li>
+              <li id="ref-49">Ethereum.org. <cite>The Merge</cite>. Roadmap. <a class="ref-link" href="https://ethereum.org/en/roadmap/merge/">https://ethereum.org/en/roadmap/merge/</a> (last updated 15 May 2026; accessed 8 October 2026)</li>
+              <li id="ref-50">Ethereum.org. <cite>Quantum resistance</cite>. Roadmap. <a class="ref-link" href="https://ethereum.org/en/roadmap/future-proofing/quantum-resistance/">https://ethereum.org/en/roadmap/future-proofing/quantum-resistance/</a> (last updated 8 September 2026; accessed 8 October 2026)</li>
+              <li id="ref-51">Eyal, I. and Sirer, E. G. (2014). <cite>Majority is not enough: Bitcoin mining is vulnerable</cite>. Financial Cryptography and Data Security (FC 2014), LNCS, pp. 436–454. <a class="ref-link" href="https://doi.org/10.1007/978-3-662-45472-5_28">https://doi.org/10.1007/978-3-662-45472-5_28</a></li>
+              <li id="ref-52">Faz-Hernández, A., Scott, S., Sullivan, N., Wahby, R. S. and Wood, C. A. (2023). <cite>RFC 9380: Hashing to Elliptic Curves</cite>. IRTF, August 2023. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc9380">https://www.rfc-editor.org/rfc/rfc9380</a></li>
+              <li id="ref-53">Gabizon, A., Williamson, Z. J. and Ciobotaru, O. (2019). <cite>PLONK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge</cite>. Cryptology ePrint Archive, paper 2019/953. <a class="ref-link" href="https://eprint.iacr.org/2019/953">https://eprint.iacr.org/2019/953</a></li>
+              <li id="ref-54">Gidney, C. (2025). <cite>How to factor 2048 bit RSA integers with less than a million noisy qubits</cite>. arXiv:2505.15917. <a class="ref-link" href="https://arxiv.org/abs/2505.15917">https://arxiv.org/abs/2505.15917</a></li>
+              <li id="ref-55">Gilad, Y., Hemo, R., Micali, S., Vlachos, G. and Zeldovich, N. (2017). <cite>Algorand: Scaling Byzantine Agreements for Cryptocurrencies</cite>. Proceedings of the 26th Symposium on Operating Systems Principles (SOSP '17), pp. 51–68. <a class="ref-link" href="https://doi.org/10.1145/3132747.3132757">https://doi.org/10.1145/3132747.3132757</a>; full version, Cryptology ePrint Archive, paper 2017/454, <a class="ref-link" href="https://eprint.iacr.org/2017/454">https://eprint.iacr.org/2017/454</a></li>
+              <li id="ref-56">Goldberg, S., Reyzin, L., Papadopoulos, D. and Včelák, J. (2023). <cite>RFC 9381: Verifiable Random Functions (VRFs)</cite>. IRTF, August 2023. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc9381">https://www.rfc-editor.org/rfc/rfc9381</a></li>
+              <li id="ref-57">Goodell, B., Noether, S. and Blue, A. (2019). <cite>Concise Linkable Ring Signatures and Forgery Against Adversarial Keys</cite>. Cryptology ePrint Archive, paper 2019/654. <a class="ref-link" href="https://eprint.iacr.org/2019/654">https://eprint.iacr.org/2019/654</a></li>
+              <li id="ref-58">Groth, J. (2016). <cite>On the size of pairing-based non-interactive arguments</cite>. Advances in Cryptology, EUROCRYPT 2016. Cryptology ePrint Archive, paper 2016/260. <a class="ref-link" href="https://eprint.iacr.org/2016/260">https://eprint.iacr.org/2016/260</a></li>
+              <li id="ref-59">Grunspan, C. and Pérez-Marco, R. (2018). <cite>Double spend races</cite>. International Journal of Theoretical and Applied Finance 21(8). <a class="ref-link" href="https://doi.org/10.1142/S021902491850053X">https://doi.org/10.1142/S021902491850053X</a></li>
+              <li id="ref-60">Halcrow, M. A. and Ferguson, N. (2009). <cite>A Second Pre-image Attack Against Elliptic Curve Only Hash (ECOH)</cite>. Cryptology ePrint Archive, paper 2009/168. <a class="ref-link" href="https://eprint.iacr.org/2009/168">https://eprint.iacr.org/2009/168</a></li>
+              <li id="ref-61">Hopwood, D., Bowe, S., Hornby, T. and Wilcox, N. (2026). <cite>Zcash Protocol Specification</cite>, version 2026.7.0 [NU6.2], build of 8 October 2026. Electric Coin Company. <a class="ref-link" href="https://zips.z.cash/protocol/protocol.pdf">https://zips.z.cash/protocol/protocol.pdf</a> (living document; section and page numbers refer to this build)</li>
+              <li id="ref-62">Kate, A., Zaverucha, G. M. and Goldberg, I. (2010). <cite>Constant-size commitments to polynomials and their applications</cite>. Advances in Cryptology, ASIACRYPT 2010, LNCS, pp. 177–194. <a class="ref-link" href="https://doi.org/10.1007/978-3-642-17373-8_11">https://doi.org/10.1007/978-3-642-17373-8_11</a></li>
+              <li id="ref-63">Kiayias, A., Russell, A., David, B. and Oliynykov, R. (2017). <cite>Ouroboros: A Provably Secure Proof-of-Stake Blockchain Protocol</cite>. Advances in Cryptology, CRYPTO 2017. Cryptology ePrint Archive, paper 2016/889. <a class="ref-link" href="https://eprint.iacr.org/2016/889">https://eprint.iacr.org/2016/889</a></li>
+              <li id="ref-64">Klyubin, A. (2013). <cite>Some SecureRandom Thoughts</cite>. Android Developers Blog, 14 August 2013. <a class="ref-link" href="https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html">https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html</a></li>
+              <li id="ref-65">Koblitz, N. (1987). <cite>Elliptic curve cryptosystems</cite>. Mathematics of Computation 48(177), 203–209. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1987-0866109-5">https://doi.org/10.1090/S0025-5718-1987-0866109-5</a></li>
+              <li id="ref-66">Kusaka, T., Joichi, S., Ikuta, K., Khandaker, M. A.-A., Nogami, Y., Uehara, S., Yamai, N. and Duquesne, S. (2018). <cite>Solving 114-Bit ECDLP for a Barreto-Naehrig Curve</cite>. Information Security and Cryptology, ICISC 2017, LNCS 10779, pp. 231–244. <a class="ref-link" href="https://doi.org/10.1007/978-3-319-78556-1_13">https://doi.org/10.1007/978-3-319-78556-1_13</a></li>
+              <li id="ref-67">L'Ecuyer, P. and Simard, R. (2007). <cite>TestU01: A C library for empirical testing of random number generators</cite>. ACM Transactions on Mathematical Software 33(4), 1–40. <a class="ref-link" href="https://doi.org/10.1145/1268776.1268777">https://doi.org/10.1145/1268776.1268777</a></li>
+              <li id="ref-68">Meiklejohn, S., Pomarole, M., Jordan, G., Levchenko, K., McCoy, D., Voelker, G. M. and Savage, S. (2013). <cite>A fistful of bitcoins: characterizing payments among men with no names</cite>. Proceedings of the 2013 Internet Measurement Conference (IMC '13), pp. 127–140. <a class="ref-link" href="https://doi.org/10.1145/2504730.2504747">https://doi.org/10.1145/2504730.2504747</a></li>
+              <li id="ref-69">Menezes, A. J., van Oorschot, P. C. and Vanstone, S. A. (1996). <cite>Handbook of Applied Cryptography</cite>. CRC Press. Chapters 2 and 9, available from the authors: <a class="ref-link" href="https://cacr.uwaterloo.ca/hac/">https://cacr.uwaterloo.ca/hac/</a></li>
+              <li id="ref-70">Miller, V. S. (1986). <cite>Use of elliptic curves in cryptography</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 417–426. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_31">https://doi.org/10.1007/3-540-39799-X_31</a></li>
+              <li id="ref-71">Monero Project (2018). <cite>Monero 0.13.0 "Beryllium Bullet" Release</cite>. 11 October 2018. <a class="ref-link" href="https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html">https://www.getmonero.org/2018/10/11/monero-0.13.0-released.html</a></li>
+              <li id="ref-72">Monero Project (2022). <cite>Monero's network upgrade of July 2022</cite> (date later moved to August 2022). <a class="ref-link" href="https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html">https://www.getmonero.org/2022/04/20/network-upgrade-july-2022.html</a></li>
+              <li id="ref-73">Monero Project (2023). <cite>Post-Mortem of 10-Block-Old Decoy Selection Bug</cite>. 8 June 2023. <a class="ref-link" href="https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html">https://www.getmonero.org/2023/06/08/10block-old-decoy-selection-bug.html</a></li>
+              <li id="ref-74">Monero Project (2026). <cite>FCMP++ and Carrot stressnet releases</cite>, repository seraphis-migration/monero. <a class="ref-link" href="https://github.com/seraphis-migration/monero/releases">https://github.com/seraphis-migration/monero/releases</a> (accessed 8 October 2026)</li>
+              <li id="ref-75">Moody, D., Perlner, R., Regenscheid, A., Robinson, A. and Cooper, D. (2024). <cite>Transition to Post-Quantum Cryptography Standards</cite>. NIST IR 8547, initial public draft, 12 November 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.IR.8547.ipd">https://doi.org/10.6028/NIST.IR.8547.ipd</a></li>
+              <li id="ref-76">Möser, M., Soska, K., Heilman, E., Lee, K., Heffan, H., Srivastava, S., Hogan, K., Hennessey, J., Miller, A., Narayanan, A. and Christin, N. (2018). <cite>An Empirical Analysis of Traceability in the Monero Blockchain</cite>. Proceedings on Privacy Enhancing Technologies 2018(3), 143–163. <a class="ref-link" href="https://doi.org/10.1515/popets-2018-0025">https://doi.org/10.1515/popets-2018-0025</a></li>
+              <li id="ref-77">Nakamoto, S. (2008). <cite>Bitcoin: A Peer-to-Peer Electronic Cash System</cite>. <a class="ref-link" href="https://bitcoin.org/bitcoin.pdf">https://bitcoin.org/bitcoin.pdf</a></li>
+              <li id="ref-78">Nick, J., Ruffing, T. and Jin, E. <cite>BIP 327: MuSig2 for BIP340-compatible Multi-Signatures</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-79">NIST (2015). <cite>FIPS 202: SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions</cite>. August 2015. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.202">https://doi.org/10.6028/NIST.FIPS.202</a></li>
+              <li id="ref-80">NIST (2024a). <cite>FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.203">https://doi.org/10.6028/NIST.FIPS.203</a></li>
+              <li id="ref-81">NIST (2024b). <cite>FIPS 204: Module-Lattice-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.204">https://doi.org/10.6028/NIST.FIPS.204</a></li>
+              <li id="ref-82">NIST (2024c). <cite>FIPS 205: Stateless Hash-Based Digital Signature Standard</cite>. 13 August 2024. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.205">https://doi.org/10.6028/NIST.FIPS.205</a></li>
+              <li id="ref-83">NIST (2025). <cite>NIST PQC Standardization Process: HQC Announced as 4th Round Selection</cite>. 11 March 2025. <a class="ref-link" href="https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection">https://www.nist.gov/news-events/news/2025/03/nist-pqc-standardization-process-hqc-announced-4th-round-selection</a></li>
+              <li id="ref-84">Noether, S. and Mackenzie, A. (2016). <cite>Ring Confidential Transactions</cite>. Ledger 1, 1–18. <a class="ref-link" href="https://doi.org/10.5195/ledger.2016.34">https://doi.org/10.5195/ledger.2016.34</a></li>
+              <li id="ref-85">Parker, L. (2024). <cite>Full-Chain Membership Proofs Development</cite>. getmonero.org, 27 April 2024. <a class="ref-link" href="https://www.getmonero.org/2024/04/27/fcmps.html">https://www.getmonero.org/2024/04/27/fcmps.html</a></li>
+              <li id="ref-86">Pedersen, T. P. (1992). <cite>Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing</cite>. Advances in Cryptology, CRYPTO '91, LNCS 576, pp. 129–140. <a class="ref-link" href="https://doi.org/10.1007/3-540-46766-1_9">https://doi.org/10.1007/3-540-46766-1_9</a></li>
+              <li id="ref-87">Pollard, J. M. (1978). <cite>Monte Carlo Methods for Index Computation (mod p)</cite>. Mathematics of Computation 32(143), 918–924. <a class="ref-link" href="https://doi.org/10.2307/2006496">https://doi.org/10.2307/2006496</a></li>
+              <li id="ref-88">Pornin, T. (2013). <cite>RFC 6979: Deterministic Usage of the Digital Signature Algorithm (DSA) and Elliptic Curve Digital Signature Algorithm (ECDSA)</cite>. August 2013. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc6979">https://www.rfc-editor.org/rfc/rfc6979</a></li>
+              <li id="ref-89">Roetteler, M., Naehrig, M., Svore, K. M. and Lauter, K. (2017). <cite>Quantum resource estimates for computing elliptic curve discrete logarithms</cite>. Advances in Cryptology, ASIACRYPT 2017. Cryptology ePrint Archive, paper 2017/598. <a class="ref-link" href="https://eprint.iacr.org/2017/598">https://eprint.iacr.org/2017/598</a></li>
+              <li id="ref-90">Rogaway, P. and Shrimpton, T. (2004). <cite>Cryptographic Hash-Function Basics: Definitions, Implications, and Separations for Preimage Resistance, Second-Preimage Resistance, and Collision Resistance</cite>. Fast Software Encryption (FSE 2004). Cryptology ePrint Archive, paper 2004/035. <a class="ref-link" href="https://eprint.iacr.org/2004/035">https://eprint.iacr.org/2004/035</a></li>
+              <li id="ref-91">Rosenfeld, M. (2014). <cite>Analysis of hashrate-based double spending</cite>. arXiv:1402.2009. <a class="ref-link" href="https://arxiv.org/abs/1402.2009">https://arxiv.org/abs/1402.2009</a></li>
+              <li id="ref-92">Rukhin, A., Soto, J., Nechvatal, J., Smid, M., Barker, E., Leigh, S., Levenson, M., Vangel, M., Banks, D., Heckert, A., Dray, J. and Vo, S.; revised by Bassham, L. E. (2010). <cite>A Statistical Test Suite for Random and Pseudorandom Number Generators for Cryptographic Applications</cite>. NIST Special Publication 800-22, revision 1a, April 2010. <a class="ref-link" href="https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf">https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf</a></li>
+              <li id="ref-93">Ryan, D., Feist, D., D'Amato, F., Wang, H.-W. and Stokes, A. <cite>EIP-7594: PeerDAS, Peer Data Availability Sampling</cite>. Ethereum Improvement Proposal, status Final, created 12 January 2024. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-7594">https://eips.ethereum.org/EIPS/eip-7594</a> (accessed 8 October 2026)</li>
+              <li id="ref-94">Shor, P. W. (1997). <cite>Polynomial-time algorithms for prime factorization and discrete logarithms on a quantum computer</cite>. SIAM Journal on Computing 26(5), 1484–1509. <a class="ref-link" href="https://doi.org/10.1137/S0097539795293172">https://doi.org/10.1137/S0097539795293172</a></li>
+              <li id="ref-95">Shoup, V. (1997). <cite>Lower Bounds for Discrete Logarithms and Related Problems</cite>. Advances in Cryptology, EUROCRYPT '97, LNCS 1233, pp. 256–266. <a class="ref-link" href="https://doi.org/10.1007/3-540-69053-0_18">https://doi.org/10.1007/3-540-69053-0_18</a></li>
+              <li id="ref-96">Solana. <cite>Transactions</cite>. Solana documentation, core concepts. <a class="ref-link" href="https://solana.com/docs/core/transactions">https://solana.com/docs/core/transactions</a> (accessed 8 October 2026)</li>
+              <li id="ref-97">van Oorschot, P. C. and Wiener, M. J. (1999). <cite>Parallel Collision Search with Cryptanalytic Applications</cite>. Journal of Cryptology 12(1), 1–28. <a class="ref-link" href="https://doi.org/10.1007/PL00003816">https://doi.org/10.1007/PL00003816</a></li>
+              <li id="ref-98">van Saberhagen, N. (2013). <cite>CryptoNote v 2.0</cite>. 17 October 2013. <a class="ref-link" href="https://bytecoin.org/old/whitepaper.pdf">https://bytecoin.org/old/whitepaper.pdf</a></li>
+              <li id="ref-99">Vičič, J. and Tošić, A. (2022). <cite>Application of Benford's Law on Cryptocurrencies</cite>. Journal of Theoretical and Applied Electronic Commerce Research 17(1), 313–326. <a class="ref-link" href="https://doi.org/10.3390/jtaer17010016">https://doi.org/10.3390/jtaer17010016</a></li>
+              <li id="ref-100">Webster, A. F. and Tavares, S. E. (1986). <cite>On the Design of S-Boxes</cite>. Advances in Cryptology, CRYPTO '85, LNCS 218, pp. 523–534. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_41">https://doi.org/10.1007/3-540-39799-X_41</a></li>
+              <li id="ref-101">Wuille, P., Nick, J. and Ruffing, T. <cite>BIP 340: Schnorr Signatures for secp256k1</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-102">Wuille, P., Nick, J. and Towns, A. <cite>BIP 341: Taproot: SegWit version 1 spending rules</cite>. Bitcoin Improvement Proposal. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki</a> (accessed 8 October 2026)</li>
+              <li id="ref-103">Yakovenko, A. (n.d.). <cite>Solana: A new architecture for a high performance blockchain</cite>, v0.8.13. <a class="ref-link" href="https://solana.com/solana-whitepaper.pdf">https://solana.com/solana-whitepaper.pdf</a> (undated document; accessed 8 October 2026)</li>
+              <li id="ref-104">Zcash (2018). <cite>Sapling</cite>. Network upgrade page. <a class="ref-link" href="https://z.cash/upgrade/sapling/">https://z.cash/upgrade/sapling/</a> (accessed 8 October 2026)</li>
+              <li id="ref-105">Zcash (Electric Coin Company). <cite>Sinsemilla</cite>. The halo2 Book, design: gadgets. <a class="ref-link" href="https://zcash.github.io/halo2/design/gadgets/sinsemilla.html">https://zcash.github.io/halo2/design/gadgets/sinsemilla.html</a> (accessed 8 October 2026)</li>
+              <li id="ref-106">Zcash Improvement Proposals. <cite>ZIP 205: Deployment of the Sapling Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0205">https://zips.z.cash/zip-0205</a> (accessed 8 October 2026)</li>
+              <li id="ref-107">Zcash Improvement Proposals. <cite>ZIP 252: Deployment of the NU5 Network Upgrade</cite>. <a class="ref-link" href="https://zips.z.cash/zip-0252">https://zips.z.cash/zip-0252</a> (accessed 8 October 2026)</li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

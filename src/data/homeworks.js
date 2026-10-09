@@ -16,4 +16,14 @@
  * homework folder (except those starting with "_") requires an entry here;
  * the build fails otherwise.
  */
-export default [];
+export default [
+  {
+    number: 1,
+    title: 'A toy hash function on secp256k1 and its statistical properties',
+    abstract:
+      'A hash function is built from scalar and point arithmetic on the Bitcoin curve secp256k1 and put on trial: its digests are tested for uniformity, independence and avalanche against the binomial and chi-square laws an ideal hash would obey, and the structural flaws that statistics cannot see are exposed. A survey of cryptography and statistics in the major blockchains closes the work.',
+    topics: ['Elliptic-curve cryptography', 'Hash functions', 'Randomness testing', 'Blockchains'],
+    published: '2026-10-08',
+    status: 'published',
+  },
+];
