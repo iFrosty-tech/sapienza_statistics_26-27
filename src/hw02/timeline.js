@@ -56,6 +56,15 @@ export const TIMELINE = Object.freeze([
     source: 'Koblitz1987',
   },
   {
+    id: 'sec2-v1',
+    title: 'SEC 2 version 1.0: first publication of secp256k1',
+    detail: 'Certicom Research, Standards for Efficient Cryptography',
+    date: '2000-09-20',
+    dateLabel: '20 Sep 2000',
+    kind: 'public-key',
+    source: 'SEC2',
+  },
+  {
     id: 'fips180-2',
     title: 'FIPS 180-2: SHA-256, SHA-384 and SHA-512 (SHA-2)',
     detail: 'Draft announced 30 May 2001; final standard 1 August 2002',
@@ -163,7 +172,7 @@ export const TIMELINE = Object.freeze([
   },
   {
     id: 'fips180-4',
-    title: 'FIPS 180-4: Secure Hash Standard (current edition)',
+    title: 'FIPS 180-4: Secure Hash Standard (August 2015 revision, the edition cited)',
     detail: 'Specifies SHA-1 and the SHA-2 family, SHA-512 included',
     date: '2015-08',
     dateLabel: 'Aug 2015',

@@ -85,8 +85,10 @@
               <code>crypto</code> module offers the same primitive, the tests also compare the two implementations.
               Third, one worked example is recomputed every time the page is built: the development mnemonic of the
               Hardhat toolkit, whose first account is published with its address and its private key [<a href="#ref-21">21</a>].
-              The build stops if either value differs, so every number printed in §3 agrees with an independent
-              source.
+              The build stops if either value, or either of the two digests of the empty input, differs from its
+              published value; the published addresses of the second and third accounts are checked by the test
+              suite. The intermediate values printed in §3 are not each compared with a published value: they lie
+              on the computation that produced these verified endpoints.
             </p>
             <p>The work answers five questions.</p>
             <ol>
@@ -240,7 +242,7 @@
                 </p>
                 <p>
                   Each row is one stage of the worked example: the standard that defines it, its operation class
-                  (§2), the operation applied and the value it produces, with the size of that value in bits. The
+                  (§2), the operation applied and the value it produces, with the size in bits of the quantity drawn on the strip. The
                   strip under each name is drawn to scale, its full width being 512 bits, with the 1-bits of the value
                   marked; the rule between two rows names the operation that maps one value to the next. The
                   final value, <code>{{fig.example.address}}</code>, is the address of account #0 published for this
@@ -389,10 +391,11 @@
             </div>
             <p>
               where <span data-tex>\mathrm{HMAC}_K(x) = H\bigl((K \oplus \mathrm{opad}) \,\|\, H((K \oplus \mathrm{ipad}) \,\|\, x)\bigr)</span>
-              with <span data-tex>H</span> = SHA-512 [<a href="#ref-11">11</a>, §2]. Since SHA-512 already yields 512 bits, a single
+              with <span data-tex>H</span> = SHA-512 and <span data-tex>K</span> the key zero-padded to the 128-byte
+              block of SHA-512, or first hashed if longer [<a href="#ref-11">11</a>, §§2–3; <a href="#ref-17">17</a>, §1]. Since SHA-512 already yields 512 bits, a single
               output block suffices. The sentence is the HMAC key, so the step is keyed key derivation; its purpose is
               that every candidate sentence or passphrase costs an attacker 2048 evaluations of HMAC instead of one.
-              Against 128 bits of uniform entropy this factor of about <span data-tex>2^{11}</span> is immaterial,
+              Against 128 bits of uniform entropy this factor of <span data-tex>2^{11}</span> is immaterial,
               since the search is already infeasible (§4.9); it matters when the secret is weak, as a passphrase
               chosen by a person may be.
             </p>
@@ -491,7 +494,7 @@
               A derived key is invalid when <span data-tex>\mathrm{parse}_{256}(I_L) \ge n</span> or
               <span data-tex>k_i = 0</span>, in which case "one should proceed with the next value for
               <span data-tex>i</span>", an event that "has probability lower than 1 in 2<sup>127</sup>" [<a href="#ref-30">30</a>]. Its
-              exact probability is computed in §4.5. The implementation used here reports such an event as an error
+              dominant term is computed exactly in §4.5. The implementation used here reports such an event as an error
               instead of moving to the next index; at that probability the difference has no practical consequence.
               Serialised extended keys are 78-byte structures (version, depth, parent fingerprint, child number, chain
               code and key) followed by a 32-bit checksum and encoded in Base58, "a Base58-encoded string of exactly
@@ -1041,8 +1044,8 @@
               sibling keys differ in {{fig.stages.privateKey.sibling.mean}} bits on average, as two unrelated keys
               would. None of the stage tests of Table 3 rejects at the 5% level, the smallest p-value being
               {{fig.stages.address.sibling.p}} for the sibling distance of addresses. Figure 9 looks at the address
-              bit by bit: the number of ones at each of the 160 positions is <span data-tex>\mathrm{Bin}(n, \tfrac12)</span>
-              under <span data-tex>H_0</span>, and the sum of the squared standardised counts,
+              bit by bit: the number of ones at each of the 160 positions is <span data-tex>\mathrm{Bin}(N_w, \tfrac12)</span>
+              under <span data-tex>H_0</span>, with <span data-tex>N_w</span> the number of addresses in the sample, and the sum of the squared standardised counts,
               <span data-tex>\chi^2</span>(160) = {{fig.addressBits.all.statistic}}, gives p = {{fig.addressBits.all.p}}.
               {{fig.addressBits.all.beyondTwoSigma}} positions lie beyond ±1.96, where 8 are expected, and the largest
               |z|, {{fig.addressBits.all.maxAbsZ}}, is below the Bonferroni threshold for 160 two-sided tests at the 5%
@@ -1050,7 +1053,7 @@
             </p>
             <p>
               These results say that, within the power of {{fig.params.pipeline.n}} samples, the outputs of every
-              stage look like independent fair coin flips and that a one-bit change at the start reaches about half
+              stage are, in these statistics, consistent with independent fair coin flips and that a one-bit change at the start reaches about half
               of the bits of every later stage. They do not say that the stages are secure. The permutation
               Keccak-f[1600] of §3.6 is itself invertible by design and passes the diffusion test of §4.6; one-wayness
               is a property that no count of bits can establish.
@@ -1109,7 +1112,7 @@
               </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig8-title">
-                  <span class="pplot__fig-no">Figure 8.</span>Hamming weight, avalanche and sibling distance of each stage against Bin(n, ½)
+                  <span class="pplot__fig-no">Figure 8.</span>Hamming weight, avalanche and sibling distance of each stage against Bin(m, ½)
                   <span class="pplot__simulated">Simulated</span>
                 </p>
                 <p>
@@ -1273,14 +1276,14 @@
               generator whose keys came from a 32-bit seed.
             </p>
             <p>
-              The same searches record the number <span data-tex>L</span> of leading zero digits of every address
+              The same searches record the number <span data-tex>Z</span> of leading zero digits of every address
               generated, whose law under <span data-tex>H_0</span> is
-              <span data-tex>P(L = j) = \tfrac{15}{16}\,(\tfrac{1}{16})^{j}</span>. A naive test of this law on all
+              <span data-tex>P(Z = j) = \tfrac{15}{16}\,(\tfrac{1}{16})^{j}</span>. A naive test of this law on all
               generated addresses would be wrong, because the stopping rule fixes how many addresses reach
-              <span data-tex>L \ge k</span>: exactly one per search. The test used here conditions on the stopping
-              rule. The addresses that did not end a search follow the law of <span data-tex>L</span> given
-              <span data-tex>L &lt; k</span>; those that ended one follow the law of <span data-tex>L</span> given
-              <span data-tex>L \ge k</span>, which by the memorylessness of the geometric law is
+              <span data-tex>Z \ge k</span>: exactly one per search. The test used here conditions on the stopping
+              rule. The addresses that did not end a search follow the law of <span data-tex>Z</span> given
+              <span data-tex>Z &lt; k</span>; those that ended one follow the law of <span data-tex>Z</span> given
+              <span data-tex>Z \ge k</span>, which by the memorylessness of the geometric law is
               <span data-tex>k</span> plus a geometric variable on <span data-tex>\{0, 1, \dots\}</span> with success
               probability 15/16; the two chi-square statistics are added, as are their degrees of freedom. The
               p-values are {{fig.vanity.k1.lzP}} for <span data-tex>k = 1</span> and {{fig.vanity.k2.lzP}} for
@@ -1292,11 +1295,12 @@
               digest nibble is uniform. Hence <span data-tex>H_0: L \sim \mathrm{Bin}(40, 6/16)</span> for the number
               of letters, with mean 15, and <span data-tex>U \sim \mathrm{Bin}(40, 3/16)</span> for the number of
               upper-case letters, with mean 7.5. For {{fig.addressCase.random.n}} uniformly random strings the mean of
-              <span data-tex>L</span> is {{fig.addressCase.random.lMean}} (p = {{fig.addressCase.random.lP}}) and
-              that of <span data-tex>U</span> {{fig.addressCase.random.uMean}} (p = {{fig.addressCase.random.uP}});
-              for the {{fig.addressCase.real.n}} addresses produced by the pipeline sample of §4.4 they are
-              {{fig.addressCase.real.lMean}} (p = {{fig.addressCase.real.lP}}) and {{fig.addressCase.real.uMean}}
-              (p = {{fig.addressCase.real.uP}}). Table 3 completes the record: the addresses produced by the full
+              <span data-tex>L</span> is {{fig.addressCase.random.lMean}} (χ² test of the distribution, p = {{fig.addressCase.random.lP}})
+              and that of <span data-tex>U</span> {{fig.addressCase.random.uMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.random.uP}}); for the {{fig.addressCase.real.n}} addresses produced by the
+              pipeline sample of §4.4 they are {{fig.addressCase.real.lMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.real.lP}}) and {{fig.addressCase.real.uMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.real.uP}}). Table 3 completes the record: the addresses produced by the full
               pipeline are, by these statistics, indistinguishable from uniform 160-bit strings.
             </p>
 
@@ -1334,7 +1338,7 @@
                   <div><dt>Searches</dt><dd data-fig-stat="searches">{{fig.vanity.k1.searches}}</dd></div>
                   <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.vanity.k1.statistic}}</dd></div>
                   <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.vanity.k1.p}}</dd></div>
-                  <div><dt>Leading zeros p</dt><dd data-fig-stat="lzP">{{fig.vanity.k1.lzP}}</dd></div>
+                  <div><dt>Leading zeros Z, p</dt><dd data-fig-stat="lzP">{{fig.vanity.k1.lzP}}</dd></div>
                 </dl>
                 <p class="pplot__seed">
                   <span class="tabular" data-fig-stat="generated">{{fig.vanity.k1.generated}}</span> addresses generated,
@@ -1538,7 +1542,7 @@
               {{fig.brute.rhoCoefficient}} <span data-tex>\sqrt{n}</span> group additions, that is 2 to the power
               {{fig.brute.rhoLog2}} on secp256k1, which agrees with the <span data-tex>2^{127.8}</span> of SafeCurves
               [<a href="#ref-2">2</a>]. Guessing a 12-word mnemonic and solving the discrete logarithm of a known public key
-              therefore both cost about <span data-tex>2^{128}</span> operations, the security level of the curve. A
+              therefore both cost about <span data-tex>2^{128}</span> trials or group operations respectively, the security level of the curve. A
               24-word mnemonic raises the cost of guessing the mnemonic itself to <span data-tex>2^{256}</span>, but
               not the security of a key whose public key is known, which remains bounded by the discrete
               logarithm.
@@ -1556,13 +1560,14 @@
               technical memorandum in April 1977 and as a journal article in <cite>Communications of the ACM</cite> in
               February 1978 [<a href="#ref-25">25</a>]; the assignment's "1977" is the date of the memorandum. Elliptic-curve
               cryptography, on which secp256k1 rests, was proposed independently by Miller, at CRYPTO '85 with
-              proceedings published in 1986 [<a href="#ref-14">14</a>], and by Koblitz in 1987 [<a href="#ref-10">10</a>]; the domain parameters of
-              secp256k1 used today are those of SEC 2 version 2.0, dated 27 January 2010 [<a href="#ref-6">6</a>].
+              proceedings published in 1986 [<a href="#ref-14">14</a>], and by Koblitz in 1987 [<a href="#ref-10">10</a>]. The curve secp256k1 was
+              first published in version 1.0 of SEC 2, dated 20 September 2000 [<a href="#ref-6">6</a>, version 1.0, §2.7.1]; the
+              parameters are cited on this page from version 2.0, dated 27 January 2010 [<a href="#ref-6">6</a>].
             </p>
             <p>
               The hash functions came next. A draft of FIPS 180-2, adding SHA-256, SHA-384 and SHA-512 to SHA-1, was
               announced on 30 May 2001, and the final standard is dated 1 August 2002, effective from 1 February 2003
-              [<a href="#ref-16">16</a>]. The assignment's "standardized in 2001" is therefore, with respect, the date of the draft:
+              [<a href="#ref-16">16</a>]. The assignment's "standardized in 2001" is therefore the date of the draft:
               SHA-2 was standardised in 2002. The edition cited here, FIPS 180-4, is dated August 2015
               [<a href="#ref-17">17</a>]. NIST announced the competition for SHA-3 on 2 November 2007, selected Keccak on 2 October
               2012, published a draft of FIPS 202 in May 2014 and the final standard on 4 August 2015 [<a href="#ref-19">19</a>];
@@ -1620,7 +1625,7 @@
             <h3 id="s5-2">5.2 SHA-2 and Keccak / SHA-3</h3>
             <p>
               SHA-2 and SHA-3 are both cryptographic hash functions standardised by NIST, but they are built in
-              different ways. SHA-512, specified in FIPS 180-4 [<a href="#ref-17">17</a>, §6.4], pads the message with its length,
+              different ways. SHA-512, specified in FIPS 180-4 [<a href="#ref-17">17</a>, §§5.1.2, 5.2.2, 6.4], pads the message with its length,
               splits it into 1024-bit blocks and feeds them one at a time to a compression function of 80 rounds that
               updates a chaining value of eight 64-bit words; the digest is the final chaining value. This iterated
               compression of fixed-size blocks is the construction known as Merkle–Damgård, and the whole internal
@@ -1748,10 +1753,12 @@
               avoid. A single algorithm would have to compromise on all of them. The design follows instead the
               principle of separation of concerns: each step does one job, and the interfaces between steps are
               fixed byte strings. Domain separation keeps the jobs apart even where the same primitive is reused:
-              BIP-39 salts PBKDF2 with the string "mnemonic", BIP-32 keys its master HMAC with "Bitcoin seed" and
-              prefixes hardened derivations with the byte 0x00, FIPS 202 separates its functions by their suffixes,
-              and EIP-55 hashes the ASCII text of the address rather than its bytes, so that its digest is unrelated
-              to the one that produced the address.
+              BIP-39 salts PBKDF2 with the string "mnemonic", BIP-32 keys its master HMAC with "Bitcoin seed" and,
+              in hardened derivation, pads the private key with the byte 0x00 to 33 bytes
+              [<a href="#ref-30">30</a>, "Private parent key → private child key"], which also keeps that input
+              apart from a compressed public key, whose first byte is 02 or 03 [<a href="#ref-30">30</a>, "Conventions"]; FIPS 202 separates its functions by their suffixes,
+              and EIP-55 hashes the ASCII text of the address, a different input from the public key whose digest
+              produced the address.
             </p>
             <p>
               The choice of primitives also reflects history rather than a single design. BIP-39 and BIP-32 come
@@ -1796,7 +1803,9 @@
               code able to "recover private keys from any vanity address generated with Profanity" and advised users
               to move their assets [<a href="#ref-1">1</a>]. Since the tool started from "1 of 4 bln seed private keys" rather than
               from a mnemonic [<a href="#ref-1">1</a>], Table 4 applies to it through the size of the seed space, not through the
-              cost per trial. According to The Block, the market maker Wintermute said in September 2022 that 160
+              cost per trial. Each seed, however, starts a long sequence of candidate keys, so that, by 1inch's
+              estimate, recovering every vanity address of six or seven characters "would have required thousands
+              of GPUs and months of time" [<a href="#ref-1">1</a>]. According to The Block, the market maker Wintermute said in September 2022 that 160
               million dollars had been stolen from its Ethereum vault, and experts quoted in the same report blamed
               a Profanity-generated address; the figure and the attribution rest on press reports, not on an official
               post-mortem [<a href="#ref-27">27</a>].
@@ -1817,9 +1826,11 @@
               <span data-tex>m</span> independently seeded wallets contains a repeated one with probability about
               <span data-tex>m^2/2^{33}</span>, which is negligible for samples of a few thousand; and without
               repetitions, under the random-function model, distinct inputs give independent uniform outputs however
-              few the possible inputs are. Tests on
-              the outputs measure how well the functions mix their inputs; they say nothing about how many inputs
-              there were. A wallet is secure only if its entropy is generated by a cryptographically secure source,
+              few the possible inputs are. The tests of §4, on weights, distances and frequencies, are therefore
+              blind to the size of the input space. Only a count of collisions could reveal a space of
+              <span data-tex>2^{32}</span> entropies, and by the same formula it would need samples of the order of
+              <span data-tex>2^{16}</span> wallets before a repetition became likely, far beyond the samples used
+              here. A wallet is secure only if its entropy is generated by a cryptographically secure source,
               and that property must be established by inspecting the generator, not by testing what comes out of
               the pipeline.
             </p>
@@ -1833,8 +1844,10 @@
               published values. The worked example reproduces the address <code>{{fig.example.address}}</code> and the
               private key that Hardhat publishes for its development mnemonic, together with the addresses of its
               second and third accounts, and the primitives agree with the reference vectors of BIP-39, BIP-32,
-              Keccak-256, SHA3-256 and EIP-55. Since the build stops on any disagreement, every value printed on the
-              page has been verified in this sense (first question).
+              Keccak-256, SHA3-256 and EIP-55 (first question). The build checks the address and private key of the
+              first account and the two digests of the empty input, and stops on any disagreement; the second and
+              third accounts are checked by the test suite. The intermediate values printed in §3 are not each
+              compared with a published value: they lie on the computation that produced these verified endpoints.
             </p>
             <p>
               The steps fall into distinct classes (second question). Only the draw of the entropy is key generation;
@@ -1846,7 +1859,7 @@
             </p>
             <p>
               Under the model of hash functions as random functions, every stage has an exact law, and the samples
-              agree with all of them (third question): the acceptance and substitution rates of the BIP-39 checksum
+              are consistent with all of them (third question): the acceptance and substitution rates of the BIP-39 checksum
               match their exact values, including the 127/2047 and 7/2047 of the last word; seeds, keys and
               addresses have binomial weights and avalanche distances; Keccak-f[1600] reaches the binomial level of
               diffusion within three rounds; vanity searches are geometric; and EIP-55 lets a random error pass with
@@ -1864,10 +1877,11 @@
             <p>
               The pipeline needs several primitives because its requirements conflict (fifth question): slowness
               against speed, invertibility against one-wayness, algebraic structure against its absence. Each
-              primitive does one job, and domain separation keeps the jobs apart. Its security, however, rests on a
-              single step that none of the others can repair: the generation of the entropy. The Milk Sad and
+              primitive does one job, and domain separation keeps the jobs apart. Its security, however, depends first
+              of all on a step that none of the others can repair: the generation of the entropy. The Milk Sad and
               Profanity cases show what follows when that step produces 32 bits instead of 128 or 256, and the
-              experiments of this page show why statistical tests on the outputs could never have revealed it.
+              experiments of this page show why the statistical tests of §4, at these sample sizes, could not have
+              revealed it.
             </p>
           </section>
 
@@ -1924,9 +1938,9 @@
               <li id="ref-1">1inch (2022). <cite>A vulnerability disclosed in Profanity, an Ethereum vanity address tool</cite>. 1inch blog, 15 September 2022, updated 30 October 2024. <a class="ref-link" href="https://1inch.com/blog/post/a-vulnerability-disclosed-in-profanity-an-ethereum-vanity-address-tool">https://1inch.com/blog/post/a-vulnerability-disclosed-in-profanity-an-ethereum-vanity-address-tool</a> (accessed 9 October 2026)</li>
               <li id="ref-2">Bernstein, D. J. and Lange, T. <cite>SafeCurves: the rho method</cite>. <a class="ref-link" href="https://safecurves.cr.yp.to/rho.html">https://safecurves.cr.yp.to/rho.html</a> (accessed 9 October 2026)</li>
               <li id="ref-3">Bertoni, G., Daemen, J., Peeters, M. and Van Assche, G. (Keccak team). <cite>Keccak specifications summary</cite>. <a class="ref-link" href="https://keccak.team/keccak_specs_summary.html">https://keccak.team/keccak_specs_summary.html</a> (accessed 9 October 2026)</li>
-              <li id="ref-4">Breitner, J. and Heninger, N. (2019). <cite>Biased Nonce Sense: Lattice Attacks against Weak ECDSA Signatures in Cryptocurrencies</cite>. Financial Cryptography and Data Security (FC 2019), LNCS, pp. 3–20. <a class="ref-link" href="https://doi.org/10.1007/978-3-030-32101-7_1">https://doi.org/10.1007/978-3-030-32101-7_1</a>; Cryptology ePrint Archive, paper 2019/023, <a class="ref-link" href="https://eprint.iacr.org/2019/023">https://eprint.iacr.org/2019/023</a></li>
+              <li id="ref-4">Breitner, J. and Heninger, N. (2019). <cite>Biased Nonce Sense: Lattice Attacks Against Weak ECDSA Signatures in Cryptocurrencies</cite>. Financial Cryptography and Data Security (FC 2019), LNCS, pp. 3–20. <a class="ref-link" href="https://doi.org/10.1007/978-3-030-32101-7_1">https://doi.org/10.1007/978-3-030-32101-7_1</a>; Cryptology ePrint Archive, paper 2019/023, <a class="ref-link" href="https://eprint.iacr.org/2019/023">https://eprint.iacr.org/2019/023</a></li>
               <li id="ref-5">Buterin, V. and Van de Sande, A. (2016). <cite>ERC-55: Mixed-case checksum address encoding</cite>. Ethereum Improvement Proposal, status Final, created 14 January 2016. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-55">https://eips.ethereum.org/EIPS/eip-55</a> (accessed 9 October 2026)</li>
-              <li id="ref-6">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>, version 2.0, 27 January 2010. Standards for Efficient Cryptography Group. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a></li>
+              <li id="ref-6">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>, version 2.0, 27 January 2010. Standards for Efficient Cryptography Group. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a>; first published as version 1.0, 20 September 2000, <a class="ref-link" href="https://www.secg.org/SEC2-Ver-1.0.pdf">https://www.secg.org/SEC2-Ver-1.0.pdf</a></li>
               <li id="ref-7">Diffie, W. and Hellman, M. (1976). <cite>New directions in cryptography</cite>. IEEE Transactions on Information Theory 22(6), 644–654. <a class="ref-link" href="https://doi.org/10.1109/TIT.1976.1055638">https://doi.org/10.1109/TIT.1976.1055638</a></li>
               <li id="ref-8">ethereum.org. <cite>The history of Ethereum</cite> and <cite>Ethash</cite>. <a class="ref-link" href="https://ethereum.org/en/ethereum-forks/">https://ethereum.org/en/ethereum-forks/</a>; <a class="ref-link" href="https://ethereum.org/en/developers/docs/consensus-mechanisms/pow/mining/mining-algorithms/ethash/">https://ethereum.org/en/developers/docs/consensus-mechanisms/pow/mining/mining-algorithms/ethash/</a> (accessed 9 October 2026)</li>
               <li id="ref-9">Johnson, N. and Bylica, P. (2018). <cite>EIP-1052: EXTCODEHASH opcode</cite>. Ethereum Improvement Proposal. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-1052">https://eips.ethereum.org/EIPS/eip-1052</a> (accessed 9 October 2026)</li>
@@ -1947,7 +1961,7 @@
               <li id="ref-24">Rainbow. Source file <cite>src/features/wallet/core/walletLibrary.ts</cite> (rainbow-me/rainbow, commit 486d833). <a class="ref-link" href="https://github.com/rainbow-me/rainbow/blob/486d8337bdae2efca730390f6cc93d7fad58f75e/src/features/wallet/core/walletLibrary.ts">https://github.com/rainbow-me/rainbow/blob/486d8337bdae2efca730390f6cc93d7fad58f75e/src/features/wallet/core/walletLibrary.ts</a> (accessed 9 October 2026)</li>
               <li id="ref-25">Rivest, R. L., Shamir, A. and Adleman, L. M. (1978). <cite>A method for obtaining digital signatures and public-key cryptosystems</cite>. Communications of the ACM 21(2), 120–126. <a class="ref-link" href="https://doi.org/10.1145/359340.359342">https://doi.org/10.1145/359340.359342</a>; earlier as MIT technical memorandum MIT-LCS-TM-082, April 1977, <a class="ref-link" href="https://hdl.handle.net/1721.1/148910">https://hdl.handle.net/1721.1/148910</a></li>
               <li id="ref-26">Rusnak, P. and Palatinus, M. (2014). <cite>SLIP-0044: Registered coin types for BIP-0044</cite>. SatoshiLabs Improvement Proposal, created 9 July 2014. <a class="ref-link" href="https://github.com/satoshilabs/slips/blob/master/slip-0044.md">https://github.com/satoshilabs/slips/blob/master/slip-0044.md</a> (accessed 9 October 2026)</li>
-              <li id="ref-27">The Block (2022). <cite>Experts blame a 'vanity address' bug for Wintermute's $160 million hack</cite>. Press report, September 2022. <a class="ref-link" href="https://www.theblock.co/post/171192/e">https://www.theblock.co/post/171192/e</a> (accessed 9 October 2026)</li>
+              <li id="ref-27">The Block (2022). <cite>Experts blame a 'vanity address' bug for Wintermute's $160 million hack</cite>. Press report, 20 September 2022. <a class="ref-link" href="https://www.theblock.co/news/defi/2022-09-20-experts-blame-a-vanity-address-bug-for-wintermutes-160-million-hack-171192">https://www.theblock.co/news/defi/2022-09-20-experts-blame-a-vanity-address-bug-for-wintermutes-160-million-hack-171192</a> (accessed 9 October 2026)</li>
               <li id="ref-28">Trezor (SatoshiLabs). <cite>python-mnemonic: vectors.json</cite>, the reference test vectors of BIP-39 (last changed 2024). <a class="ref-link" href="https://github.com/trezor/python-mnemonic/blob/master/vectors.json">https://github.com/trezor/python-mnemonic/blob/master/vectors.json</a> (accessed 9 October 2026)</li>
               <li id="ref-29">Wood, G. (2025). <cite>Ethereum: A Secure Decentralised Generalised Transaction Ledger</cite>. Ethereum yellow paper, Shanghai version efc5f9a of 4 February 2025. <a class="ref-link" href="https://ethereum.github.io/yellowpaper/paper.pdf">https://ethereum.github.io/yellowpaper/paper.pdf</a> (accessed 9 October 2026)</li>
               <li id="ref-30">Wuille, P. (2012). <cite>BIP 32: Hierarchical Deterministic Wallets</cite>. Bitcoin Improvement Proposal, status Deployed, assigned 11 February 2012. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki</a> (accessed 9 October 2026)</li>
