@@ -42,7 +42,8 @@
 }
 
 /* Long hex values quoted in text wrap at any digit rather than widen the page */
-.prose p code {
+.prose p code,
+.prose li code {
   overflow-wrap: anywhere;
 }
 
@@ -53,6 +54,24 @@
   padding: 0;
   border: 0;
   background: none;
+}
+
+/* The assignment of homework 02 is quoted in several paragraphs */
+.prose blockquote.assignment p + p {
+  margin-top: var(--space-2);
+}
+
+/* Table 1: six text columns; below the measure it scrolls rather than stacking single words */
+.data-table--taxonomy {
+  min-width: 36rem;
+}
+
+.data-table--taxonomy tbody th {
+  width: 7rem;
+}
+
+.data-table--taxonomy td:last-child {
+  width: 24%;
 }
 
 /* Wide tables scroll inside their frame rather than squeezing their row heads */
