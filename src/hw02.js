@@ -22,9 +22,26 @@ import './styles/hw01.css';
 import './styles/hw02.css';
 
 import { mountChartFigures } from './hw02/figures.js';
+import { mountPipeline } from './hw02/pipeline.js';
+import { mountExplorer } from './hw02/explorer.js';
+import { mountBip39 } from './hw02/bip39-figure.js';
+import { mountHdTree } from './hw02/hdtree.js';
+import { mountKeccak3d } from './hw02/keccak3d.js';
+import { mountEip55 } from './hw02/eip55.js';
+import { mountTimeline } from './hw02/timeline-figure.js';
+import { mountDigests } from './hw02/digests.js';
 
 /** [selector, mount] pairs for the interactive figures listed above. */
-const MOUNTS = [];
+const MOUNTS = [
+  ['[data-pipeline]', mountPipeline],
+  ['[data-explorer]', mountExplorer],
+  ['[data-bip39]', mountBip39],
+  ['[data-hdtree]', mountHdTree],
+  ['[data-keccak3d]', mountKeccak3d],
+  ['[data-eip55]', mountEip55],
+  ['[data-timeline]', mountTimeline],
+  ['[data-digests]', mountDigests],
+];
 
 for (const [selector, mount] of MOUNTS) {
   for (const figure of document.querySelectorAll(selector)) {

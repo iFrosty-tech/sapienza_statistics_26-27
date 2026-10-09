@@ -25,6 +25,7 @@ import { binomialPmfTable } from '../lib/stats.js';
 import { bytesToHex } from '../lib/bytes.js';
 import { sha256 } from '../lib/sha256.js';
 import { fractionalYear } from './timeline.js';
+import { bitDistance, bitString, hexToBitString, onesRuns, stripFraction } from './bits.js';
 
 /* ------------------------------------------------------------ formats */
 
@@ -531,37 +532,82 @@ export const OPERATION_CLASS = Object.freeze({
   hd: 'Derivation · HD',
   publicKey: 'Public-key',
   hashing: 'Hashing',
+  truncation: 'Hashing · truncation',
   checksumEncoding: 'Checksum + encoding',
 });
 
+/** The operation that maps each stage of the ledger to the next one. */
+export const PIPELINE_LINKS = Object.freeze(['BIP-39 encoding', 'PBKDF2-HMAC-SHA512', 'BIP-32 / BIP-44', 'secp256k1', 'Keccak-256', 'Last 20 bytes', 'EIP-55']);
+
+/** For each hex digit of a checksummed address, '1' when EIP-55 prints it in upper case. */
+export function casePattern(checksummed) {
+  return [...checksummed.slice(2)].map((c) => (c >= 'A' && c <= 'F' ? '1' : '0')).join('');
+}
+
 /**
- * The eight stages of the pipeline with their values, from the output of
- * deriveEthereumAccount.
+ * The eight stages of the pipeline with their values and their bits (in
+ * reading order), from the output of deriveEthereumAccount.
  * @param {object} account
  */
 export function pipelineStages(account) {
   const words = account.words.length;
   const cs = account.checksumBits.length;
-  return [
-    { key: 'entropy', name: 'Entropy', standard: 'BIP-39', cls: 'generation', operation: `ENT = ${account.entropyBits.length} bits`, value: hex(account.entropy), bits: account.entropyBits.length },
-    { key: 'mnemonic', name: 'Mnemonic', standard: 'BIP-39', cls: 'encodingChecksum', operation: `CS = ${cs} bits of SHA-256(entropy); ${words} words of 11 bits`, value: account.mnemonic, bits: words * 11 },
-    { key: 'seed', name: 'Seed', standard: 'BIP-39', cls: 'stretching', operation: 'PBKDF2-HMAC-SHA512, 2048 iterations, salt "mnemonic" + passphrase', value: hex(account.seed), bits: 512 },
-    { key: 'master', name: 'Master key', standard: 'BIP-32', cls: 'hd', operation: 'HMAC-SHA512 with key "Bitcoin seed": IL is the key, IR the chain code', value: hex(account.master.privateKey), bits: 256 },
-    { key: 'privateKey', name: 'Private key', standard: 'BIP-32 / BIP-44', cls: 'hd', operation: `CKDpriv along ${account.path}`, value: hex(account.privateKey), bits: 256 },
-    { key: 'publicKey', name: 'Public key', standard: 'secp256k1', cls: 'publicKey', operation: 'K = k · G, uncompressed 04 ‖ x ‖ y', value: hex(account.publicKey), bits: 512 },
-    { key: 'address', name: 'Address', standard: 'Keccak-256', cls: 'hashing', operation: 'last 20 bytes of Keccak-256(x ‖ y)', value: account.address, bits: 160 },
-    { key: 'checksummed', name: 'Checksummed address', standard: 'EIP-55', cls: 'checksumEncoding', operation: 'letter case from Keccak-256 of the lower-case hex', value: account.checksummed, bits: 160 },
+  const stages = [
+    { key: 'entropy', name: 'Entropy', standard: 'BIP-39', cls: 'generation', operation: `ENT = ${account.entropyBits.length} random bits`, value: hex(account.entropy), bitString: account.entropyBits },
+    { key: 'mnemonic', name: 'Mnemonic', standard: 'BIP-39', cls: 'encodingChecksum', operation: `CS = ${cs} bits of SHA-256(entropy) appended; ${words} words of 11 bits`, value: account.mnemonic, bitString: account.entropyBits + account.checksumBits },
+    { key: 'seed', name: 'Seed', standard: 'BIP-39', cls: 'stretching', operation: 'PBKDF2-HMAC-SHA512, 2048 iterations, salt "mnemonic" + passphrase', value: hex(account.seed), bitString: bitString(account.seed) },
+    { key: 'privateKey', name: 'Private key', standard: 'BIP-32 / BIP-44', cls: 'hd', operation: `master key from HMAC-SHA512 with key "Bitcoin seed", then CKDpriv along ${account.path}`, value: hex(account.privateKey), bitString: bitString(account.privateKey) },
+    { key: 'publicKey', name: 'Public key', standard: 'secp256k1', cls: 'publicKey', operation: 'K = k · G, uncompressed 04 ‖ x ‖ y; the strip shows x ‖ y', value: hex(account.publicKey), bitString: bitString(account.publicKey.subarray(1)) },
+    { key: 'digest', name: 'Keccak-256 digest', standard: 'Keccak-256', cls: 'hashing', operation: 'Keccak-256(x ‖ y), 32 bytes', value: hex(account.keccakDigest), bitString: bitString(account.keccakDigest) },
+    { key: 'address', name: 'Address', standard: 'Ethereum', cls: 'truncation', operation: 'the last 20 bytes of the digest, in lower-case hex', value: account.address, bitString: bitString(account.keccakDigest.subarray(12)) },
+    { key: 'checksummed', name: 'Checksummed address', standard: 'EIP-55', cls: 'checksumEncoding', operation: 'letter case from Keccak-256 of the lower-case hex', value: account.checksummed, bitString: bitString(account.keccakDigest.subarray(12)), casePattern: casePattern(account.checksummed) },
   ];
+  return stages.map((s, i) => ({ ...s, bits: s.bitString.length, link: PIPELINE_LINKS[i] ?? null }));
+}
+
+/**
+ * A thin ruled strip (its frame is the border of the outer span) as wide as
+ * the stage's share of 512 bits, its 1-bits marked in plot red; under a checksummed address, a second row marks the
+ * hex digits that EIP-55 prints in upper case.
+ * @param {string} key
+ * @param {string} bits '0'/'1' string
+ * @param {{ casePattern?: string }} [options]
+ */
+export function renderBitStrip(key, bits, { casePattern: cases } = {}) {
+  const n = bits.length;
+  const h = cases ? 7 : 4;
+  const marks = onesRuns(bits)
+    .map(([start, length]) => `M${start} 0h${length}v4h-${length}z`)
+    .join('');
+  const caseRow = cases
+    ? `<path class="strip__case" d="${[...cases]
+        .map((c, i) => (c === '1' ? `M${4 * i + 0.5} 5h3v2h-3z` : ''))
+        .join('')}"/>`
+    : '';
+  return (
+    `<span class="strip" data-strip="${escapeXml(key)}" style="--strip:${stripFraction(n)}">` +
+    `<svg class="strip__bits" viewBox="0 0 ${n} ${h}" preserveAspectRatio="none" aria-hidden="true" focusable="false">` +
+    `<path class="strip__marks" d="${marks}"/>` +
+    caseRow +
+    `</svg></span>`
+  );
 }
 
 /**
  * Fig. "pipeline ledger": one ruled row per stage, its operation class tag,
- * the operation and the value of the worked example.
+ * the operation, the bit strip and the value of the worked example, each row
+ * linked to the next by the operation that produces it.
  * @param {object} account output of deriveEthereumAccount
  */
 export function renderPipelineLedger(account) {
-  const rows = pipelineStages(account).map(
-    (s, i) =>
+  const rows = pipelineStages(account).map((s, i) => {
+    const upper = s.casePattern ? [...s.casePattern].filter((c) => c === '1').length : 0;
+    const note = s.casePattern ? `<span class="ledger__strip-note">lower row: the ${upper} letters printed in upper case</span>` : '';
+    const link = s.link
+      ? `<p class="ledger__link"><svg class="ledger__arrow" viewBox="0 0 10 26" width="10" height="26" aria-hidden="true" focusable="false"><path class="ledger__arrow-line" d="M5 0V25"/><path class="ledger__arrow-head" d="M1.5 20.5L5 25l3.5-4.5"/></svg>` +
+        `<span class="visually-hidden">Next stage by </span><span class="ledger__link-label">${escapeXml(s.link)}</span></p>`
+      : '';
+    return (
       `<li class="ledger__stage" data-pipeline-stage="${s.key}" style="--i:${i}">` +
       `<div class="ledger__head">` +
       `<span class="ledger__no" aria-hidden="true">${i + 1}</span>` +
@@ -569,58 +615,79 @@ export function renderPipelineLedger(account) {
       `<span class="ledger__std">${escapeXml(s.standard)}</span>` +
       `<span class="ledger__class" data-class="${s.cls}">${escapeXml(OPERATION_CLASS[s.cls])}</span>` +
       `</div>` +
+      `<p class="ledger__strip"><span class="ledger__track">${renderBitStrip(s.key, s.bitString, { casePattern: s.casePattern })}</span>` +
+      `<span class="ledger__bits">${s.bits} bits</span>${note}</p>` +
       `<p class="ledger__op">${escapeXml(s.operation)}</p>` +
-      `<p class="ledger__value"><code data-pipeline-value="${s.key}">${escapeXml(s.value)}</code><span class="ledger__bits">${s.bits} bits</span></p>` +
-      `</li>`,
-  );
+      `<p class="ledger__value"><code data-pipeline-value="${s.key}">${escapeXml(s.value)}</code></p>` +
+      link +
+      `</li>`
+    );
+  });
   return `<ol class="ledger" data-pipeline-stages>${rows.join('')}</ol>`;
 }
 
 /* ------------------------------------------------------ explorer output */
 
 /**
- * The output panel of the live explorer for one account.
+ * The output panel of the live explorer for one account: every intermediate
+ * value, grouped under the operation class that produced it.
  * @param {object} account output of deriveEthereumAccount
  */
 export function renderExplorerOutput(account) {
   const cell = (key, caption, value, { wide = false, mono = true } = {}) =>
-    `<div class="demo__cell${wide ? ' demo__cell--wide' : ''}"><span class="caption">${escapeXml(caption)}</span>` +
+    `<div class="demo__cell${wide ? ' demo__cell--wide' : ''}"><span class="caption" data-explorer-caption="${key}">${escapeXml(caption)}</span>` +
     `<span class="demo__value${mono ? ' demo__value--mono' : ''}" data-explorer-out="${key}">${escapeXml(value)}</span></div>`;
+  const group = (cls, cells) =>
+    `<div class="explorer__group"><dt><span class="ledger__class" data-class="${cls}">${escapeXml(OPERATION_CLASS[cls])}</span></dt>` +
+    `<dd class="demo__grid">${cells.join('')}</dd></div>`;
   return (
-    `<div class="demo__grid explorer__out">` +
-    cell('entropy', `Entropy (${account.entropyBits.length} bits)`, hex(account.entropy)) +
-    cell('checksum', 'Checksum bits', account.checksumBits) +
-    cell('seed', 'Seed (512 bits)', hex(account.seed), { wide: true }) +
-    cell('path', 'Derivation path', account.path, { mono: false }) +
-    cell('privateKey', 'Private key k', hex(account.privateKey)) +
-    cell('publicKey', 'Public key K = k · G (uncompressed)', hex(account.publicKey), { wide: true }) +
-    cell('address', 'Address (lower case)', account.address) +
-    cell('checksummed', 'Checksummed address (EIP-55)', account.checksummed) +
-    `</div>`
+    `<dl class="explorer__out">` +
+    group('generation', [cell('entropy', `Entropy (${account.entropyBits.length} bits)`, hex(account.entropy), { wide: true })]) +
+    group('encodingChecksum', [
+      cell('indices', 'Word indices (11 bits each)', account.wordIndices.join(' '), { mono: false }),
+      cell('checksum', 'Checksum bits', account.checksumBits),
+    ]) +
+    group('stretching', [cell('seed', 'Seed (512 bits)', hex(account.seed), { wide: true })]) +
+    group('hd', [
+      cell('master', 'Master private key', hex(account.master.privateKey), { wide: true }),
+      cell('path', 'Derivation path', account.path, { mono: false }),
+      cell('privateKey', 'Private key k', hex(account.privateKey)),
+    ]) +
+    group('publicKey', [cell('publicKey', 'Public key K = k · G (uncompressed)', hex(account.publicKey), { wide: true })]) +
+    group('hashing', [cell('digest', 'Keccak-256(x ‖ y)', hex(account.keccakDigest), { wide: true })]) +
+    group('truncation', [cell('address', 'Address (last 20 bytes)', account.address, { wide: true })]) +
+    group('checksumEncoding', [cell('checksummed', 'Checksummed address (EIP-55)', account.checksummed, { wide: true })]) +
+    `</dl>`
   );
 }
 
 /* -------------------------------------------------------- BIP-39 bits */
 
 /**
- * Fig. "BIP-39 bit grouping": the entropy bits and the checksum bits cut
- * into 11-bit word indices.
- * @param {object} account output of deriveEthereumAccount
+ * Fig. "BIP-39 bit grouping": the entropy bits and the checksum bits as one
+ * stream, cut by 11-bit brackets into word indices.
+ * @param {object} account output of deriveEthereumAccount (or deriveLenient)
  */
 export function renderBip39Grouping(account) {
   const ent = account.entropyBits.length;
   const cs = account.checksumBits.length;
   const firstByte = sha256(account.entropy)[0].toString(2).padStart(8, '0');
+  const cellOf = (b, extra = '') => `<span class="bip39__bit${extra}${b === '1' ? ' is-one' : ''}">${b}</span>`;
   const words = account.words.map((word, i) => {
     const bits = account.wordIndices[i].toString(2).padStart(11, '0');
     const isLast = i === account.words.length - 1;
-    const body = isLast ? `${bits.slice(0, 11 - cs)}<span class="bip39__cs">${bits.slice(11 - cs)}</span>` : bits;
+    const cells = isLast
+      ? [...bits.slice(0, 11 - cs)].map((b) => cellOf(b)).join('') + `<span class="bip39__cs">${[...bits.slice(11 - cs)].map((b) => cellOf(b, ' is-cs')).join('')}</span>`
+      : [...bits].map((b) => cellOf(b)).join('');
+    const spoken = isLast ? `${bits.slice(0, 11 - cs)}, checksum ${bits.slice(11 - cs)}` : bits;
     return (
       `<li class="bip39__word" data-bip39-word="${i}">` +
-      `<span class="bip39__pos" aria-hidden="true">${i + 1}</span>` +
-      `<span class="bip39__bits">${body}</span>` +
-      `<span class="bip39__index">${account.wordIndices[i]}</span>` +
+      `<span class="bip39__cells" aria-hidden="true">${cells}</span>` +
+      `<svg class="bip39__bracket" viewBox="0 0 110 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0.75 0V6.5H109.25V0"/></svg>` +
+      `<span class="bip39__label" aria-hidden="true"><span class="bip39__pos">${i + 1}</span>` +
       `<span class="bip39__text">${escapeXml(word)}</span>` +
+      `<span class="bip39__index">${account.wordIndices[i]}</span></span>` +
+      `<span class="visually-hidden">Word ${i + 1}, ${escapeXml(word)}: bits ${spoken}, index ${account.wordIndices[i]}.</span>` +
       `</li>`
     );
   });
@@ -876,20 +943,34 @@ export function renderTimeline(events, { id }) {
 
 /* ----------------------------------------------------------- digests */
 
+/** The domain-separation suffix appended to the message before the pad10*1 padding (FIPS 202). */
+export const DIGEST_SUFFIX = Object.freeze({ keccak256: '0x01', sha3_256: '0x06' });
+
 /**
- * Fig. "digest comparator": the digests of one input under four functions.
+ * Fig. "digest comparator": the digests of one input under four functions;
+ * Keccak-256 and SHA3-256 sit side by side with their padding suffixes and
+ * the number of bits in which they differ.
  * @param {{ input: string, rows: { key?: string, name: string, bits: number, hex: string }[] }} data
  */
 export function renderDigestTable({ input, rows }) {
-  return (
-    `<dl class="digests" data-digests-input="${escapeXml(input)}">` +
-    rows
-      .map(
-        (r) =>
-          `<div class="digests__row"><dt><span class="digests__name">${escapeXml(r.name)}</span><span class="digests__bits">${r.bits} bits</span></dt>` +
-          `<dd><code class="digests__hex" data-digest="${escapeXml(r.key ?? r.name)}">${escapeXml(r.hex)}</code></dd></div>`,
-      )
-      .join('') +
-    `</dl>`
-  );
+  const keyOf = (r) => r.key ?? r.name;
+  const keccak = rows.find((r) => r.key === 'keccak256');
+  const sha3 = rows.find((r) => r.key === 'sha3_256');
+  const twins = keccak && sha3 && keccak.hex.length === sha3.hex.length ? bitDistance(hexToBitString(keccak.hex), hexToBitString(sha3.hex)) : null;
+  const body = rows
+    .map((r) => {
+      const suffix = DIGEST_SUFFIX[r.key];
+      return (
+        `<div class="digests__row"${suffix ? ' data-twin' : ''} data-digest-row="${escapeXml(keyOf(r))}"><dt><span class="digests__name">${escapeXml(r.name)}</span><span class="digests__bits">${r.bits} bits</span>` +
+        (suffix ? `<span class="digests__pad">Padding suffix <span class="digests__pad-value">${suffix}</span></span>` : '') +
+        `</dt><dd><code class="digests__hex" data-digest="${escapeXml(keyOf(r))}">${escapeXml(r.hex)}</code></dd></div>`
+      );
+    })
+    .join('');
+  const note =
+    twins === null
+      ? ''
+      : `<p class="digests__twins" data-digests-twins="${twins}">Keccak-256 and SHA3-256 of the same input differ in <span class="tabular" data-digests-twins-count>${twins}</span> of 256 bits: ` +
+        `the same permutation Keccak-f[1600] and the same rate of 1088 bits, with the padding suffix 0x01 against 0x06.</p>`;
+  return `<div class="digests-frame"><dl class="digests" data-digests-input="${escapeXml(input)}">${body}</dl>${note}</div>`;
 }

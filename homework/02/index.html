@@ -95,6 +95,13 @@
             </p>
 
             <figure class="chart-figure hw02-figure" data-pipeline aria-labelledby="fig1-title">
+              <div class="figure-bar" data-pipeline-controls hidden>
+                <button type="button" class="form-button" data-pipeline-run data-source-anchor>Run the pipeline</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
               <div class="chart-figure__canvas" data-pipeline-canvas><!-- @figure id=pipeline --></div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig1-title">
@@ -103,6 +110,8 @@
                 <p>
                   Each row is one stage of the worked example: the standard that defines it, its operation class
                   (§2), the operation applied and the value it produces, with the size of that value in bits. The
+                  strip under each name is drawn to scale, its full width being 512 bits, with the 1-bits of the value
+                  marked; the rule between two rows names the operation that maps one value to the next. The
                   final value, <code>{{fig.example.address}}</code>, is the address of account #0 published for this
                   mnemonic by the Hardhat development network, and is checked when the page is built.
                 </p>
@@ -127,8 +136,8 @@
               <form class="explorer__form" data-explorer-form hidden>
                 <label class="text-field text-field--area">
                   <span class="caption">Mnemonic (12 to 24 words)</span>
-                  <textarea data-explorer-mnemonic rows="2" autocomplete="off" autocapitalize="off" spellcheck="false">{{fig.example.mnemonic}}</textarea>
-                  <span class="text-field__note" data-explorer-mnemonic-note></span>
+                  <textarea data-explorer-mnemonic rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="explorer-mnemonic-note">{{fig.example.mnemonic}}</textarea>
+                  <span class="text-field__note" id="explorer-mnemonic-note" data-explorer-mnemonic-note></span>
                 </label>
                 <div class="demo__row">
                   <label class="text-field">
@@ -144,8 +153,15 @@
                     <input type="number" data-explorer-index value="0" min="0" max="2147483647" step="1" />
                   </label>
                 </div>
-                <div class="demo__row">
-                  <button type="button" class="form-button" data-explorer-generate>Generate new 12-word phrase</button>
+                <p class="explorer__path" data-explorer-path>Path m/44'/60'/0'/0/0</p>
+                <div class="explorer__buttons">
+                  <button type="button" class="form-button" data-explorer-generate>Generate a new 12-word phrase</button>
+                  <button type="button" class="form-button" data-explorer-example>Use the worked example</button>
+                  <button type="button" class="form-button" data-explorer-flip>Flip one entropy bit</button>
+                </div>
+                <div class="explorer__avalanche">
+                  <p class="caption">Avalanche: bits changed at every stage by one flipped entropy bit</p>
+                  <div data-explorer-avalanche hidden></div>
                 </div>
               </form>
               <div class="chart-figure__canvas" data-explorer-output><!-- @figure id=explorer --></div>
@@ -170,6 +186,13 @@
             </p>
 
             <figure class="chart-figure hw02-figure" data-bip39 aria-labelledby="fig3-title">
+              <div class="figure-bar" data-bip39-controls hidden>
+                <button type="button" class="form-button" data-bip39-replay data-source-anchor>Replay the grouping</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
               <div class="chart-figure__canvas" data-bip39-canvas><!-- @figure id=bip39 --></div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig3-title">
@@ -206,6 +229,35 @@
 
             <figure class="chart-figure hw02-figure" data-hdtree aria-labelledby="fig4-title">
               <div class="chart-figure__canvas hdtree-frame" data-hdtree-canvas><!-- @figure id=hdtree --></div>
+              <div class="hdtree__controls" data-hdtree-controls hidden>
+                <fieldset class="choice">
+                  <legend class="caption">Address index i</legend>
+                  <div class="choice__options">
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i0" value="0" data-hdtree-index checked /><label for="hdtree-i0">i = 0</label></div>
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i1" value="1" data-hdtree-index /><label for="hdtree-i1">i = 1</label></div>
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i2" value="2" data-hdtree-index /><label for="hdtree-i2">i = 2</label></div>
+                  </div>
+                </fieldset>
+                <div class="hdtree__buttons">
+                  <button type="button" class="form-button" data-hdtree-replay>Draw the path</button>
+                  <button type="button" class="form-button" data-hdtree-leak>Recover the parent private key</button>
+                </div>
+              </div>
+              <div class="hdtree__leak-out" data-hdtree-leak-out hidden>
+                <p class="caption">Non-hardened leak: the parent m/44'/60'/0'/0 from its extended public key and one child private key</p>
+                <dl class="demo__grid">
+                  <div class="demo__cell demo__cell--wide"><dt class="caption">Private key <span class="math">k<sub>i</sub></span> of the selected leaf</dt><dd class="demo__value demo__value--mono" data-leak="child">—</dd></div>
+                  <div class="demo__cell demo__cell--wide"><dt class="caption"><span class="math">I<sub>L</sub></span>, left half of HMAC-SHA512(<span class="math">c<sub>par</sub>, K<sub>par</sub> ‖ i</span>), from the xpub</dt><dd class="demo__value demo__value--mono" data-leak="il">—</dd></div>
+                  <div class="demo__cell"><dt class="caption">Recovered <span class="math">k<sub>par</sub> = k<sub>i</sub> − I<sub>L</sub> mod n</span></dt><dd class="demo__value demo__value--mono" data-leak="recovered">—</dd></div>
+                  <div class="demo__cell"><dt class="caption"><span class="math">k<sub>par</sub></span> derived from the seed</dt><dd class="demo__value demo__value--mono" data-leak="true">—</dd></div>
+                  <div class="demo__cell demo__cell--wide"><dt class="caption">Equal</dt><dd class="demo__value" data-leak="equal">—</dd></div>
+                </dl>
+                <p class="demo__note">
+                  An extended public key and the private key of one of its normal children determine the parent private key;
+                  since the account level m/44'/60'/0' is hardened, such a leak reaches the account's chain but neither the
+                  other accounts nor the master key.
+                </p>
+              </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig4-title">
                   <span class="pplot__fig-no">Figure 4.</span>The derivation tree of m/44'/60'/0'/0/i
@@ -244,7 +296,18 @@
 
             <figure class="chart-figure hw02-figure" data-keccak3d aria-labelledby="fig5-title">
               <div class="chart-figure__canvas" data-keccak3d-canvas><!-- @figure id=keccak3d --></div>
-              <div class="chart-figure__controls" data-keccak3d-controls hidden></div>
+              <div class="chart-figure__controls keccak3d__controls" data-keccak3d-controls hidden>
+                <label class="text-field keccak3d__range">
+                  <span class="caption">Checkpoint of the trace</span>
+                  <input type="range" min="0" max="15" step="1" value="6" data-keccak3d-step />
+                </label>
+                <div class="keccak3d__buttons">
+                  <button type="button" class="form-button" data-keccak3d-prev>Previous step</button>
+                  <button type="button" class="form-button" data-keccak3d-next>Next step</button>
+                  <button type="button" class="form-button" data-keccak3d-play aria-pressed="false">Play the steps</button>
+                </div>
+                <p class="keccak3d__readout" data-keccak3d-readout></p>
+              </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig5-title">
                   <span class="pplot__fig-no">Figure 5.</span>The Keccak-f[1600] state as a 5 × 5 × 64 lattice of bits
@@ -266,7 +329,22 @@
             <p class="placeholder">The case of each letter of the address is set by one nibble of a second Keccak-256 digest.</p>
 
             <figure class="chart-figure hw02-figure" data-eip55 aria-labelledby="fig6-title">
+              <div class="figure-bar" data-eip55-controls hidden>
+                <button type="button" class="form-button" data-eip55-play data-source-anchor>Apply the checksum</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
               <div class="chart-figure__canvas" data-eip55-canvas><!-- @figure id=eip55 --></div>
+              <div class="eip55-check" data-eip55-controls hidden>
+                <label class="text-field">
+                  <span class="caption">Check an address</span>
+                  <input type="text" data-eip55-input placeholder="0x followed by 40 hex digits" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="eip55-result" />
+                </label>
+                <p class="eip55-check__result" id="eip55-result" data-eip55-result aria-live="polite"></p>
+                <p class="eip55-check__echo"><code data-eip55-echo></code></p>
+              </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig6-title">
                   <span class="pplot__fig-no">Figure 6.</span>EIP-55 applied to the address of the worked example
@@ -768,8 +846,8 @@
             <figure class="chart-figure hw02-figure" data-digests aria-labelledby="fig15-title">
               <div class="digests__controls" data-digests-controls hidden>
                 <label class="text-field">
-                  <span class="caption">Input (UTF-8)</span>
-                  <input type="text" data-digests-input value="" autocomplete="off" spellcheck="false" />
+                  <span class="caption">Input (UTF-8), recomputed at every keystroke</span>
+                  <input type="text" data-digests-input value="" placeholder="Type any text" autocomplete="off" spellcheck="false" />
                 </label>
               </div>
               <div class="chart-figure__canvas" data-digests-output><!-- @figure id=digests --></div>

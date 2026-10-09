@@ -23,6 +23,7 @@ import {
   formatP,
   formatSci,
   hdTreeModel,
+  pipelineStages,
   renderBip39Grouping,
   renderChart,
   renderDigestTable,
@@ -65,8 +66,42 @@ test('the pipeline ledger prints eight stages, each with its operation class and
   assert.equal(count(html, 'class="ledger__stage"'), 8);
   assert.equal(count(html, 'class="ledger__class"'), 8);
   assert.ok(html.includes('data-pipeline-stage="checksummed"'));
+  assert.ok(html.includes('data-pipeline-stage="digest"'), 'the Keccak-256 digest is a stage of its own');
   assert.ok(html.includes('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'));
   assert.ok(html.includes('key stretching'));
+});
+
+test('every ledger stage carries a bit strip as wide as its share of 512 bits, with its 1-bits marked', () => {
+  const stages = pipelineStages(example.account);
+  assert.deepEqual(
+    stages.map((s) => [s.key, s.bits]),
+    [
+      ['entropy', 128],
+      ['mnemonic', 132],
+      ['seed', 512],
+      ['privateKey', 256],
+      ['publicKey', 512],
+      ['digest', 256],
+      ['address', 160],
+      ['checksummed', 160],
+    ],
+  );
+  for (const s of stages) assert.equal(s.bitString.length, s.bits, s.key);
+  const html = renderPipelineLedger(example.account);
+  assert.equal(count(html, 'class="strip"'), 8);
+  assert.ok(html.includes('viewBox="0 0 128 '));
+  assert.ok(html.includes('--strip:0.25'), 'the entropy strip spans a quarter of the track');
+  const ones = [...example.account.entropyBits].filter((b) => b === '1').length;
+  const entropyStrip = html.match(/data-strip="entropy"[^]*?<\/svg>/)[0];
+  const marked = [...entropyStrip.matchAll(/M(\d+) 0h(\d+)/g)].reduce((a, m) => a + Number(m[2]), 0);
+  assert.equal(marked, ones);
+  assert.equal(count(html, 'class="strip__case"'), 1, 'the case pattern of the checksummed address');
+});
+
+test('the ledger links consecutive stages with the operation that maps one to the next', () => {
+  const html = renderPipelineLedger(example.account);
+  const labels = [...html.matchAll(/class="ledger__link-label">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(labels, ['BIP-39 encoding', 'PBKDF2-HMAC-SHA512', 'BIP-32 / BIP-44', 'secp256k1', 'Keccak-256', 'Last 20 bytes', 'EIP-55']);
 });
 
 test('the BIP-39 grouping shows 12 words of 11 bits and the 4 checksum bits', () => {
@@ -75,6 +110,15 @@ test('the BIP-39 grouping shows 12 words of 11 bits and the 4 checksum bits', ()
   assert.equal(count(html, 'class="bip39__cs"'), 1, 'the checksum bits sit in the last word');
   assert.ok(html.includes('>1010<'), 'checksum bits of the example');
   assert.ok(html.includes('>junk<') && html.includes('>1788<'));
+});
+
+test('the BIP-39 grouping prints the 132-bit stream bit by bit under 11-bit brackets', () => {
+  const html = renderBip39Grouping(example.account);
+  assert.equal(count(html, 'class="bip39__bit'), 132);
+  assert.equal(count(html, 'class="bip39__bit is-cs'), 4);
+  assert.equal(count(html, 'class="bip39__bracket"'), 12);
+  const stream = [...html.matchAll(/class="bip39__bit[^"]*"[^>]*>([01])</g)].map((m) => m[1]).join('');
+  assert.equal(stream, example.account.entropyBits + example.account.checksumBits);
 });
 
 test('the HD tree draws hardened edges as double rules and normal edges as single rules', () => {
@@ -127,6 +171,20 @@ test('the digest table prints four digests of the same input', () => {
   ] });
   assert.equal(count(html, 'class="digests__row"'), 4);
   assert.ok(html.includes('Keccak-256') && html.includes('a7ff'));
+});
+
+test('the digest table prints the padding suffix of Keccak-256 and SHA3-256 and the bits in which they differ', () => {
+  const html = renderDigestTable({ input: '', rows: [
+    { key: 'sha256', name: 'SHA-256', bits: 256, hex: 'e3b0' },
+    { key: 'sha512', name: 'SHA-512', bits: 512, hex: 'cf83' },
+    { key: 'keccak256', name: 'Keccak-256', bits: 256, hex: 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470' },
+    { key: 'sha3_256', name: 'SHA3-256', bits: 256, hex: 'a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a' },
+  ] });
+  assert.ok(html.includes('0x01') && html.includes('0x06'));
+  assert.equal(count(html, 'class="digests__row digests__row--twin"'), 0, 'twin rows keep the plain row class');
+  const twins = html.match(/data-digests-twins="(\d+)"/);
+  assert.ok(twins, 'the twin comparison is printed');
+  assert.ok(Number(twins[1]) > 64 && Number(twins[1]) < 192);
 });
 
 test('chart kinds render valid SVG for real experiment results', () => {

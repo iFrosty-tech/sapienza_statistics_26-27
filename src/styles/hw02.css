@@ -194,6 +194,7 @@
 
 .ledger__class {
   margin-left: auto;
+  font-family: var(--font-form);
   padding: 0 0.4em;
   border: var(--hair) solid var(--ruling-ink);
   font-size: var(--text-caption);
@@ -211,16 +212,12 @@
 }
 
 .ledger__value {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
   margin: 0;
 }
 
 .ledger__value code {
+  display: block;
   min-width: 0;
-  flex: 1 1 20rem;
   padding: 0;
   background: none;
   font-size: 0.8125rem;
@@ -228,7 +225,51 @@
   overflow-wrap: anywhere;
 }
 
+/* Bit strip: the track is the full width of 512 bits; each strip is its share of it. */
+.ledger__strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-1) 0 0;
+}
+
+.ledger__track {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.strip {
+  display: block;
+  width: calc(var(--strip, 1) * 100%);
+  height: 0.75rem;
+  box-sizing: border-box;
+  border: var(--hair) solid var(--ruling-ink);
+  background: var(--paper);
+}
+
+.strip[data-strip='checksummed'] {
+  height: 1.3125rem;
+  border-bottom-color: var(--ruling);
+}
+
+.strip__bits {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.strip__marks {
+  fill: var(--plot);
+}
+
+.strip__case {
+  fill: var(--ink);
+}
+
 .ledger__bits {
+  flex: none;
+  min-width: 5.5rem;
   font-family: var(--font-form);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -236,6 +277,46 @@
   text-transform: uppercase;
   color: var(--ruling-ink);
   font-variant-numeric: tabular-nums lining-nums;
+}
+
+.ledger__strip-note {
+  flex-basis: 100%;
+  font-family: var(--font-form);
+  font-size: var(--text-caption);
+  color: var(--ink-faint);
+}
+
+/* The rule to the next stage, under the name of the operation that produces it */
+.ledger__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 calc(-1 * var(--space-3));
+  margin-left: calc(-1 * var(--space-3) - 6.5px);
+}
+
+.ledger__arrow {
+  flex: none;
+  overflow: visible;
+}
+
+.ledger__arrow path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ledger__link-label {
+  padding: 0 0.4em;
+  background: var(--paper);
+  font-family: var(--font-form);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 @media (max-width: 36rem) {
@@ -337,25 +418,96 @@
 
 .bip39__words {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-  gap: var(--hair);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-2);
   margin: 0;
-  padding: 0;
+  padding: var(--space-4) var(--space-3);
   list-style: none;
-  background: var(--ruling);
   border: var(--rule) solid var(--ink);
+  background: var(--paper);
+}
+
+@media (max-width: 52rem) {
+  .bip39__words {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 34rem) {
+  .bip39__words {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-inline: var(--space-2);
+  }
 }
 
 .bip39__word {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.15rem var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--paper);
+  gap: 0.15rem;
+  min-width: 0;
+  outline: none;
+  cursor: default;
+}
+
+.bip39__cells {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  border-bottom: var(--hair) solid var(--ruling);
+}
+
+.bip39__cs {
+  display: contents;
+}
+
+.bip39__bit {
+  display: block;
+  padding-block: 0.15rem;
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--ink-faint);
+  transition: color var(--dur-feedback) var(--ease-out), box-shadow var(--dur-feedback) var(--ease-out);
+}
+
+.bip39__bit.is-one {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Checksum bits: outlined cells, the same ink, a distinct mark */
+.bip39__bit.is-cs {
+  outline: 1.25px solid var(--ink);
+  outline-offset: -1.25px;
+}
+
+.bip39__cs-legend {
+  outline: 1.25px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.bip39__bracket {
+  display: block;
+  width: 100%;
+  height: 0.5rem;
+  overflow: visible;
+}
+
+.bip39__bracket path {
+  fill: none;
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+  transition: stroke var(--dur-feedback) var(--ease-out);
+}
+
+.bip39__label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  padding-inline: 0.1rem;
 }
 
 .bip39__pos {
-  grid-row: span 2;
   font-family: var(--font-form);
   font-size: var(--text-caption);
   font-weight: 700;
@@ -363,32 +515,38 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-.bip39__bits {
-  font-family: var(--font-code);
-  font-size: 0.875rem;
-  letter-spacing: 0.04em;
-}
-
-/* Checksum bits are printed in reverse, ink ground and paper figures. */
-.bip39__cs,
-.bip39__cs-legend {
-  background: var(--ink);
-  color: var(--paper);
+.bip39__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-form);
+  font-size: 0.9375rem;
+  font-weight: 650;
 }
 
 .bip39__index {
   grid-column: 2;
   font-family: var(--font-form);
-  font-size: var(--text-small);
+  font-size: var(--text-caption);
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-.bip39__text {
-  grid-column: 2;
-  font-family: var(--font-form);
-  font-size: 1rem;
-  font-weight: 650;
+/* The word pointed at or focused: its 11 bits and its bracket in plot red */
+.bip39__word:hover .bip39__bit,
+.bip39__word:focus .bip39__bit,
+.bip39__word.is-active .bip39__bit {
+  box-shadow: inset 0 -2px 0 var(--plot);
+}
+
+.bip39__word:hover .bip39__bracket path,
+.bip39__word:focus .bip39__bracket path,
+.bip39__word.is-active .bip39__bracket path {
+  stroke: var(--plot);
+}
+
+.bip39__word:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
 }
 
 @media (max-width: 44rem) {
@@ -701,14 +859,500 @@
   }
 }
 
+/* ---------- Interactive figures ---------- */
+
+/* A figure's own controls: the action on the left, the account shown on the right */
+.figure-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: 2.75rem;
+}
+
+.form-button[hidden],
+.figure-bar[hidden],
+.hdtree__controls[hidden],
+.hdtree__leak-out[hidden],
+.eip55-check[hidden],
+[data-explorer-avalanche][hidden] {
+  display: none;
+}
+
+.figure-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  min-height: 2.75rem;
+}
+
+.figure-source__label {
+  font-family: var(--font-form);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* Parts of a figure that wait, unprinted, for its first run (scripted only) */
+[data-pipeline].is-primed .strip,
+[data-pipeline].is-primed .ledger__value,
+[data-pipeline].is-primed .ledger__class,
+[data-pipeline].is-primed .ledger__link,
+[data-bip39].is-primed .bip39__bit,
+[data-bip39].is-primed .bip39__bracket,
+[data-bip39].is-primed .bip39__label,
+[data-hdtree].is-primed .hdtree__edge,
+[data-hdtree].is-primed .hdtree__node + .hdtree__node,
+[data-eip55].is-primed .eip55__nibble,
+[data-eip55].is-primed .eip55__mark,
+[data-timeline].is-primed .timeline__event {
+  opacity: 0;
+}
+
+/* ---------- Fig. 2: explorer form and output ---------- */
+.explorer__path {
+  margin: 0;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.explorer__path[data-kind='error'],
+.text-field__note[data-kind='error'] {
+  color: var(--plot-deep);
+  font-weight: 600;
+}
+
+.text-field__note[data-kind='warning'] {
+  padding: var(--space-2) var(--space-3);
+  border: var(--hair) dashed var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.text-field__note[data-kind='ok'] {
+  color: var(--ink-soft);
+}
+
+.explorer__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.text-field [aria-invalid='true'] {
+  border-color: var(--plot-deep);
+  box-shadow: inset 0 -2px 0 var(--plot);
+}
+
+.explorer__out {
+  display: grid;
+  margin: 0;
+  border-top: var(--rule) solid var(--ink);
+  transition: opacity var(--dur-state) var(--ease-out);
+}
+
+[data-explorer-output].is-stale .explorer__out {
+  opacity: 0.45;
+}
+
+.explorer__group {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hair) solid var(--ruling);
+}
+
+.explorer__group dt {
+  padding-top: var(--space-2);
+}
+
+.explorer__group .ledger__class {
+  display: inline-block;
+  margin-left: 0;
+}
+
+.explorer__group dd {
+  margin: 0;
+  border-width: var(--hair);
+  border-color: var(--ruling-ink);
+}
+
+.demo__value.is-warning {
+  text-decoration: underline wavy var(--plot);
+  text-underline-offset: 0.25em;
+}
+
+@media (max-width: 40rem) {
+  .explorer__group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .explorer__group dt {
+    padding-top: 0;
+  }
+}
+
+/* Avalanche of one flipped entropy bit */
+.explorer__avalanche {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.explorer__avalanche > .caption {
+  margin: 0;
+}
+
+.avalanche__head {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  color: var(--ink-soft);
+}
+
+.avalanche__frame {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.explorer__form > * {
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .avalanche th,
+  .avalanche td {
+    padding-inline: 0.35rem;
+    font-size: 0.8125rem;
+  }
+
+  /* On a phone the numbers carry the reading; the bars need more width than there is. */
+  .avalanche__cell,
+  .avalanche thead th:last-child {
+    display: none;
+  }
+}
+
+.avalanche {
+  width: 100%;
+}
+
+.avalanche th[scope='row'] {
+  white-space: nowrap;
+}
+
+.avalanche__cell {
+  width: 40%;
+  min-width: 7rem;
+}
+
+.avalanche__bar {
+  position: relative;
+  display: block;
+  height: 0.75rem;
+  border: var(--hair) solid var(--ruling-ink);
+  background: var(--paper);
+}
+
+.avalanche__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--plot);
+}
+
+.avalanche__tick {
+  position: absolute;
+  top: -0.25rem;
+  bottom: -0.25rem;
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--ink);
+}
+
+/* ---------- Fig. 4: HD tree states and the leak ---------- */
+.hdtree__edge,
+.hdtree__node {
+  transition: opacity var(--dur-state) var(--ease-out);
+}
+
+.hdtree__edge.is-dim,
+.hdtree__node.is-dim {
+  opacity: 0.38;
+}
+
+.hdtree__node.is-selected rect,
+.hdtree__node.is-recovered rect {
+  stroke: var(--plot);
+  stroke-width: 2;
+}
+
+.hdtree__leak-line,
+.hdtree__leak-head {
+  fill: none;
+  stroke: var(--plot);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hdtree__leak-dot {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1;
+}
+
+.hdtree__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.hdtree__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.hdtree__leak-out {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hdtree__leak-out > .caption,
+.hdtree__leak-out dl,
+.hdtree__leak-out dd {
+  margin: 0;
+}
+
+.hdtree__leak-out .demo__note {
+  margin: 0;
+  max-width: 68ch;
+}
+
+/* ---------- Fig. 5: the lattice on canvas ---------- */
+.lattice-canvas {
+  display: block;
+  max-width: 100%;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.lattice-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.lattice-canvas:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.keccak3d__controls {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.keccak3d__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.keccak3d__range input[type='range'] {
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  accent-color: var(--plot);
+  background: transparent;
+  cursor: pointer;
+}
+
+.keccak3d__range input[type='range']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.keccak3d__readout {
+  margin: 0;
+  min-height: 1.5em;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- Fig. 6: case flips and the address check ---------- */
+.eip55__chars {
+  perspective: 40rem;
+}
+
+.eip55__glyph {
+  display: inline-block;
+  backface-visibility: hidden;
+}
+
+.eip55-check {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.eip55-check__result {
+  margin: 0;
+  min-height: 3em;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.eip55-check__result[data-status='invalid'],
+.eip55-check__result[data-status='malformed'] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.eip55-check__echo {
+  margin: 0;
+  min-height: 1.5em;
+}
+
+.eip55-check__echo code {
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.eip55__offending {
+  padding: 0 0.05em;
+  background: none;
+  color: var(--ink);
+  outline: 2px solid var(--plot);
+  outline-offset: 0;
+}
+
+/* ---------- Fig. 15: live digests ---------- */
+@media (min-width: 52rem) {
+  .digests {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+  }
+
+  .digests__row:not([data-twin]) {
+    grid-column: 1 / -1;
+  }
+
+  .digests__row[data-twin] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    border-top: var(--hair) solid var(--ruling);
+  }
+
+  .digests__row[data-twin] .digests__hex {
+    display: block;
+    max-width: 33ch;
+  }
+}
+
+.digests__pad {
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.digests__pad-value,
+.caption .math {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.caption .math {
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+.digests__delta {
+  margin-top: 0.15rem;
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.digests__delta [data-delta-count] {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.digests__hex .is-changed {
+  text-decoration: underline 2px;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  animation: hw02-digit-fade 600ms var(--ease-out);
+}
+
+@keyframes hw02-digit-fade {
+  0%,
+  40% {
+    text-decoration-color: var(--plot);
+  }
+
+  to {
+    text-decoration-color: transparent;
+  }
+}
+
+.digests__twins {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.digests__controls {
+  display: grid;
+}
+
 /* ---------- Print ---------- */
 @media print {
   .explorer__form,
   .digests__controls,
+  .figure-bar,
+  .hdtree__controls,
+  .hdtree__leak-out,
+  .eip55-check,
+  .digests__delta,
+  .lattice-canvas,
   [data-explorer-status],
   [data-pipeline-status],
   [data-keccak3d-controls] {
     display: none !important;
+  }
+
+  .lattice-frame[hidden] {
+    display: block !important;
+  }
+
+  .is-primed * {
+    opacity: 1 !important;
+    clip-path: none !important;
+    transform: none !important;
   }
 
   .prose .placeholder {
