@@ -325,13 +325,74 @@ export function expectedCollidingPairs(n, bits) {
 /**
  * Probability that m values drawn uniformly from a space of the given size
  * contain at least one repeat. Exact: 1 − Π_{i<m} (1 − i / size), computed in
- * log space; otherwise the approximation 1 − exp(−m(m − 1) / (2 size)).
+ * log space; otherwise the approximation 1 − exp(−m(m − 1) / (2 size)). Both use
+ * expm1, so that probabilities far below the double-precision epsilon (such as
+ * collisions among 160-bit addresses) are not rounded to zero.
  */
 export function collisionProbability(m, size, { exact = false } = {}) {
   if (m <= 1) return 0;
   if (m > size) return 1;
-  if (!exact) return 1 - Math.exp((-m * (m - 1)) / (2 * size));
+  if (!exact) return -Math.expm1((-m * (m - 1)) / (2 * size));
   let logNoCollision = 0;
   for (let i = 1; i < m; i += 1) logNoCollision += Math.log1p(-i / size);
-  return 1 - Math.exp(logNoCollision);
+  return -Math.expm1(logNoCollision);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Binomial proportions and the geometric law                                */
+/* ------------------------------------------------------------------------ */
+
+/** The 0.975 quantile of the standard normal distribution. */
+export const Z_95 = 1.959963984540054;
+
+/**
+ * Wilson score interval for a binomial proportion (Wilson, 1927): the set of
+ * p for which |k − np| / sqrt(np(1 − p)) ≤ z. Unlike the Wald interval it
+ * stays inside [0, 1] and keeps its coverage for proportions near 0, the
+ * regime of checksum acceptance rates.
+ * @param {number} k successes
+ * @param {number} n trials (n > 0)
+ * @param {{ z?: number }} [options] normal quantile, 1.96 for 95 %
+ * @returns {{ low: number, high: number, center: number }}
+ */
+export function wilsonInterval(k, n, { z = Z_95 } = {}) {
+  if (!(n > 0) || k < 0 || k > n) throw new Error('wilsonInterval needs 0 ≤ k ≤ n and n > 0');
+  const phat = k / n;
+  const z2 = z * z;
+  const denominator = 1 + z2 / n;
+  const center = (phat + z2 / (2 * n)) / denominator;
+  const half = (z / denominator) * Math.sqrt((phat * (1 - phat)) / n + z2 / (4 * n * n));
+  // The bounds are exactly 0 for k = 0 and 1 for k = n; set them so that round-off does not show.
+  const low = k === 0 ? 0 : Math.max(0, center - half);
+  const high = k === n ? 1 : Math.min(1, center + half);
+  return { low, high, center };
+}
+
+/**
+ * Exact two-sided binomial test of H0: X ~ Bin(n, p) for an observed k. The
+ * p-value is the total probability of the outcomes no more likely than k
+ * (the rule of R's binom.test), with a relative tolerance of 1e-7 for ties.
+ */
+export function binomialTestTwoSided(k, n, p) {
+  if (!Number.isInteger(k) || !Number.isInteger(n) || k < 0 || k > n) throw new Error('binomialTestTwoSided needs integers 0 ≤ k ≤ n');
+  const observed = binomialPmf(n, k, p);
+  const threshold = observed * (1 + 1e-7);
+  let total = 0;
+  for (let i = 0; i <= n; i += 1) {
+    const pi = binomialPmf(n, i, p);
+    if (pi <= threshold) total += pi;
+  }
+  return Math.min(1, total);
+}
+
+/** P(T = t) for T ~ Geometric(p) on {1, 2, …}, the number of trials up to the first success. */
+export function geometricPmf(t, p) {
+  if (!Number.isInteger(t) || t < 1) return 0;
+  return Math.exp((t - 1) * Math.log1p(-p)) * p;
+}
+
+/** P(T ≤ t) for T ~ Geometric(p) on {1, 2, …}: 1 − (1 − p)^t. */
+export function geometricCdf(t, p) {
+  if (t < 1) return 0;
+  return -Math.expm1(Math.floor(t) * Math.log1p(-p));
 }

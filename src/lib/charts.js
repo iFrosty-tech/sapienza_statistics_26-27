@@ -597,3 +597,222 @@ export function renderHeatMap({ id, rows, cols, flips, trials, rasterize, alt, l
     `</div></div>`
   );
 }
+
+/* --------------------------------------------------------- band chart */
+
+/** Decade exponents k with 10^k inside [min, max] on a logarithmic axis. */
+function decadeTicks(min, max) {
+  const values = [];
+  for (let k = Math.ceil(Math.log10(min) - 1e-9); k <= Math.floor(Math.log10(max) + 1e-9); k += 1) values.push(k);
+  return values;
+}
+
+/**
+ * A statistic followed across ordered checkpoints: the mean as a line with a
+ * point at every checkpoint, the interquartile range as a band, optional
+ * horizontal references and brackets that group the checkpoints (for
+ * instance the step mappings of one round).
+ * @param {{ id: string, title: string, desc: string,
+ *   points: { label: string, tick?: string, mean: number, q1: number, q3: number }[],
+ *   references?: { value: number, label: string }[], groups?: { from: number, to: number, label: string }[],
+ *   yLog?: boolean, yDomain?: [number, number], width?: number, height?: number, xLabel?: string, yLabel?: string }} options
+ */
+export function renderBandChart({
+  id,
+  title,
+  desc,
+  points,
+  references = [],
+  groups = [],
+  yLog = false,
+  yDomain,
+  width = 960,
+  height = 420,
+  xLabel = '',
+  yLabel = '',
+}) {
+  const g = layout({ width, height, margin: { bottom: groups.length ? 72 : 50 } });
+  const values = points.flatMap((p) => [p.q1, p.q3, p.mean]).concat(references.map((r) => r.value));
+  const dataMax = Math.max(...values);
+  const domain = yDomain ?? (yLog ? [1, 10 ** Math.ceil(Math.log10(dataMax * 1.05))] : [0, dataMax * 1.08]);
+  let y;
+  let yTicks;
+  if (yLog) {
+    const toY = linear(Math.log10(domain[0]), Math.log10(domain[1]), g.bottom, g.top);
+    y = (v) => toY(Math.log10(Math.max(v, domain[0])));
+    yTicks = decadeTicks(domain[0], domain[1]).map((k) => ({ value: 10 ** k, label: k === 0 ? '1' : powerLabel(10, formatNumber(k, 0)) }));
+  } else {
+    const t = niceTicks(domain[0], domain[1], g.narrow ? 4 : 5);
+    y = linear(domain[0], t.values.at(-1), g.bottom, g.top);
+    yTicks = t.values.map((value) => ({ value, label: formatNumber(value, t.decimals) }));
+  }
+  const step = g.plotW / points.length;
+  const x = (i) => g.left + (i + 0.5) * step;
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--band' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yTicks.map((t) => ({ value: t.value, y: y(t.value) })), { major: () => false }));
+  for (const grp of groups.slice(1)) {
+    const gx = g.left + grp.from * step;
+    out.push(`<line class="chart__ruling chart__ruling--v is-major" x1="${round(gx)}" x2="${round(gx)}" y1="${g.top}" y2="${round(g.bottom)}"/>`);
+  }
+  out.push(frame(g), '</g>');
+
+  const upper = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${round(x(i))},${round(y(p.q3))}`).join('');
+  const lower = points
+    .map((p, i) => [i, p])
+    .reverse()
+    .map(([i, p]) => `L${round(x(i))},${round(y(p.q1))}`)
+    .join('');
+  out.push(`<path class="chart__band-area" d="${upper}${lower}Z" aria-hidden="true"/>`);
+
+  out.push('<g class="chart__references" aria-hidden="true">');
+  for (const ref of references) {
+    out.push(
+      `<line class="chart__reference" x1="${g.left}" x2="${round(g.right)}" y1="${round(y(ref.value))}" y2="${round(y(ref.value))}"/>`,
+      `<text class="chart__annotation" x="${round(g.left + 6)}" y="${round(y(ref.value) - 5)}">${escapeXml(ref.label)}</text>`,
+    );
+  }
+  out.push('</g>');
+
+  const trace = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${round(x(i))},${round(y(p.mean))}`).join('');
+  out.push(`<path class="chart__trace" d="${trace}" aria-hidden="true"/>`);
+  out.push('<g class="chart__data" aria-hidden="true">');
+  points.forEach((p, i) => out.push(`<circle class="chart__point" cx="${round(x(i))}" cy="${round(y(p.mean))}" r="${g.narrow ? 2.4 : 3.2}"/>`));
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(yLabels(g, yTicks.map((t) => ({ label: t.label, y: y(t.value) }))));
+  out.push(
+    xLabels(
+      g,
+      points.map((p, i) => ({ label: escapeXml(p.tick ?? p.label), x: x(i) })).filter((t) => t.label !== ''),
+    ),
+  );
+  for (const grp of groups) {
+    const x0 = g.left + grp.from * step + 2;
+    const x1 = g.left + (grp.to + 1) * step - 2;
+    const by = g.bottom + 27;
+    out.push(
+      `<path class="chart__group" d="M${round(x0)},${round(by - 4)}V${round(by)}H${round(x1)}V${round(by - 4)}"/>`,
+      `<text class="chart__group-label" x="${round((x0 + x1) / 2)}" y="${round(by + 13)}" text-anchor="middle">${escapeXml(grp.label)}</text>`,
+    );
+  }
+  out.push(axisTitles({ ...g, bottom: g.bottom + (groups.length ? 22 : 0) }, xLabel, yLabel), '</g></svg>');
+  return out.join('');
+}
+
+/* ------------------------------------------------- interval dot plot */
+
+/**
+ * One row per quantity on a logarithmic probability axis: the exact value as
+ * an ink tick, the Monte Carlo estimate as a point and its confidence
+ * interval as a line. Row labels are printed above their row, so the chart
+ * keeps its full width on a phone.
+ * @param {{ id: string, title: string, desc: string,
+ *   rows: { label: string, expected: number, estimate: number, low: number, high: number }[],
+ *   xDomain?: [number, number], width?: number, rowHeight?: number, xLabel?: string }} options
+ */
+export function renderIntervalDots({ id, title, desc, rows, xDomain, width = 960, rowHeight = 52, xLabel = '' }) {
+  const height = 16 + rows.length * rowHeight + 50;
+  const g = layout({ width, height, margin: { left: width < 520 ? 14 : 20, right: width < 520 ? 18 : 28 } });
+  const positive = rows.flatMap((r) => [r.expected, r.estimate, r.low, r.high]).filter((v) => v > 0);
+  const domain = xDomain ?? [
+    10 ** Math.floor(Math.log10(Math.min(...positive))),
+    10 ** Math.ceil(Math.log10(Math.max(...positive))),
+  ];
+  const toX = linear(Math.log10(domain[0]), Math.log10(domain[1]), g.left, g.right);
+  const x = (v) => toX(Math.log10(Math.min(domain[1], Math.max(v, domain[0]))));
+  const ticks = decadeTicks(domain[0], domain[1]);
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--intervals' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(vRulings(g, ticks.map((k) => ({ value: k, x: toX(k) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  rows.forEach((r, i) => {
+    const top = g.top + i * rowHeight;
+    const cy = top + rowHeight * 0.66;
+    if (i > 0) out.push(`<line class="chart__row-rule" x1="${g.left}" x2="${round(g.right)}" y1="${round(top)}" y2="${round(top)}"/>`);
+    out.push(
+      `<text class="chart__row-label" x="${round(g.left + 6)}" y="${round(top + 15)}">${escapeXml(r.label)}</text>`,
+      `<line class="chart__interval" x1="${round(x(r.low))}" x2="${round(x(r.high))}" y1="${round(cy)}" y2="${round(cy)}"/>`,
+      `<line class="chart__expected-mark" x1="${round(x(r.expected))}" x2="${round(x(r.expected))}" y1="${round(cy - 8)}" y2="${round(cy + 8)}"/>`,
+      `<circle class="chart__point" cx="${round(x(r.estimate))}" cy="${round(cy)}" r="${g.narrow ? 3.2 : 4}"/>`,
+    );
+  });
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(xLabels(g, ticks.map((k) => ({ label: k === 0 ? '1' : powerLabel(10, formatNumber(k, 0)), x: toX(k) }))));
+  out.push(axisTitles(g, xLabel, ''), '</g></svg>');
+  return out.join('');
+}
+
+/* ------------------------------------------------------ capacity bars */
+
+/**
+ * Horizontal bars of a capacity with a filled part, one row per item, the
+ * label printed above its bar: for instance the size of a representation
+ * against the entropy it can carry.
+ * @param {{ id: string, title: string, desc: string, rows: { label: string, total: number, part: number }[],
+ *   max?: number, width?: number, rowHeight?: number, xLabel?: string, totalLabel?: string, partLabel?: string }} options
+ */
+export function renderCapacityBars({
+  id,
+  title,
+  desc,
+  rows,
+  max,
+  width = 960,
+  rowHeight = 46,
+  xLabel = 'Bits',
+  totalLabel = 'Total',
+  partLabel = 'Part',
+}) {
+  const legendH = 26;
+  const height = legendH + 16 + rows.length * rowHeight + 46;
+  const narrow = width < 520;
+  const g = layout({ width, height, margin: { top: 16 + legendH, left: narrow ? 14 : 20, right: narrow ? 18 : 28 } });
+  const top = max ?? Math.max(...rows.map((r) => r.total));
+  const ticks = niceTicks(0, top, narrow ? 4 : 8);
+  // The axis ends on a tick at or beyond the longest bar, so no bar leaves the frame.
+  if (ticks.values.at(-1) < top) ticks.values.push(+(ticks.values.at(-1) + ticks.step).toFixed(10));
+  const end = ticks.values.at(-1);
+  const x = linear(0, end, g.left, g.right);
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--capacity' })];
+
+  const lx = g.left + 40 + totalLabel.length * 6.4;
+  out.push(
+    '<g class="chart__legend" aria-hidden="true">',
+    `<rect class="chart__capacity chart__swatch" x="${g.left}" y="10" width="22" height="10"/>`,
+    `<text class="chart__legend-label" x="${g.left + 28}" y="19">${escapeXml(totalLabel)}</text>`,
+    `<rect class="chart__bar chart__swatch" x="${round(lx)}" y="10" width="22" height="10"/>`,
+    `<text class="chart__legend-label" x="${round(lx + 28)}" y="19">${escapeXml(partLabel)}</text>`,
+    '</g>',
+  );
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(vRulings(g, ticks.values.filter((v) => v > 0 && v < end).map((value) => ({ value, x: x(value) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  rows.forEach((r, i) => {
+    const top = g.top + i * rowHeight;
+    const barY = top + 21;
+    const barH = Math.min(14, rowHeight - 26);
+    out.push(
+      `<text class="chart__row-label" x="${round(g.left + 6)}" y="${round(top + 15)}">${escapeXml(r.label)}</text>`,
+      `<text class="chart__row-value" x="${round(g.right - 6)}" y="${round(top + 15)}" text-anchor="end">${escapeXml(`${r.part} of ${r.total}`)}</text>`,
+      `<rect class="chart__capacity" x="${g.left}" y="${round(barY)}" width="${round(x(r.total) - g.left)}" height="${barH}"/>`,
+      `<rect class="chart__bar" x="${g.left}" y="${round(barY)}" width="${round(x(r.part) - g.left)}" height="${barH}"/>`,
+    );
+  });
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(xLabels(g, ticks.values.map((value) => ({ label: formatNumber(value, ticks.decimals), x: x(value) }))));
+  out.push(axisTitles(g, xLabel, ''), '</g></svg>');
+  return out.join('');
+}

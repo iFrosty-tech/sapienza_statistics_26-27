@@ -26,4 +26,13 @@ export default [
     published: '2026-10-08',
     status: 'published',
   },
+  {
+    number: 2,
+    title: 'From wallet seed to Ethereum address: hashing, key derivation and cryptographic primitives',
+    abstract:
+      'The Ethereum wallet pipeline from a BIP-39 mnemonic to an EIP-55 checksummed address is implemented from the standards, checked against published test vectors, and each of its stages is tested against the statistical laws that an ideal construction would obey.',
+    topics: ['Key derivation', 'Hash functions', 'Elliptic-curve cryptography', 'Checksums and encodings'],
+    published: '2026-10-09',
+    status: 'published',
+  },
 ];

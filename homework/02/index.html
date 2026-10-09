@@ -1,0 +1,1977 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw02.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> A taxonomy of operations</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> The pipeline step by step</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Statistical properties</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Historical context</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Why several primitives</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> When the statistical assumption fails</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Conclusion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                HMWK 2 — From Wallet Seed to Ethereum Address: Hashing, Key Derivation and Cryptographic Primitives /
+                Statistical properties / TASK Check the practical cryptographic pipeline used in Ethereum wallets, from
+                a mnemonic phrase to an Ethereum address and briefly describe the role and purpose of the following
+                standards and cryptographic primitives: BIP-39 — mnemonic sentence and seed generation; BIP-32 —
+                hierarchical deterministic (HD) key derivation; BIP-44 — standard derivation paths for hierarchical
+                deterministic wallets; secp256k1 — elliptic-curve public-key cryptography; Keccak-256 — hash function
+                used in Ethereum address derivation; EIP-55 — mixed-case checksum encoding for Ethereum addresses.
+              </p>
+              <p>
+                In case try experiencing with software such as metamask, rabby, exodus, rainbow, ... or similar to
+                understand the role of each iece of technology ... A simplified wallet pipeline can be represented as:
+                Mnemonic ↓ BIP-39 ↓ Seed BIP-32 / BIP-44 ↓ Private Key ↓ secp256k1 ↓ Public Key ↓ Keccak-256 ↓ Ethereum
+                Address ↓ EIP-55 ↓ Checksummed Address.
+              </p>
+              <p>
+                For the purpose of this homework, distinguish clearly between: key generation and key derivation;
+                public-key cryptography; hashing; checksums; encoding. Also briefly discuss the role of each primitive
+                and how the different steps fit together and the statistical properties.
+              </p>
+              <p>
+                Hints: TEMPORAL AND HISTORICAL CONTEXT Briefly place these technologies in chronological context.
+                Discuss the approximate historical order of: RSA — public-key cryptography, introduced in 1977; SHA-2 /
+                SHA-512 — standardized in 2001; BIP-32 — hierarchical deterministic wallets, 2012; BIP-39 — mnemonic
+                code for generating deterministic wallets, 2013; BIP-44 — multi-account hierarchical deterministic
+                wallets, 2014; SHA-3 — standardized by NIST in 2015, based on Keccak; EIP-55 — Ethereum mixed-case
+                checksum addresses, 2016. Also explain the distinction between: SHA-2 / SHA-512 and Keccak / SHA-3 They
+                are related historically and both belong to the family of cryptographic hash functions, but Keccak is
+                the underlying design selected for SHA-3, while Ethereum uses Keccak-256, which is not identical to the
+                standardized SHA3-256 function (because of the padding/domain-separation convention.)
+              </p>
+              <p>
+                Why does the Ethereum wallet pipeline use several different cryptographic techniques instead of using
+                one single algorithm for everything? Explain briefly why: BIP-39/BIP-32/BIP-44 → key management and
+                derivation; secp256k1 → public/private key relationship and digital signatures; Keccak-256 → hashing;
+                EIP-55 → checksum/error detection serve different purposes in the overall system.
+              </p>
+            </blockquote>
+            <p>
+              To <em>check</em> the pipeline is given here an operational meaning with three parts. First, every step
+              is implemented independently from the text of its standard, in plain JavaScript and without a
+              cryptographic library: SHA-512, HMAC and PBKDF2, the Keccak-f[1600] permutation and its sponge, the
+              arithmetic of secp256k1, BIP-39, BIP-32, the BIP-44 paths, the address rule and EIP-55. The same code
+              runs when the page is built and in the reader's browser. Second, the implementation is validated against
+              published test vectors, among them the reference vectors of BIP-39 [<a href="#ref-28">28</a>], the test vectors of
+              BIP-32 [<a href="#ref-30">30</a>, "Test vectors"], the test cases of EIP-55 [<a href="#ref-5">5</a>] and the published digests of the
+              empty input under Keccak-256 [<a href="#ref-9">9</a>] and SHA3-256 [<a href="#ref-20">20</a>]; where Node's built-in
+              <code>crypto</code> module offers the same primitive, the tests also compare the two implementations.
+              Third, one worked example is recomputed every time the page is built: the development mnemonic of the
+              Hardhat toolkit, whose first account is published with its address and its private key [<a href="#ref-21">21</a>].
+              The build stops if either value, or either of the two digests of the empty input, differs from its
+              published value; the published addresses of the second and third accounts are checked by the test
+              suite. The intermediate values printed in §3 are not each compared with a published value: they lie
+              on the computation that produced these verified endpoints.
+            </p>
+            <p>The work answers five questions.</p>
+            <ol>
+              <li>Does an independent implementation reproduce the published values at every stage of the pipeline (§3)?</li>
+              <li>To which class of operation does each step belong: key generation, key derivation, public-key cryptography, hashing, checksum or encoding (§2)?</li>
+              <li>
+                Which statistical properties should each stage have if its hash functions behave as random functions,
+                and do simulated samples agree with them (§4)?
+              </li>
+              <li>In what order did the technologies appear, and how do SHA-2, Keccak and SHA-3 differ (§5)?</li>
+              <li>
+                Why does the pipeline combine several primitives instead of one (§6), and what is left of its security
+                when the randomness at its start is weak (§7)?
+              </li>
+            </ol>
+            <p>
+              The scope is deliberately narrow. Only Ethereum accounts are considered (coin type 60 of BIP-44), with
+              the English word list of BIP-39; the worked example has an empty passphrase, which the explorer of
+              Figure 2 lets the reader change. Signatures are described but not implemented. No wallet application
+              was run by the author: §3.8 gives a procedure by which a reader can repeat the comparison in a wallet,
+              and the evidence offered here is the agreement with published vectors checked at build time. The
+              statistical tests of §4 can reveal certain departures from the behaviour of an ideal random function;
+              as in <a href="{{base}}homework/01/">Homework 1</a>, passing them is a necessary condition for a
+              cryptographic function, not a proof of its security. Timings are measured on one machine with one
+              thread and are meant as orders of magnitude only.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> A taxonomy of operations</h2>
+            <p>
+              The assignment asks for five notions to be kept apart. They are distinguished here by what the
+              operation computes and by three formal properties: whether it takes a secret key as a parameter,
+              whether it can be inverted, and whether its input is secret. Table 1 collects the result.
+            </p>
+            <p>
+              <strong>Key generation</strong> is the sampling of a secret: a value drawn by a random process, ideally
+              uniformly from a set so large that guessing it is infeasible. It is not a function of earlier data,
+              and it is the only step of the pipeline that creates entropy. In a BIP-39 wallet it is the draw of the
+              initial entropy, a string of ENT bits with ENT a multiple of 32 between 128 and 256
+              [<a href="#ref-23">23</a>, "Generating the mnemonic"]; every later secret is computed from it. Its quality is a property
+              of the random generator, not of any standard of the pipeline, and §7 shows what follows when the
+              generator is weak.
+            </p>
+            <p>
+              <strong>Key derivation</strong> computes key material from secrets that already exist by a
+              deterministic function. A deterministic function cannot add entropy (§4.1), so derivation serves other
+              ends. PBKDF2 performs <em>key stretching</em>: it maps a secret that a person can transcribe, together
+              with a salt, to a key of fixed length by iterating a pseudorandom function, so that every guess costs an
+              attacker a fixed amount of work [<a href="#ref-15">15</a>, §5.2]. BIP-32 performs <em>hierarchical derivation</em>:
+              from a parent key and a 256-bit chain code it computes a tree of child keys with HMAC-SHA512, so that a
+              single backup determines any number of accounts [<a href="#ref-30">30</a>]. Both are keyed, because HMAC takes the
+              password or the chain code as its key [<a href="#ref-11">11</a>, §2], and both are one-way.
+            </p>
+            <p>
+              <strong>Public-key cryptography</strong> rests on a pair <span data-tex>(k, K)</span> linked by a map
+              that is easy to evaluate and believed infeasible to invert. On secp256k1,
+              <span data-tex>K = kG</span> is the <span data-tex>k</span>-fold sum of a fixed base point
+              <span data-tex>G</span> in a group of prime order <span data-tex>n</span> [<a href="#ref-6">6</a>, §2.4.1]. What
+              separates this relation from a hash is its algebraic structure: it lets the holder of
+              <span data-tex>k</span> produce signatures that anyone who knows only <span data-tex>K</span> can
+              verify. Ethereum transactions are signed with recoverable ECDSA signatures on this curve
+              [<a href="#ref-29">29</a>, Appendix F].
+            </p>
+            <p>
+              <strong>Hashing</strong> is an unkeyed, deterministic map from inputs of any length to outputs of fixed
+              length, designed so that it is infeasible to find an input with a given digest (preimage resistance) or
+              two inputs with the same digest (collision resistance). In the pipeline, Keccak-256 maps the public key
+              to the address; SHA-256 computes the checksum of BIP-39; SHA-512 works inside HMAC, and therefore inside
+              PBKDF2 and BIP-32. A hash function has no key pair and no group structure: on its own it is not a
+              signature scheme.
+            </p>
+            <p>
+              A <strong>checksum</strong> is redundancy appended to data so that accidental errors can be detected.
+              The data stay in clear and anyone can compute a valid checksum for any data, so a checksum gives neither
+              secrecy nor authentication. The pipeline has three: the <span data-tex>CS = ENT/32</span> bits of
+              BIP-39, the letter case of EIP-55, and the 32 bits derived from a double SHA-256 that are appended to a
+              serialised extended key before its Base58 encoding [<a href="#ref-30">30</a>, "Serialization format"].
+            </p>
+            <p>
+              An <strong>encoding</strong> is a reversible change of representation, with no key and no secrecy: bits
+              into 11-bit word indices and words, bytes into hexadecimal digits, extended keys into Base58, letters
+              into upper or lower case. An encoding preserves information exactly; it neither adds nor removes
+              entropy.
+            </p>
+            <p>
+              Some steps belong to two classes. The mnemonic is an encoding of the entropy followed by a checksum.
+              EIP-55 is a checksum carried by an encoding: its check bits are stored in the case of letters that
+              already encode the address. The address is the Keccak-256 digest of the public key truncated to its
+              last 160 bits; a truncated hash is again a hash with a shorter output, which is why Figure 1 tags that
+              stage <em>Hashing · truncation</em>. Conversely, the checksum of BIP-39 and the case pattern of EIP-55
+              are computed with hash functions without being hashes in purpose: the class of a step is set by what it
+              is for, not by the primitive inside it.
+            </p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption">
+              <table class="data-table data-table--compact data-table--taxonomy">
+                <caption id="table1-caption">Table 1. The classes of operation in the wallet pipeline: what each computes, whether it takes a secret key, whether it can be inverted, whether its input is secret, and the pipeline steps that belong to it.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Operation class</th>
+                    <th scope="col">Definition</th>
+                    <th scope="col">Keyed?</th>
+                    <th scope="col">Invertible?</th>
+                    <th scope="col">Secret input?</th>
+                    <th scope="col">Pipeline steps</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Key generation</th><td>Random draw of a secret; the only source of entropy</td><td>n/a (not a function)</td><td>n/a</td><td>None; the output is the secret</td><td>BIP-39 entropy, 128 to 256 bits</td></tr>
+                  <tr><th scope="row">Key derivation: stretching</th><td>Costly map from a weak secret and a salt to a key</td><td>Yes: the mnemonic keys HMAC</td><td>No</td><td>Yes: mnemonic, passphrase</td><td>PBKDF2-HMAC-SHA512, 2048 iterations: mnemonic → seed</td></tr>
+                  <tr><th scope="row">Key derivation: hierarchical</th><td>Parent key and chain code → child keys</td><td>Yes: the chain code keys HMAC</td><td>No; but see eq. (6) for normal children</td><td>Yes (CKDpriv); no (CKDpub)</td><td>Master key; CKDpriv along m/44'/60'/0'/0/i</td></tr>
+                  <tr><th scope="row">Public-key cryptography</th><td>One-way K = kG with group structure; supports signatures</td><td>Its input is the key k</td><td>No: discrete logarithm</td><td>Yes: k</td><td>k → K on secp256k1; ECDSA</td></tr>
+                  <tr><th scope="row">Hashing</th><td>Unkeyed map to a fixed length; preimage and collision resistant</td><td>No</td><td>No</td><td>Not necessarily</td><td>Keccak-256 → address (truncated); SHA-256 in the checksum; SHA-512 in HMAC</td></tr>
+                  <tr><th scope="row">Checksum</th><td>Public redundancy that detects errors; no security</td><td>No</td><td>n/a (data kept in clear)</td><td>Either</td><td>BIP-39 checksum; EIP-55 case; Base58Check of xprv / xpub</td></tr>
+                  <tr><th scope="row">Encoding</th><td>Reversible change of representation</td><td>No</td><td>Yes: a bijection</td><td>Either</td><td>Words; hexadecimal; Base58; letter case</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The pipeline step by step</h2>
+            <p>
+              The eight stages from the entropy to the checksummed address are followed on one worked example: the
+              mnemonic <code>{{fig.example.mnemonic}}</code> with an {{fig.example.passphrase}} passphrase, at the
+              path <code>{{fig.example.path}}</code>. This is the default mnemonic of the Hardhat development network,
+              which derives its accounts from the parent path m/44'/60'/0'/0 starting at index 0 and publishes the
+              address and the private key of the first of them [<a href="#ref-21">21</a>]. The example is chosen because it can be
+              checked, not because it is typical. Its entropy, <code>{{fig.example.entropy}}</code>, is the repeating
+              bit pattern that makes eleven of the words read "test", and since the phrase is public it carries no
+              secret entropy at all. A real wallet draws its entropy from a cryptographically secure generator, as the
+              button "Generate a new 12-word phrase" of Figure 2 does with the browser's
+              <code>crypto.getRandomValues</code>.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-pipeline aria-labelledby="fig1-title">
+              <div class="figure-bar" data-pipeline-controls hidden>
+                <button type="button" class="form-button" data-pipeline-run data-source-anchor>Run the pipeline</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
+              <div class="chart-figure__canvas" data-pipeline-canvas><!-- @figure id=pipeline --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The pipeline ledger: eight stages from entropy to the checksummed address
+                </p>
+                <p>
+                  Each row is one stage of the worked example: the standard that defines it, its operation class
+                  (§2), the operation applied and the value it produces, with the size in bits of the quantity drawn on the strip. The
+                  strip under each name is drawn to scale, its full width being 512 bits, with the 1-bits of the value
+                  marked; the rule between two rows names the operation that maps one value to the next. The
+                  final value, <code>{{fig.example.address}}</code>, is the address of account #0 published for this
+                  mnemonic by the Hardhat development network [<a href="#ref-21">21</a>], and is checked when the page is built.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-pipeline-status aria-live="polite"></p>
+            </figure>
+
+            <p>
+              Figure 2 repeats the computation in the browser for any test mnemonic, passphrase, account and index,
+              grouping its outputs by the operation classes of §2. Its button "Flip one entropy bit" changes a single
+              bit of the entropy and reports how many bits change at every later stage, a one-sample preview of the
+              avalanche experiment of §4.4. The subsections below follow the stages in order.
+            </p>
+
+            <figure class="chart-figure hw02-figure explorer" data-explorer aria-labelledby="fig2-title">
+              <div class="explorer__warning" role="note" aria-labelledby="explorer-warning-title">
+                <p class="explorer__warning-title" id="explorer-warning-title">A teaching tool, not a wallet</p>
+                <p>
+                  This explorer reproduces the computations of a wallet for study only. Every computation runs in
+                  this browser and nothing typed here is sent anywhere. Even so, a real recovery phrase must never be
+                  typed into any web page, this one included: a page cannot prove what its scripts do with what it
+                  receives. Use only published test phrases, such as the one shown, and never send funds to an
+                  address derived from them.
+                </p>
+              </div>
+              <form class="explorer__form" data-explorer-form hidden>
+                <label class="text-field text-field--area">
+                  <span class="caption">Mnemonic (12 to 24 words)</span>
+                  <textarea data-explorer-mnemonic rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="explorer-mnemonic-note">{{fig.example.mnemonic}}</textarea>
+                  <span class="text-field__note" id="explorer-mnemonic-note" data-explorer-mnemonic-note></span>
+                </label>
+                <div class="demo__row">
+                  <label class="text-field">
+                    <span class="caption">Passphrase (optional)</span>
+                    <input type="text" data-explorer-passphrase value="" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="text-field">
+                    <span class="caption">Account (hardened)</span>
+                    <input type="number" data-explorer-account value="0" min="0" max="2147483647" step="1" />
+                  </label>
+                  <label class="text-field">
+                    <span class="caption">Address index</span>
+                    <input type="number" data-explorer-index value="0" min="0" max="2147483647" step="1" />
+                  </label>
+                </div>
+                <p class="explorer__path" data-explorer-path>Path m/44'/60'/0'/0/0</p>
+                <div class="explorer__buttons">
+                  <button type="button" class="form-button" data-explorer-generate>Generate a new 12-word phrase</button>
+                  <button type="button" class="form-button" data-explorer-example>Use the worked example</button>
+                  <button type="button" class="form-button" data-explorer-flip>Flip one entropy bit</button>
+                </div>
+                <div class="explorer__avalanche">
+                  <p class="caption">Avalanche: bits changed at every stage by one flipped entropy bit</p>
+                  <div data-explorer-avalanche hidden></div>
+                </div>
+              </form>
+              <div class="chart-figure__canvas" data-explorer-output><!-- @figure id=explorer --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>The pipeline, computed live
+                </p>
+                <p>
+                  The mnemonic is normalised and checked, stretched into the seed, derived along
+                  m/44'/60'/account'/0/index and turned into the address and its checksummed form. Without scripting
+                  the panel shows the worked example of Figure 1.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-explorer-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-1">3.1 From entropy to the BIP-39 mnemonic</h3>
+            <p>
+              BIP-39 turns the entropy into a sentence of common words that a person can write down. The entropy must
+              be a multiple of 32 bits, between 128 and 256; a checksum made of the first
+              <span data-tex>ENT/32</span> bits of its SHA-256 digest is appended, and the concatenation is cut into
+              groups of 11 bits, "each encoding a number from 0-2047, serving as an index into a wordlist"
+              [<a href="#ref-23">23</a>, "Generating the mnemonic"]:
+            </p>
+            <div class="equation" id="eq-bip39">
+              <div data-tex-display>
+                \mathrm{CS} = \frac{\mathrm{ENT}}{32}, \qquad \mathrm{MS} = \frac{\mathrm{ENT} + \mathrm{CS}}{11},
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              where MS is the number of words. The five admissible sizes give
+              <span data-tex>(\mathrm{ENT}, \mathrm{CS}, \mathrm{MS}) = (128, 4, 12)</span>,
+              <span data-tex>(160, 5, 15)</span>, <span data-tex>(192, 6, 18)</span>,
+              <span data-tex>(224, 7, 21)</span> and <span data-tex>(256, 8, 24)</span>. The step is an encoding with
+              a checksum (§2): the words are a bijective image of the
+              <span data-tex>\mathrm{ENT} + \mathrm{CS}</span> bits, and the checksum is a function of the entropy, so
+              a mnemonic carries exactly ENT bits of information. The word list has 2048 entries; the standard
+              describes an ideal list as one in which "it's enough to type the first four letters to unambiguously
+              identify the word", similar words are avoided and the list is sorted, and it requires words to be
+              encoded in UTF-8 under Normalization Form Compatibility Decomposition (NFKD) [<a href="#ref-23">23</a>, "Wordlist"].
+            </p>
+            <p>
+              In the worked example the {{fig.example.entropyBits}} entropy bits are followed by the
+              {{fig.example.checksumLength}} checksum bits <code>{{fig.example.checksumBits}}</code> and cut into
+              {{fig.example.words}} word indices (Figure 3). The first eleven groups are pure entropy; the last index,
+              {{fig.example.lastIndex}} ("{{fig.example.lastWord}}"), holds the last seven entropy bits followed by
+              the checksum. This mixed structure of the last word is what §4.2 and §4.3 test.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-bip39 aria-labelledby="fig3-title">
+              <div class="figure-bar" data-bip39-controls hidden>
+                <button type="button" class="form-button" data-bip39-replay data-source-anchor>Replay the grouping</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
+              <div class="chart-figure__canvas" data-bip39-canvas><!-- @figure id=bip39 --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>BIP-39: entropy and checksum bits grouped into 11-bit word indices
+                </p>
+                <p>
+                  The {{fig.example.entropyBits}} bits of entropy, followed by the first
+                  {{fig.example.checksumLength}} bits of SHA-256(entropy) (marked), are read in groups of 11 bits,
+                  most significant first; each group is an index between 0 and 2047 into the English word list. Word
+                  indices of the example: {{fig.example.indices}}.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-bip39-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-2">3.2 From the mnemonic to the seed</h3>
+            <p>
+              The seed is not the entropy but a key stretched from the sentence. BIP-39 uses "the PBKDF2 function with
+              a mnemonic sentence (in UTF-8 NFKD) used as the password and the string "mnemonic" + passphrase (again
+              in UTF-8 NFKD) used as the salt", with 2048 iterations of HMAC-SHA512 and a derived key of 512 bits; an
+              absent passphrase is the empty string [<a href="#ref-23">23</a>, "From mnemonic to seed"]. In the notation of RFC 8018
+              [<a href="#ref-15">15</a>, §5.2], with <span data-tex>P</span> the normalised sentence and
+              <span data-tex>S</span> the salt,
+            </p>
+            <div class="equation" id="eq-pbkdf2">
+              <div data-tex-display>
+                \mathrm{seed} = U_1 \oplus U_2 \oplus \cdots \oplus U_{2048}, \qquad
+                U_1 = \mathrm{HMAC}_P\bigl(S \,\|\, \mathrm{INT}(1)\bigr), \quad
+                U_j = \mathrm{HMAC}_P(U_{j-1}),
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              where <span data-tex>\mathrm{HMAC}_K(x) = H\bigl((K \oplus \mathrm{opad}) \,\|\, H((K \oplus \mathrm{ipad}) \,\|\, x)\bigr)</span>
+              with <span data-tex>H</span> = SHA-512 and <span data-tex>K</span> the key zero-padded to the 128-byte
+              block of SHA-512, or first hashed if longer [<a href="#ref-11">11</a>, §§2–3; <a href="#ref-17">17</a>, §1]. Since SHA-512 already yields 512 bits, a single
+              output block suffices. The sentence is the HMAC key, so the step is keyed key derivation; its purpose is
+              that every candidate sentence or passphrase costs an attacker 2048 evaluations of HMAC instead of one.
+              Against 128 bits of uniform entropy this factor of <span data-tex>2^{11}</span> is immaterial,
+              since the search is already infeasible (§4.9); it matters when the secret is weak, as a passphrase
+              chosen by a person may be.
+            </p>
+            <p>
+              Two consequences of the definition deserve emphasis. First, the passphrase is a second factor that
+              nothing checks: "every passphrase generates a valid seed (and thus a deterministic wallet) but only the
+              correct one will make the desired wallet available" [<a href="#ref-23">23</a>, "From mnemonic to seed"], so a mistyped
+              passphrase silently opens a different, empty wallet. Second, the checksum of §3.1 does not enter the
+              seed. "The conversion of the mnemonic sentence to a binary seed is completely independent from
+              generating the sentence", and software "must compute a checksum for the mnemonic sentence using a
+              wordlist and issue a warning if it is invalid" [<a href="#ref-23">23</a>, "From mnemonic to seed"]: an invalid checksum
+              calls for a warning, not a rejection. The explorer of Figure 2 follows the standard in this respect: it
+              warns about an invalid checksum and derives the seed all the same. The conversion is also one-way: the
+              sentence cannot be recovered from the seed [<a href="#ref-23">23</a>, "Shortcomings"].
+            </p>
+            <div class="worked">
+              <div><span class="caption">Mnemonic (password)</span><span class="worked__value">{{fig.example.mnemonic}}</span></div>
+              <div><span class="caption">Salt</span><span class="worked__value">"mnemonic" + passphrase ({{fig.example.passphrase}})</span></div>
+              <div><span class="caption">Seed, 512 bits</span><span class="worked__value">{{fig.example.seed}}</span></div>
+            </div>
+
+            <h3 id="s3-3">3.3 BIP-32: master key and child keys</h3>
+            <p>
+              BIP-32 turns one seed into a tree of keys. Every node is an extended key: a key on secp256k1 together
+              with a 256-bit chain code [<a href="#ref-30">30</a>, "Extended keys"]. The root is computed from the seed
+              <span data-tex>S</span> as
+            </p>
+            <div class="equation" id="eq-master">
+              <div data-tex-display>
+                I = \mathrm{HMAC\text{-}SHA512}(\text{key} = \texttt{"Bitcoin seed"},\ S), \qquad
+                k_m = \mathrm{parse}_{256}(I_L), \quad c_m = I_R,
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              where <span data-tex>I_L</span> and <span data-tex>I_R</span> are the left and right 32 bytes of
+              <span data-tex>I</span>; the master key is invalid if <span data-tex>k_m = 0</span> or
+              <span data-tex>k_m \ge n</span> [<a href="#ref-30">30</a>, "Master key generation"]. A child of index
+              <span data-tex>i</span> is derived from its parent <span data-tex>(k_{\mathrm{par}}, c_{\mathrm{par}})</span>
+              by the function CKDpriv:
+            </p>
+            <div class="equation" id="eq-ckdpriv">
+              <div data-tex-display>
+                \begin{gathered}
+                I = \begin{cases}
+                  \mathrm{HMAC}\bigl(c_{\mathrm{par}},\ \texttt{0x00} \,\|\, \mathrm{ser}_{256}(k_{\mathrm{par}}) \,\|\, \mathrm{ser}_{32}(i)\bigr), & i \ge 2^{31},\\
+                  \mathrm{HMAC}\bigl(c_{\mathrm{par}},\ \mathrm{ser}_P(k_{\mathrm{par}} G) \,\|\, \mathrm{ser}_{32}(i)\bigr), & i &lt; 2^{31},
+                \end{cases}\\
+                k_i = \mathrm{parse}_{256}(I_L) + k_{\mathrm{par}} \bmod n, \qquad c_i = I_R,
+                \end{gathered}
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              where HMAC is HMAC-SHA512, the first case is a hardened child, the second a normal one, and
+              <span data-tex>\mathrm{ser}_P</span> is the 33-byte compressed form of a point
+              [<a href="#ref-30">30</a>, "Conventions"; "Private parent key → private child key"]. Indices from 0 to
+              <span data-tex>2^{31} - 1</span> are normal; those from <span data-tex>2^{31}</span> to
+              <span data-tex>2^{32} - 1</span> are hardened and are written with an apostrophe. The difference lies
+              only in the data hashed: a hardened child hashes the parent's private key, a normal child its public
+              key. A normal child can therefore also be derived without any private key, by the function CKDpub,
+            </p>
+            <div class="equation" id="eq-ckdpub">
+              <div data-tex-display>
+                K_i = \mathrm{parse}_{256}(I_L)\, G + K_{\mathrm{par}}, \qquad i &lt; 2^{31},
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              which BIP-32 defines for normal children only; deriving a private child from a public parent "is not
+              possible" [<a href="#ref-30">30</a>]. CKDpub is what makes watch-only wallets possible: the extended public key of the
+              example at {{fig.example.changePath}}, printed below, lets anyone compute every receiving address of the
+              account without being able to spend from it.
+            </p>
+            <p>
+              The same algebra has a price. Since <span data-tex>I_L</span> of a normal child is computable from the
+              parent's extended public key, a single leaked child private key gives
+            </p>
+            <div class="equation" id="eq-leak">
+              <div data-tex-display>
+                k_{\mathrm{par}} = k_i - \mathrm{parse}_{256}(I_L) \bmod n .
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              BIP-32 states it plainly: "knowledge of a parent extended public key plus any non-hardened private key
+              descending from it is equivalent to knowing the parent extended private key (and thus every private and
+              public key descending from it)" [<a href="#ref-30">30</a>, "Security"]. The button "Recover the parent private key" of
+              Figure 4 performs equation (6) on the example and compares the result with the key derived from the
+              seed. Hardened derivation blocks the leak, because its <span data-tex>I_L</span> depends on
+              <span data-tex>k_{\mathrm{par}}</span>, which the extended public key does not contain. This is why
+              BIP-44 hardens its first three levels (§3.4): a leak below the account level reaches that account's
+              chains, but neither the other accounts, nor the other coins, nor the master key.
+            </p>
+            <p>
+              A derived key is invalid when <span data-tex>\mathrm{parse}_{256}(I_L) \ge n</span> or
+              <span data-tex>k_i = 0</span>, in which case "one should proceed with the next value for
+              <span data-tex>i</span>", an event that "has probability lower than 1 in 2<sup>127</sup>" [<a href="#ref-30">30</a>]. Its
+              dominant term is computed exactly in §4.5. The implementation used here reports such an event as an error
+              instead of moving to the next index; at that probability the difference has no practical consequence.
+              Serialised extended keys are 78-byte structures (version, depth, parent fingerprint, child number, chain
+              code and key) followed by a 32-bit checksum and encoded in Base58, "a Base58-encoded string of exactly
+              111 characters" beginning with <code>xprv</code> or <code>xpub</code> [<a href="#ref-30">30</a>, "Serialization format"].
+            </p>
+            <div class="worked">
+              <div><span class="caption">Master private key IL</span><span class="worked__value">{{fig.example.masterKey}}</span></div>
+              <div><span class="caption">Master chain code IR</span><span class="worked__value">{{fig.example.masterChainCode}}</span></div>
+              <div><span class="caption">Master extended private key (xprv)</span><span class="worked__value">{{fig.example.xprvMaster}}</span></div>
+              <div><span class="caption">Extended public key at {{fig.example.changePath}} (xpub)</span><span class="worked__value">{{fig.example.xpubChange}}</span></div>
+            </div>
+
+            <figure class="chart-figure hw02-figure" data-hdtree aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas hdtree-frame" data-hdtree-canvas><!-- @figure id=hdtree --></div>
+              <div class="hdtree__controls" data-hdtree-controls hidden>
+                <fieldset class="choice">
+                  <legend class="caption">Address index <span class="math">i</span></legend>
+                  <div class="choice__options">
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i0" value="0" data-hdtree-index checked /><label for="hdtree-i0">i = 0</label></div>
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i1" value="1" data-hdtree-index /><label for="hdtree-i1">i = 1</label></div>
+                    <div class="choice__option"><input type="radio" name="hdtree-index" id="hdtree-i2" value="2" data-hdtree-index /><label for="hdtree-i2">i = 2</label></div>
+                  </div>
+                </fieldset>
+                <div class="hdtree__buttons">
+                  <button type="button" class="form-button" data-hdtree-replay>Draw the path</button>
+                  <button type="button" class="form-button" data-hdtree-leak>Recover the parent private key</button>
+                </div>
+              </div>
+              <div class="hdtree__leak-out" data-hdtree-leak-out hidden>
+                <p class="caption">Non-hardened leak: the parent <span class="math">m/44'/60'/0'/0</span> from its extended public key and one child private key</p>
+                <dl class="demo__grid">
+                  <div class="demo__cell demo__cell--wide"><dt class="caption">Private key <span class="math">k<sub>i</sub></span> of the selected leaf</dt><dd class="demo__value demo__value--mono" data-leak="child">—</dd></div>
+                  <div class="demo__cell demo__cell--wide"><dt class="caption"><span class="math">I<sub>L</sub></span>, left half of HMAC-SHA512(<span class="math">c<sub>par</sub>, K<sub>par</sub> ‖ i</span>), from the xpub</dt><dd class="demo__value demo__value--mono" data-leak="il">—</dd></div>
+                  <div class="demo__cell"><dt class="caption">Recovered <span class="math">k<sub>par</sub> = k<sub>i</sub> − I<sub>L</sub> mod n</span></dt><dd class="demo__value demo__value--mono" data-leak="recovered">—</dd></div>
+                  <div class="demo__cell"><dt class="caption"><span class="math">k<sub>par</sub></span> derived from the seed</dt><dd class="demo__value demo__value--mono" data-leak="true">—</dd></div>
+                  <div class="demo__cell demo__cell--wide"><dt class="caption">Equal</dt><dd class="demo__value" data-leak="equal">—</dd></div>
+                </dl>
+                <p class="demo__note">
+                  An extended public key and the private key of one of its normal children determine the parent private key;
+                  since the account level m/44'/60'/0' is hardened, such a leak reaches the account's chain but neither the
+                  other accounts nor the master key.
+                </p>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>The derivation tree of m/44'/60'/0'/0/i
+                </p>
+                <p>
+                  Hardened derivations (index at least 2³¹, written with an apostrophe) are drawn as double rules,
+                  normal derivations as single rules. The three leaves are the first three addresses of the example:
+                  <code>{{fig.example.address0}}</code>, <code>{{fig.example.address1}}</code> and
+                  <code>{{fig.example.address2}}</code>.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-hdtree-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-4">3.4 BIP-44 paths and wallet conventions</h3>
+            <p>
+              BIP-32 allows any tree; BIP-44 fixes one shape for it, the path
+              <code>m / purpose' / coin_type' / account' / change / address_index</code>, in which the apostrophe
+              marks hardened derivation [<a href="#ref-22">22</a>, "Path levels"]. The purpose is the constant 44' (0x8000002C),
+              following BIP-43. The coin type separates currencies; its registry is delegated to SatoshiLabs'
+              SLIP-0044, where Ether has the number 60, and the hardened component for coin type
+              <span data-tex>n</span> is <span data-tex>\texttt{0x80000000} + n</span> [<a href="#ref-22">22</a>, <a href="#ref-26">26</a>]. The
+              account level separates independent sets of funds. The change level is 0 for the external chain of
+              receiving addresses and 1 for the internal chain of change addresses, and the last level numbers the
+              addresses; these two levels use normal derivation, so that an account's extended public key can
+              generate all its addresses [<a href="#ref-22">22</a>]. When a wallet is restored, the standard sets an address gap limit
+              of 20: "If the software hits 20 unused addresses in a row, it expects there are no used addresses
+              beyond this point and stops searching the address chain" [<a href="#ref-22">22</a>, "Address gap limit"].
+            </p>
+            <p>
+              The standard leaves room for different readings, and Ethereum wallets have adopted at least three
+              conventions for numbering the accounts that a user sees. MetaMask derives account
+              <span data-tex>i</span> at <code>m/44'/60'/0'/0/i</code>: its HD keyring fixes the parent path
+              <code>m/44'/60'/0'/0</code> and derives the child <span data-tex>i</span>, and its documentation states
+              that it supports only this default path when a seed phrase is imported [<a href="#ref-12">12</a>]. Rainbow uses the
+              same default path [<a href="#ref-24">24</a>]. The Ledger Live convention places the index at the account level,
+              <code>m/44'/60'/i'/0/0</code>, and the legacy convention of MyEtherWallet and MyCrypto at a fourth
+              level, <code>m/44'/60'/0'/i</code>; both appear among the hardware-wallet paths of the MetaMask
+              extension and the first in Rainbow's Ledger code [<a href="#ref-12">12</a>, <a href="#ref-24">24</a>].
+            </p>
+            <p>
+              The consequence for a user who imports a phrase into another wallet follows directly. For
+              <span data-tex>i = 0</span> the MetaMask and Ledger Live conventions name the same key,
+              <code>m/44'/60'/0'/0/0</code>, but they part from the second account on:
+              <code>m/44'/60'/0'/0/1</code> against <code>m/44'/60'/1'/0/0</code>. The legacy convention differs
+              from the first account, since its <code>m/44'/60'/0'/0</code> is, under BIP-44, the node of the
+              external chain rather than an address. The same twelve words can thus show different addresses, or
+              empty accounts, in different wallets while the funds remain intact at another path; the remedy is to
+              select the matching path, not to doubt the phrase. Figure 4 draws the MetaMask convention for the
+              first three indices.
+            </p>
+
+            <h3 id="s3-5">3.5 secp256k1: the public key</h3>
+            <p>
+              The private key at the end of the path is a scalar of the curve secp256k1, defined in SEC 2 over the
+              prime field <span data-tex>\mathbb{F}_p</span> [<a href="#ref-6">6</a>, §2.4.1]:
+            </p>
+            <div class="equation" id="eq-curve">
+              <div data-tex-display>
+                y^2 = x^3 + 7, \qquad p = 2^{256} - 2^{32} - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1, \qquad K = kG,
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <p>
+              with the base point <span data-tex>G</span> of prime order <span data-tex>n</span> and cofactor
+              <span data-tex>h = 1</span>; SEC 2 calls it "a Koblitz curve". The Ethereum yellow paper takes the
+              private key to be "a randomly selected positive integer … in the range [1, secp256k1n − 1]", where
+              secp256k1n is the order <span data-tex>n</span>, and the public key to be "a byte array of size 64",
+              the concatenation of the two coordinates of <span data-tex>K</span> [<a href="#ref-29">29</a>, Appendix F]. BIP-32 uses
+              instead the 33-byte compressed form, a prefix 02 or 03 for the parity of <span data-tex>y</span>
+              followed by <span data-tex>x</span> [<a href="#ref-30">30</a>, "Conventions"]. Both forms of the example are given
+              below.
+            </p>
+            <p>
+              The step from <span data-tex>k</span> to <span data-tex>K</span> is public-key cryptography in the sense
+              of §2: a scalar multiplication, computable in a few hundred group operations by double-and-add, whose
+              inversion is the elliptic-curve discrete logarithm problem. BIP-32 assumes that solving it requires
+              <span data-tex>2^{128}</span> group operations [<a href="#ref-30">30</a>, "Security"], and the SafeCurves project puts the
+              cost of Pollard's rho method on this curve at <span data-tex>2^{127.8}</span> [<a href="#ref-2">2</a>] (§4.9).
+              Transactions are signed with recoverable ECDSA signatures on the curve, and the yellow paper requires
+              the component <span data-tex>s</span> of a valid signature to lie in the lower half of its range,
+              <span data-tex>0 &lt; s &lt; n/2 + 1</span> [<a href="#ref-29">29</a>, Appendix F]. A signature is produced with the private
+              key and a fresh secret nonce and is verified with the public key alone, which a hash
+              function on its own does not offer. <a href="{{base}}homework/01/">Homework 1</a> built a toy hash from the
+              arithmetic of this same curve and examined its group law and statistical behaviour in detail.
+            </p>
+            <div class="worked">
+              <div><span class="caption">Private key k</span><span class="worked__value">{{fig.example.privateKey}}</span></div>
+              <div><span class="caption">K, x-coordinate</span><span class="worked__value">{{fig.example.publicKeyX}}</span></div>
+              <div><span class="caption">K, y-coordinate</span><span class="worked__value">{{fig.example.publicKeyY}}</span></div>
+              <div><span class="caption">K, compressed (SEC 1)</span><span class="worked__value">{{fig.example.publicKeyCompressed}}</span></div>
+            </div>
+
+            <h3 id="s3-6">3.6 Keccak-256 and the address</h3>
+            <p>
+              The yellow paper defines the address as "the rightmost 160-bits of the Keccak-256 hash of the
+              corresponding ECDSA public key" [<a href="#ref-29">29</a>, Appendix F, eq. (316)]:
+            </p>
+            <div class="equation" id="eq-address">
+              <div data-tex-display>
+                A(k) = \mathcal{B}_{96..255}\bigl(\mathrm{KEC}(x \,\|\, y)\bigr),
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              the bytes 12 to 31 of the 32-byte digest of the 64-byte key, without the prefix 04 of the uncompressed
+              SEC encoding. In the example below, the last 40 hex digits of the digest are the address.
+            </p>
+            <p>
+              Keccak-256 is a sponge. A permutation <span data-tex>f</span> of a state of
+              <span data-tex>b = 1600</span> bits is split into a rate of <span data-tex>r</span> bits and a capacity
+              of <span data-tex>c = b - r</span> bits; the padded message is absorbed <span data-tex>r</span> bits at a
+              time, each block being added to the rate part of the state before <span data-tex>f</span> is applied,
+              and the digest is then read from the rate part. FIPS 202 defines the family KECCAK[<span data-tex>c</span>] as the
+              sponge built on the permutation KECCAK-<span data-tex>p</span>[1600, 24] with the padding rule pad10*1
+              and the rate <span data-tex>1600 - c</span>, and the 256-bit functions use <span data-tex>c = 512</span>, hence <span data-tex>r = 1088</span>
+              [<a href="#ref-18">18</a>, §5.2; <a href="#ref-3">3</a>]. The capacity is never output, and "the capacity is double the digest
+              length" [<a href="#ref-18">18</a>, §6.1]. A 64-byte public key, plus its padding, fits in one block of 136 bytes, so the
+              address costs exactly one application of the permutation.
+            </p>
+            <p>
+              The permutation Keccak-f[1600] acts on "a 5-by-5-by-w array of bits" with
+              <span data-tex>w = 64</span> [<a href="#ref-18">18</a>, §3.1]: twenty-five lanes of 64 bits, which Figure 5 draws as a
+              lattice. Each of its 24 rounds (<span data-tex>12 + 2\ell</span> with
+              <span data-tex>w = 2^{\ell}</span>, <span data-tex>\ell = 6</span> [<a href="#ref-3">3</a>]) composes five step
+              mappings, <span data-tex>\mathrm{Rnd}(A, i_r) = \iota(\chi(\pi(\rho(\theta(A)))), i_r)</span>
+              [<a href="#ref-18">18</a>, §3.2–3.3]. The step θ adds to every bit the parities of two neighbouring columns; ρ rotates
+              every lane by its own offset; π rearranges the lanes; χ, the only non-linear step, combines each bit
+              with two others of its row; and ι adds a round constant to one lane. Figure 5 follows a single-bit
+              difference between two states through these steps, and §4.6 measures how fast it spreads.
+            </p>
+            <div class="worked">
+              <div><span class="caption">Keccak-256(x ‖ y)</span><span class="worked__value">{{fig.example.keccak}}</span></div>
+              <div><span class="caption">Address, last 20 bytes</span><span class="worked__value">{{fig.example.addressLower}}</span></div>
+            </div>
+
+            <figure class="chart-figure hw02-figure" data-keccak3d aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas" data-keccak3d-canvas><!-- @figure id=keccak3d --></div>
+              <div class="chart-figure__controls keccak3d__controls" data-keccak3d-controls hidden>
+                <label class="text-field keccak3d__range">
+                  <span class="caption">Checkpoint of the trace</span>
+                  <input type="range" min="0" max="15" step="1" value="6" data-keccak3d-step />
+                </label>
+                <div class="keccak3d__buttons">
+                  <button type="button" class="form-button" data-keccak3d-prev>Previous step</button>
+                  <button type="button" class="form-button" data-keccak3d-next>Next step</button>
+                  <button type="button" class="form-button" data-keccak3d-play aria-pressed="false">Play the steps</button>
+                </div>
+                <p class="keccak3d__readout" data-keccak3d-readout></p>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>The Keccak-f[1600] state as a 5&nbsp;×&nbsp;5&nbsp;×&nbsp;64 lattice of bits
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Two random states that differ in one bit, at x = {{fig.keccak3d.flipX}}, y = {{fig.keccak3d.flipY}},
+                  z = {{fig.keccak3d.flipZ}}, are passed through the step mappings θ, ρ, π, χ and ι. The red dots are
+                  the <span class="tabular">{{fig.keccak3d.count}}</span> bits in which the two states differ after
+                  {{fig.keccak3d.checkpoint}}; the other bits agree.
+                </p>
+                <p class="pplot__seed">One state pair, seed <span class="tabular">{{fig.keccak3d.seed}}</span>, {{fig.keccak3d.steps}} recorded steps</p>
+              </figcaption>
+              <p class="visually-hidden" data-keccak3d-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-7">3.7 EIP-55: the mixed-case checksum</h3>
+            <p>
+              An address written in hexadecimal has no redundancy: every string of 40 hex digits is a valid address,
+              so a typing error sends funds to another valid address. EIP-55, by Buterin and Van de Sande, adds a
+              checksum without changing the alphabet or the length, by giving a meaning to the case of the letters
+              a–f [<a href="#ref-5">5</a>]. The rule is to "convert the address to hex, but if the <span data-tex>i</span>th digit
+              is a letter (ie. it's one of <code>abcdef</code>) print it in uppercase if the
+              <span data-tex>4i</span>th bit of the hash of the lowercase hexadecimal address is 1 otherwise print it
+              in lowercase", where the hash is Keccak-256 of the 40 lower-case digits encoded as ASCII
+              [<a href="#ref-5">5</a>, "Specification"; "Implementation"]. With <span data-tex>h_i</span> the
+              <span data-tex>i</span>-th hex digit of that digest, the rule reads
+            </p>
+            <div class="equation" id="eq-eip55">
+              <div data-tex-display>
+                a_i \text{ is printed in upper case} \iff a_i \in \{\mathtt{a}, \dots, \mathtt{f}\} \ \text{and}\ h_i \ge 8,
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>
+              which is the test of the reference implementations (a nibble of at least 8 is one whose leading bit is
+              1). Each letter thus carries one check bit and each decimal digit none, so the number of check bits of
+              an address equals its number of letters: the address of the example has
+              <span class="tabular">{{fig.example.letters}}</span> letters, hence as many check bits. EIP-55 is a
+              checksum carried by an encoding (§2): it adds no secrecy, a wallet that ignores case still reads the
+              same address, and its whole purpose is to make a random typing error unlikely to pass. The EIP
+              estimates that "on average there will be 15 check bits per address, and the net probability that a
+              randomly generated address if mistyped will accidentally pass a check is 0.0247%" [<a href="#ref-5">5</a>, "Rationale"];
+              §4.8 derives both numbers.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-eip55 aria-labelledby="fig6-title">
+              <div class="figure-bar" data-eip55-controls hidden>
+                <button type="button" class="form-button" data-eip55-play data-source-anchor>Apply the checksum</button>
+                <p class="figure-source">
+                  <span class="figure-source__label" data-source-label>Showing: worked example</span>
+                  <button type="button" class="form-button" data-source-reset hidden>Show the worked example</button>
+                </p>
+              </div>
+              <div class="chart-figure__canvas" data-eip55-canvas><!-- @figure id=eip55 --></div>
+              <div class="eip55-check" data-eip55-controls hidden>
+                <label class="text-field">
+                  <span class="caption">Check an address</span>
+                  <input type="text" data-eip55-input placeholder="0x followed by 40 hex digits" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="eip55-result" />
+                </label>
+                <p class="eip55-check__result" id="eip55-result" data-eip55-result aria-live="polite"></p>
+                <p class="eip55-check__echo"><code data-eip55-echo></code></p>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>EIP-55 applied to the address of the worked example
+                </p>
+                <p>
+                  Under each of the 40 hex digits is the nibble of Keccak-256 of the lower-case address at the same
+                  position. A letter is printed in upper case when its nibble is 8 or more (filled mark) and in lower
+                  case otherwise (open mark); digits carry no case. The example has
+                  <span class="tabular">{{fig.example.letters}}</span> letters, of which
+                  <span class="tabular">{{fig.example.upper}}</span> are upper case.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-eip55-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s3-8">3.8 Reproducing the example in a wallet</h3>
+            <p>
+              The assignment suggests experimenting with wallet software. The verification offered on this page is
+              of a different kind: the address and private key of the worked example agree with the values published
+              by Hardhat [<a href="#ref-21">21</a>], and this agreement is checked every time the page is built. No wallet
+              application was run for this work. Since the example uses the BIP-44 path of MetaMask and Rainbow
+              [<a href="#ref-12">12</a>, <a href="#ref-24">24</a>], a reader who wishes to see the same pipeline inside a wallet can proceed as
+              follows.
+            </p>
+            <ol>
+              <li>
+                Create a separate browser profile with no other extensions and no real wallet in it, so that the test
+                wallet cannot be confused with, or interfere with, one that holds funds.
+              </li>
+              <li>
+                Install the wallet extension in that profile from its official distribution channel; MetaMask or
+                Rainbow follow the convention of the example. For other wallets, such as Rabby or Exodus, the default
+                path was not verified for this work, and the comparison of step 4 is the test.
+              </li>
+              <li>
+                Choose the option to import an existing wallet from its recovery phrase and enter the twelve words
+                <code>{{fig.example.mnemonic}}</code>, without a passphrase.
+              </li>
+              <li>
+                Compare the first account with <code>{{fig.example.address0}}</code>. If the wallet lets the user add
+                accounts, the second and third should be <code>{{fig.example.address1}}</code> and
+                <code>{{fig.example.address2}}</code> under the MetaMask convention, and will differ under the Ledger
+                Live or legacy conventions of §3.4. Where the wallet can display a private key, that of the first
+                account should be <code>0x{{fig.example.privateKey}}</code>.
+              </li>
+              <li>Remove the wallet and the browser profile afterwards.</li>
+            </ol>
+            <div class="explorer__warning" role="note" aria-labelledby="wallet-warning-title">
+              <p class="explorer__warning-title" id="wallet-warning-title">A public test phrase: never fund it</p>
+              <p>
+                This phrase is public. The private key of its first account is printed on this page and in the
+                Hardhat documentation, and every other key follows from the phrase, so anything sent to its addresses
+                on a public network can be taken by anyone. More generally, a real recovery phrase must never be typed
+                into any web page, this one included, and should be entered only into the wallet that holds it.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Statistical properties</h2>
+            <p>
+              The statistical model of this section is the usual idealisation of the hash functions in the pipeline
+              as random functions: on distinct inputs their outputs are independent and uniformly distributed bit
+              strings. Every stage then has an exact law, and every experiment tests one consequence of it. The
+              general null hypothesis, for the bits <span data-tex>X_1, \dots, X_m</span> of the output of a stage,
+              is
+            </p>
+            <div class="equation" id="eq-h0">
+              <div data-tex-display>
+                H_0:\ X_1, \dots, X_m \ \text{i.i.d.} \sim \mathrm{Bernoulli}\bigl(\tfrac12\bigr),
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              specialised below to the statistic at hand. Some quantities are exact, whatever the hash functions do;
+              they are proved, not simulated, and the simulation then checks the implementation. Entropy is drawn in
+              the simulations from a seeded statistical generator so that every number is reproducible from the seed
+              printed beside it; the consequences of that choice are discussed in §7. Proportions are compared with
+              their exact values by the two-sided exact binomial test (the rule of R's <code>binom.test</code>: the
+              total probability of all outcomes no more likely than the one observed) and given with 95% Wilson
+              intervals; distributions are compared by Pearson's chi-square test, with the tails merged until every
+              expected count is at least 5 and, since the null laws have no estimated parameter, one degree of
+              freedom fewer than the number of cells.
+            </p>
+            <p>
+              Four rules of interpretation apply throughout. A p-value is the probability, computed under
+              <span data-tex>H_0</span>, of a statistic at least as extreme as the one observed; it is not the
+              probability that <span data-tex>H_0</span> is true. A large p-value means that the sample is consistent
+              with <span data-tex>H_0</span>, not that <span data-tex>H_0</span> has been proved. Since this section
+              reports 31 p-values, some of them on overlapping data, an occasional value below 0.05 would be expected
+              even if every hypothesis held; the reading follows the whole set rather than any single value. Finally,
+              as Homework 1 found for its toy hash, statistical indistinguishability from a random function is
+              necessary for a cryptographic primitive but not sufficient: a function can pass every test of this
+              section and still be easy to invert, as §7 shows.
+            </p>
+
+            <h3 id="s4-1">4.1 The entropy ledger</h3>
+            <p>
+              For any function <span data-tex>f</span> and discrete random variable <span data-tex>X</span>,
+            </p>
+            <div class="equation" id="eq-entropy">
+              <div data-tex-display>
+                H(f(X)) \le H(X), \qquad \text{with equality if and only if } f \text{ is injective on the support of } X .
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>
+              A deterministic step can preserve or destroy entropy; it can never create it. Applied along the
+              pipeline, inequality (11) bounds the entropy of every stage by that of the generation step, and a second
+              bound is the length of the representation itself. With <span data-tex>M</span> the mnemonic and
+              <span data-tex>W</span> a passphrase chosen independently of it, and uniform entropy,
+              <span data-tex>H(\mathrm{seed}) \le H(M, W) = \mathrm{ENT} + H(W)</span>: the seed of a 12-word
+              mnemonic with an empty passphrase is <span class="tabular">{{fig.entropyLedger.w12.seedBits}}</span>
+              bits long but carries at most <span class="tabular">{{fig.entropyLedger.w12.entropy}}</span> bits of
+              entropy, and its length is no measure of its strength. The address carries at most the smaller of the
+              entropy and its 160 bits:
+              <span class="tabular">{{fig.entropyLedger.w12.addressEntropy}}</span> bits for 12 words and
+              <span class="tabular">{{fig.entropyLedger.w24.addressEntropy}}</span> for 24, in which case on average
+              about <span data-tex>2^{256}/2^{160} = 2^{96}</span> private keys share each address. Figure 7 sets the
+              two bounds side by side for every stage.
+            </p>
+
+            <figure class="chart-figure" data-fig="entropyLedger" data-fig-kind="entropyLedger" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=entropyLedger --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Mnemonic length</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-w12" name="fig7-w" value="w12" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig7-w12">12 words</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig7-w24" name="fig7-w" value="w24" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig7-w24">24 words</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>Representation size and maximum entropy of every stage
+                </p>
+                <p>
+                  Hollow bars give the number of bits of each representation, filled bars the largest entropy the stage
+                  can carry, for a <span data-fig-stat="words">{{fig.entropyLedger.w12.words}}</span>-word mnemonic
+                  and an empty passphrase: <span class="tabular" data-fig-stat="entropy">{{fig.entropyLedger.w12.entropy}}</span>
+                  bits of entropy throughout, in a seed of <span class="tabular" data-fig-stat="seedBits">{{fig.entropyLedger.w12.seedBits}}</span>
+                  bits, and at most <span class="tabular" data-fig-stat="addressEntropy">{{fig.entropyLedger.w12.addressEntropy}}</span>
+                  bits in the address.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-2">4.2 The BIP-39 checksum</h3>
+            <p>
+              Two error models are considered. In the first, a sequence of 12 or 24 words is drawn uniformly from the
+              list. Whatever the first ENT bits are, exactly one of the <span data-tex>2^{\mathrm{CS}}</span> values of
+              the checksum bits is valid, so the acceptance rate is exactly
+              <span data-tex>2^{-\mathrm{CS}}</span>, that is 1/16 for 12 words and 1/256 for 24, and
+              <span data-tex>H_0: X \sim \mathrm{Bin}(N, 2^{-\mathrm{CS}})</span> for the number
+              <span data-tex>X</span> of valid sequences among <span data-tex>N</span>. This is an exact statement, so
+              the test checks the implementation rather than SHA-256. Of
+              {{fig.checksum.w12.n}} random 12-word sequences, {{fig.checksum.w12.count}} were valid (proportion
+              {{fig.checksum.w12.rate}}, exact value {{fig.checksum.w12.expected}}, p = {{fig.checksum.w12.p}}); of
+              {{fig.checksum.w24.n}} 24-word sequences, {{fig.checksum.w24.count}} (p = {{fig.checksum.w24.p}}). The
+              figure of BIP-39 itself, "1-in-256 errors will be missed" [<a href="#ref-23">23</a>, "Shortcomings"], is the 24-word
+              case; for the 12 words that MetaMask generates [<a href="#ref-12">12</a>] the checksum has four bits and misses one
+              random sequence in sixteen.
+            </p>
+            <p>
+              In the second model a valid mnemonic suffers one error: a uniformly chosen word is replaced by a
+              uniformly chosen different word. At a position other than the last, the entropy changes while the
+              checksum stays, and under the random-function model the new SHA-256 digest matches the old checksum with
+              probability <span data-tex>2^{-\mathrm{CS}}</span>. At the last position the probability is exact.
+              <em>Claim:</em> exactly <span data-tex>2^{11-\mathrm{CS}} - 1</span> of the 2047 other words keep a
+              valid mnemonic valid when they replace its last word, that is 127 for 12 words and 7 for 24.
+              <em>Proof:</em> the last word consists of the final <span data-tex>11 - \mathrm{CS}</span> entropy bits
+              followed by the CS checksum bits, and the other words fix the remaining entropy. Each of the
+              <span data-tex>2^{11-\mathrm{CS}}</span> values of the free bits determines the whole entropy, hence its
+              checksum, so exactly one of the <span data-tex>2^{\mathrm{CS}}</span> completions is valid; of the
+              <span data-tex>2^{11-\mathrm{CS}}</span> valid last words one is the original, which leaves
+              <span data-tex>2^{11-\mathrm{CS}} - 1</span>, whatever values SHA-256 takes. The overall probability that
+              a substitution goes undetected is therefore
+            </p>
+            <div class="equation" id="eq-substitution">
+              <div data-tex-display>
+                P(\text{undetected}) = \frac{\mathrm{MS} - 1}{\mathrm{MS}}\, 2^{-\mathrm{CS}} + \frac{1}{\mathrm{MS}} \cdot \frac{2^{11 - \mathrm{CS}} - 1}{2047},
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              which is {{fig.substitution.w12.overall.expected}} for 12 words and
+              {{fig.substitution.w24.overall.expected}} for 24. The observed proportions are
+              {{fig.substitution.w12.overall.rate}} (p = {{fig.substitution.w12.overall.p}}) and
+              {{fig.substitution.w24.overall.rate}} (p = {{fig.substitution.w24.overall.p}}). Restricted to the last
+              word, where the law is exact, the 12-word rate is {{fig.substitution.w12.last.rate}} against
+              {{fig.substitution.w12.lastExact}} (p = {{fig.substitution.w12.last.p}}) and the 24-word rate
+              {{fig.substitution.w24.last.rate}} against {{fig.substitution.w24.lastExact}}
+              (p = {{fig.substitution.w24.last.p}}). The last value is the smallest p-value of Table 2: it rests on
+              {{fig.substitution.w24.last.count}} undetected substitutions where
+              {{fig.substitution.w24.last.expectedCount}} were expected, and among the eight tests of the table a
+              value of this size is unremarkable.
+            </p>
+
+            <h3 id="s4-3">4.3 Uniformity of the word indices</h3>
+            <p>
+              If the entropy is uniform, the first eleven indices of a 12-word mnemonic are uniform on
+              <span data-tex>\{0, \dots, 2047\}</span> by construction, since they are pure entropy bits. The last index
+              is seven entropy bits followed by four checksum bits; it is uniform only if the first four bits of
+              SHA-256 are uniform and independent of those seven bits, which is a consequence of the random-function
+              model rather than a certainty. The word indices of {{fig.wordIndex.last.count}} simulated 12-word
+              mnemonics were tested against
+              <span data-tex>H_0: P(\text{index} = j) = 1/2048</span> for every
+              <span data-tex>j \in \{0, \dots, 2047\}</span>. The
+              pooled first eleven positions give
+              <span data-tex>\chi^2</span>({{fig.wordIndex.pooled.df}}) = {{fig.wordIndex.pooled.statistic}}
+              (p = {{fig.wordIndex.pooled.p}}), a test of the generator and of the encoding; the last position gives
+              {{fig.wordIndex.last.statistic}} on the same degrees of freedom (p = {{fig.wordIndex.last.p}}), with
+              {{fig.wordIndex.last.expected}} expected counts per cell, enough for the chi-square approximation. Both
+              statistics lie close to their expectation, the number of degrees of freedom.
+            </p>
+            <p>
+              Table 2 collects the eight tests of §4.2 and §4.3. Every exact value lies inside the 95% Wilson interval of the
+              corresponding observed proportion, and no p-value falls below 0.05. The sample agrees with the exact laws, and with the
+              random-function model where it is needed.
+            </p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption">
+              <table class="data-table data-table--hw02">
+                <caption id="table2-caption">Table 2. Simulated tests of the BIP-39 checksum and word indices: observed count and proportion, exact expected proportion, 95% Wilson interval and exact two-sided binomial p-value; for the word indices, Pearson's statistic against the uniform law on 2048 values. Seeds {{fig.params.acceptance.seed}} (acceptance), {{fig.params.substitution.seed}} (substitution) and {{fig.params.wordIndex.seed}} (word indices).</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Experiment</th>
+                    <th scope="col" class="is-number">n</th>
+                    <th scope="col" class="is-number">Observed</th>
+                    <th scope="col" class="is-number">Proportion</th>
+                    <th scope="col" class="is-number">Exact</th>
+                    <th scope="col" class="is-number">95% interval</th>
+                    <th scope="col" class="is-number">p-value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Random 12-word sequence accepted</th><td class="is-number">{{fig.checksum.w12.n}}</td><td class="is-number">{{fig.checksum.w12.count}}</td><td class="is-number">{{fig.checksum.w12.rate}}</td><td class="is-number">{{fig.checksum.w12.expected}}</td><td class="is-number">{{fig.checksum.w12.low}}–{{fig.checksum.w12.high}}</td><td class="is-number">{{fig.checksum.w12.p}}</td></tr>
+                  <tr><th scope="row">Random 24-word sequence accepted</th><td class="is-number">{{fig.checksum.w24.n}}</td><td class="is-number">{{fig.checksum.w24.count}}</td><td class="is-number">{{fig.checksum.w24.rate}}</td><td class="is-number">{{fig.checksum.w24.expected}}</td><td class="is-number">{{fig.checksum.w24.low}}–{{fig.checksum.w24.high}}</td><td class="is-number">{{fig.checksum.w24.p}}</td></tr>
+                  <tr><th scope="row">12 words, substitution undetected, all positions</th><td class="is-number">{{fig.substitution.w12.overall.n}}</td><td class="is-number">{{fig.substitution.w12.overall.count}}</td><td class="is-number">{{fig.substitution.w12.overall.rate}}</td><td class="is-number">{{fig.substitution.w12.overall.expected}}</td><td class="is-number">{{fig.substitution.w12.overall.low}}–{{fig.substitution.w12.overall.high}}</td><td class="is-number">{{fig.substitution.w12.overall.p}}</td></tr>
+                  <tr><th scope="row">12 words, substitution undetected, last word ({{fig.substitution.w12.lastExact}})</th><td class="is-number">{{fig.substitution.w12.last.n}}</td><td class="is-number">{{fig.substitution.w12.last.count}}</td><td class="is-number">{{fig.substitution.w12.last.rate}}</td><td class="is-number">{{fig.substitution.w12.last.expected}}</td><td class="is-number">{{fig.substitution.w12.last.low}}–{{fig.substitution.w12.last.high}}</td><td class="is-number">{{fig.substitution.w12.last.p}}</td></tr>
+                  <tr><th scope="row">24 words, substitution undetected, all positions</th><td class="is-number">{{fig.substitution.w24.overall.n}}</td><td class="is-number">{{fig.substitution.w24.overall.count}}</td><td class="is-number">{{fig.substitution.w24.overall.rate}}</td><td class="is-number">{{fig.substitution.w24.overall.expected}}</td><td class="is-number">{{fig.substitution.w24.overall.low}}–{{fig.substitution.w24.overall.high}}</td><td class="is-number">{{fig.substitution.w24.overall.p}}</td></tr>
+                  <tr><th scope="row">24 words, substitution undetected, last word ({{fig.substitution.w24.lastExact}})</th><td class="is-number">{{fig.substitution.w24.last.n}}</td><td class="is-number">{{fig.substitution.w24.last.count}}</td><td class="is-number">{{fig.substitution.w24.last.rate}}</td><td class="is-number">{{fig.substitution.w24.last.expected}}</td><td class="is-number">{{fig.substitution.w24.last.low}}–{{fig.substitution.w24.last.high}}</td><td class="is-number">{{fig.substitution.w24.last.p}}</td></tr>
+                  <tr><th scope="row">Word indices, positions 1–11 pooled</th><td class="is-number">{{fig.wordIndex.pooled.count}}</td><td class="is-number" colspan="3">χ²({{fig.wordIndex.pooled.df}}) = {{fig.wordIndex.pooled.statistic}}</td><td class="is-number">—</td><td class="is-number">{{fig.wordIndex.pooled.p}}</td></tr>
+                  <tr><th scope="row">Word indices, last word</th><td class="is-number">{{fig.wordIndex.last.count}}</td><td class="is-number" colspan="3">χ²({{fig.wordIndex.last.df}}) = {{fig.wordIndex.last.statistic}}</td><td class="is-number">—</td><td class="is-number">{{fig.wordIndex.last.p}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s4-4">4.4 Uniformity and avalanche of the seed, the keys and the address</h3>
+            <p>
+              For {{fig.params.pipeline.n}} simulated wallets with uniform 128-bit entropy and an empty passphrase,
+              the full pipeline was run to <code>m/44'/60'/0'/0/0</code>, together with two twins: wallet A, whose
+              entropy differs from the original in one uniformly chosen bit, and wallet B, the sibling account at
+              index 1 of the same mnemonic. For a stage of <span data-tex>m</span> bits (the seed, 512; the private
+              key and the <span data-tex>x</span>-coordinate of the public key, 256; the address, 160) three statistics
+              were recorded: the Hamming weight <span data-tex>W</span> of the original (uniformity), its Hamming
+              distance <span data-tex>D_A</span> to twin A (avalanche) and, for the private key and the address, its
+              distance <span data-tex>D_B</span> to twin B (independence of sibling keys). Under the random-function
+              model
+            </p>
+            <div class="equation" id="eq-binomial">
+              <div data-tex-display>
+                W,\ D_A,\ D_B \sim \mathrm{Bin}\bigl(m, \tfrac12\bigr), \qquad \mathbb{E} = \frac{m}{2}, \qquad \mathrm{sd} = \frac{\sqrt{m}}{2},
+              </div>
+              <span class="equation__no">(13)</span>
+            </div>
+            <p>
+              because the weight of a uniform string, and the distance between two independent uniform strings, are
+              sums of <span data-tex>m</span> independent fair bits. The model is an approximation for the keys: a
+              private key lies in <span data-tex>[1, n-1]</span> rather than in
+              <span data-tex>[0, 2^{256})</span>, and <span data-tex>x</span> lies below <span data-tex>p</span> and is
+              the abscissa of a point of the curve; the first departure concerns a set of relative size about
+              <span data-tex>2^{-128}</span>, far below what {{fig.params.pipeline.n}} samples can resolve, and the
+              second a structure that a count of bits does not see.
+            </p>
+            <p>
+              Figure 8 shows each distribution against its binomial law and Table 3 lists the tests. One flipped bit
+              of entropy changes on average {{fig.stages.seed.avalanche.mean}} bits of the seed (expected
+              {{fig.stages.seed.avalanche.expectedMean}}), {{fig.stages.privateKey.avalanche.mean}} of the private key
+              and {{fig.stages.address.avalanche.mean}} of the address (expected
+              {{fig.stages.privateKey.avalanche.expectedMean}} and {{fig.stages.address.avalanche.expectedMean}}); the
+              sibling keys differ in {{fig.stages.privateKey.sibling.mean}} bits on average, as two unrelated keys
+              would. None of the stage tests of Table 3 rejects at the 5% level, the smallest p-value being
+              {{fig.stages.address.sibling.p}} for the sibling distance of addresses. Figure 9 looks at the address
+              bit by bit: the number of ones at each of the 160 positions is <span data-tex>\mathrm{Bin}(N_w, \tfrac12)</span>
+              under <span data-tex>H_0</span>, with <span data-tex>N_w</span> the number of addresses in the sample, and the sum of the squared standardised counts,
+              <span data-tex>\chi^2</span>(160) = {{fig.addressBits.all.statistic}}, gives p = {{fig.addressBits.all.p}}.
+              {{fig.addressBits.all.beyondTwoSigma}} positions lie beyond ±1.96, where 8 are expected, and the largest
+              |z|, {{fig.addressBits.all.maxAbsZ}}, is below the Bonferroni threshold for 160 two-sided tests at the 5%
+              level, about 3.6.
+            </p>
+            <p>
+              These results say that, within the power of {{fig.params.pipeline.n}} samples, the outputs of every
+              stage are, in these statistics, consistent with independent fair coin flips and that a one-bit change at the start reaches about half
+              of the bits of every later stage. They do not say that the stages are secure. The permutation
+              Keccak-f[1600] of §3.6 is itself invertible by design and passes the diffusion test of §4.6; one-wayness
+              is a property that no count of bits can establish.
+            </p>
+
+            <figure class="chart-figure" data-fig="stages" data-fig-kind="stages" aria-labelledby="fig8-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=stages --></div>
+              <div class="chart-figure__controls chart-figure__controls--wide" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Stage</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-seed" name="fig8-s" value="seed" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-seed">Seed</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-privateKey" name="fig8-s" value="privateKey" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-privateKey">Private key</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-publicKeyX" name="fig8-s" value="publicKeyX" data-fig-series-choice data-fig-axis="stage" />
+                      <label for="fig8-s-publicKeyX">Public key x</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-s-address" name="fig8-s" value="address" data-fig-series-choice data-fig-axis="stage" checked />
+                      <label for="fig8-s-address">Address</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset class="choice">
+                  <legend>Statistic</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-weight" name="fig8-m" value="weight" data-fig-series-choice data-fig-axis="measure" />
+                      <label for="fig8-m-weight">Weight</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-avalanche" name="fig8-m" value="avalanche" data-fig-series-choice data-fig-axis="measure" checked />
+                      <label for="fig8-m-avalanche">Avalanche</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig8-m-sibling" name="fig8-m" value="sibling" data-fig-series-choice data-fig-axis="measure" />
+                      <label for="fig8-m-sibling">Sibling</label>
+                    </div>
+                  </div>
+                </fieldset>
+                <button type="button" class="form-button" data-fig-resample>
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M2 14 14 2" stroke="currentColor" stroke-width="1.25" fill="none" />
+                    <circle cx="4.2" cy="10.4" r="1.6" fill="currentColor" />
+                    <circle cx="8.6" cy="8.1" r="1.6" fill="currentColor" />
+                    <circle cx="11.2" cy="3.6" r="1.6" fill="currentColor" />
+                  </svg>
+                  Draw new sample
+                </button>
+                <p class="caption fig-progress" data-fig-progress aria-hidden="true" hidden></p>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig8-title">
+                  <span class="pplot__fig-no">Figure 8.</span>Hamming weight, avalanche and sibling distance of each stage against Bin(m, ½)
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars are observed counts over the simulated wallets; the step line is the expected count under
+                  Bin(<span data-fig-stat="bits">{{fig.stages.address.avalanche.bits}}</span>, ½), the law of a
+                  uniformly random string of that length (weight) or of two independent ones (distances).
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean (exp. <span data-fig-stat="expectedMean">{{fig.stages.address.avalanche.expectedMean}}</span>)</dt><dd data-fig-stat="mean">{{fig.stages.address.avalanche.mean}}</dd></div>
+                  <div><dt>SD (exp. <span data-fig-stat="expectedSd">{{fig.stages.address.avalanche.expectedSd}}</span>)</dt><dd data-fig-stat="sd">{{fig.stages.address.avalanche.sd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.stages.address.avalanche.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.stages.address.avalanche.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.stages.address.avalanche.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.stages.address.avalanche.n}}</span> wallets,
+                  <span class="tabular" data-fig-stat="df">{{fig.stages.address.avalanche.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.stages.address.avalanche.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="addressBits" data-fig-kind="addressBits" aria-labelledby="fig9-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=addressBits --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig9-title">
+                  <span class="pplot__fig-no">Figure 9.</span>Standardised frequency of ones at each of the 160 address bit positions
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Each lollipop is the z-score of the number of ones at one bit position over the simulated
+                  addresses; the dashed rules mark ±1.96 and the dotted ones ±3.
+                  <span class="tabular" data-fig-stat="beyondTwoSigma">{{fig.addressBits.all.beyondTwoSigma}}</span> of 160
+                  positions lie beyond ±1.96, against 8 expected.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>χ²(160)</dt><dd data-fig-stat="statistic">{{fig.addressBits.all.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.addressBits.all.p}}</dd></div>
+                  <div><dt>max |z|</dt><dd data-fig-stat="maxAbsZ">{{fig.addressBits.all.maxAbsZ}}</dd></div>
+                  <div><dt>Monobit p</dt><dd data-fig-stat="monobitP">{{fig.addressBits.all.monobitP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  n = <span class="tabular" data-fig-stat="n">{{fig.addressBits.all.n}}</span> addresses, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.addressBits.all.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-5">4.5 The range of the private key</h3>
+            <p>
+              BIP-32 rejects a derivation whose <span data-tex>I_L</span>, read as an integer, is at least the group
+              order <span data-tex>n</span> (§3.3). If <span data-tex>I_L</span> is uniform on
+              <span data-tex>[0, 2^{256})</span>, the probability of this event is exact:
+            </p>
+            <div class="equation" id="eq-invalid">
+              <div data-tex-display>
+                P(I_L \ge n) = \frac{2^{256} - n}{2^{256}}, \qquad
+                2^{256} - n = \texttt{0x14551231950b75fc4402da1732fc9bebf} \approx 2^{128.35},
+              </div>
+              <span class="equation__no">(14)</span>
+            </div>
+            <p>
+              which evaluates to {{fig.ledger.invalidKeyProbability}}, that is 2 to the power
+              {{fig.ledger.invalidKeyLog2}}, in agreement with the bound "lower than 1 in 2<sup>127</sup>" of BIP-32.
+              This is one quantity that no simulation can estimate. A Monte Carlo estimate from
+              <span data-tex>N</span> trials of an event of probability <span data-tex>q</span> has relative standard
+              error <span data-tex>\sqrt{(1-q)/(Nq)}</span>, so a single expected occurrence already requires
+              <span data-tex>N \approx 1/q \approx 2^{128}</span> derivations; the value has to be computed, and the
+              build computes it from the integer <span data-tex>n</span> of SEC 2. Because such values are rejected
+              rather than reduced, an accepted <span data-tex>I_L</span> is uniform on <span data-tex>[0, n)</span>
+              under the random-function model, and the child key of equation (4), a shift of it modulo
+              <span data-tex>n</span>, is then uniform on <span data-tex>[1, n-1]</span>, the range the yellow paper
+              requires.
+            </p>
+
+            <h3 id="s4-6">4.6 Diffusion in Keccak-f[1600]</h3>
+            <p>
+              The hash of the address is only as good as the diffusion of its permutation. Pairs of uniformly random
+              1600-bit states that differ in one uniformly chosen bit were passed through Keccak-f[1600], and the
+              number of differing bits was recorded after every step of the first rounds and after every round. The
+              first steps are exact. <em>Claim:</em> after θ of round 1 the states differ in exactly 11 bits.
+              <em>Proof:</em> θ adds to every bit the parities of column <span data-tex>(x-1, z)</span> and of column
+              <span data-tex>(x+1, z-1)</span>. A difference at <span data-tex>(x, y, z)</span> changes the parity of
+              column <span data-tex>(x, z)</span> only, and that parity is added to the five bits of column
+              <span data-tex>(x+1, z)</span> and to the five bits of column <span data-tex>(x-1, z+1)</span>; together
+              with the original bit, which θ leaves different, that makes <span data-tex>1 + 5 + 5 = 11</span>. The
+              steps ρ and π only move bits, so they preserve the count; ι adds the same constant to both states, so it
+              leaves the difference unchanged. Only χ, being non-linear, makes the count depend on the states. The
+              simulated mean after θ of round 1 is {{fig.diffusion.all.r1theta}}, as the proof requires.
+            </p>
+            <p>
+              After the full first round the mean is {{fig.diffusion.all.r1chi}}; after rounds 2, 3 and 4 it is
+              {{fig.diffusion.all.r2}}, {{fig.diffusion.all.r3}} and {{fig.diffusion.all.r4}} (Figure 10). Under the
+              random-function model two outputs are independent uniform states, so their distance is
+              <span data-tex>\mathrm{Bin}(1600, \tfrac12)</span>, with mean 800 and standard deviation 20. After the
+              24 rounds the {{fig.diffusion.all.n}} pairs give mean {{fig.diffusion.all.finalMean}} and standard
+              deviation {{fig.diffusion.all.finalSd}}, and the binned chi-square test gives
+              <span data-tex>\chi^2</span>({{fig.diffusion.all.df}}) = {{fig.diffusion.all.statistic}},
+              p = {{fig.diffusion.all.p}}. The distance reaches the level of the binomial law within three rounds out
+              of 24. Whatever the remaining rounds contribute to security is invisible to this statistic: once two states are indistinguishable from
+              independent ones by their distance, more rounds cannot make them more so.
+            </p>
+
+            <figure class="chart-figure" data-fig="diffusion" data-fig-kind="diffusion" aria-labelledby="fig10-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=diffusion --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig10-title">
+                  <span class="pplot__fig-no">Figure 10.</span>Differing state bits after each step and round of Keccak-f[1600]
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Points are the mean number of differing bits between two states that start one bit apart, on a
+                  logarithmic scale; the band is the interquartile range; the dashed rule is 800, the mean of
+                  Bin(1600, ½). Mean after θ of round 1:
+                  <span class="tabular" data-fig-stat="r1theta">{{fig.diffusion.all.r1theta}}</span>; after round 1:
+                  <span class="tabular" data-fig-stat="r1chi">{{fig.diffusion.all.r1chi}}</span>; after rounds 2, 3 and 4:
+                  <span class="tabular" data-fig-stat="r2">{{fig.diffusion.all.r2}}</span>,
+                  <span class="tabular" data-fig-stat="r3">{{fig.diffusion.all.r3}}</span> and
+                  <span class="tabular" data-fig-stat="r4">{{fig.diffusion.all.r4}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean, round 24</dt><dd data-fig-stat="finalMean">{{fig.diffusion.all.finalMean}}</dd></div>
+                  <div><dt>SD (exp. 20)</dt><dd data-fig-stat="finalSd">{{fig.diffusion.all.finalSd}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.diffusion.all.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.diffusion.all.p}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  n = <span class="tabular" data-fig-stat="n">{{fig.diffusion.all.n}}</span> state pairs,
+                  <span class="tabular" data-fig-stat="df">{{fig.diffusion.all.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.diffusion.all.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-7">4.7 Statistics of the address</h3>
+            <p>
+              A vanity address is one chosen for a recognisable pattern, such as leading zero digits. In the experiment
+              of Figure 11 a search starts from a uniformly random private key <span data-tex>d</span> and tries
+              <span data-tex>d, d+1, d+2, \dots</span> until the lower-case address begins with
+              <span data-tex>k</span> zero hex digits. Under the random-function model each trial succeeds
+              independently with probability <span data-tex>16^{-k}</span>, so the number of trials
+              <span data-tex>T</span> of a search is geometric:
+            </p>
+            <div class="equation" id="eq-geometric">
+              <div data-tex-display>
+                H_0:\ P(T = t) = (1 - 16^{-k})^{t-1}\, 16^{-k}, \quad t = 1, 2, \dots, \qquad \mathbb{E}[T] = 16^{k}.
+              </div>
+              <span class="equation__no">(15)</span>
+            </div>
+            <p>
+              For <span data-tex>k = 1</span>, {{fig.vanity.k1.searches}} searches took {{fig.vanity.k1.mean}} trials on
+              average, 95% interval {{fig.vanity.k1.low}}–{{fig.vanity.k1.high}}, against an expected
+              {{fig.vanity.k1.expectedMean}}, and the binned chi-square test of the whole distribution gives
+              p = {{fig.vanity.k1.p}}; for <span data-tex>k = 2</span>, {{fig.vanity.k2.searches}} searches averaged
+              {{fig.vanity.k2.mean}} trials ({{fig.vanity.k2.low}}–{{fig.vanity.k2.high}}, expected
+              {{fig.vanity.k2.expectedMean}}, p = {{fig.vanity.k2.p}}). Each additional digit multiplies the expected
+              cost by 16, which is the whole economics of vanity addresses; §7 returns to a vanity-address
+              generator whose keys came from a 32-bit seed.
+            </p>
+            <p>
+              The same searches record the number <span data-tex>Z</span> of leading zero digits of every address
+              generated, whose law under <span data-tex>H_0</span> is
+              <span data-tex>P(Z = j) = \tfrac{15}{16}\,(\tfrac{1}{16})^{j}</span>. A naive test of this law on all
+              generated addresses would be wrong, because the stopping rule fixes how many addresses reach
+              <span data-tex>Z \ge k</span>: exactly one per search. The test used here conditions on the stopping
+              rule. The addresses that did not end a search follow the law of <span data-tex>Z</span> given
+              <span data-tex>Z &lt; k</span>; those that ended one follow the law of <span data-tex>Z</span> given
+              <span data-tex>Z \ge k</span>, which by the memorylessness of the geometric law is
+              <span data-tex>k</span> plus a geometric variable on <span data-tex>\{0, 1, \dots\}</span> with success
+              probability 15/16; the two chi-square statistics are added, as are their degrees of freedom. The
+              p-values are {{fig.vanity.k1.lzP}} for <span data-tex>k = 1</span> and {{fig.vanity.k2.lzP}} for
+              <span data-tex>k = 2</span>.
+            </p>
+            <p>
+              Figure 12 counts letters. A hex digit of a uniform address is a letter with probability 6/16, and, by
+              equation (9), an upper-case letter with probability <span data-tex>6/16 \cdot 1/2 = 3/16</span> when the
+              digest nibble is uniform. Hence <span data-tex>H_0: L \sim \mathrm{Bin}(40, 6/16)</span> for the number
+              of letters, with mean 15, and <span data-tex>U \sim \mathrm{Bin}(40, 3/16)</span> for the number of
+              upper-case letters, with mean 7.5. For {{fig.addressCase.random.n}} uniformly random strings the mean of
+              <span data-tex>L</span> is {{fig.addressCase.random.lMean}} (χ² test of the distribution, p = {{fig.addressCase.random.lP}})
+              and that of <span data-tex>U</span> {{fig.addressCase.random.uMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.random.uP}}); for the {{fig.addressCase.real.n}} addresses produced by the
+              pipeline sample of §4.4 they are {{fig.addressCase.real.lMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.real.lP}}) and {{fig.addressCase.real.uMean}} (χ² test of the distribution,
+              p = {{fig.addressCase.real.uP}}). Table 3 completes the record: the addresses produced by the full
+              pipeline are, by these statistics, indistinguishable from uniform 160-bit strings.
+            </p>
+
+            <figure class="chart-figure" data-fig="vanity" data-fig-kind="vanity" aria-labelledby="fig11-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=vanity --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Required prefix</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig11-k1" name="fig11-k" value="k1" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig11-k1">One zero digit</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig11-k2" name="fig11-k" value="k2" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig11-k2">Two zero digits</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig11-title">
+                  <span class="pplot__fig-no">Figure 11.</span>Trials of a vanity-address search against the geometric law
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Consecutive private keys are tried until the address begins with
+                  <span data-fig-stat="series">{{fig.vanity.k1.series}}</span>. Bars are the observed number of
+                  searches per bin, the step the expectation under the geometric law with mean
+                  <span class="tabular" data-fig-stat="expectedMean">{{fig.vanity.k1.expectedMean}}</span>. Observed mean
+                  <span class="tabular" data-fig-stat="mean">{{fig.vanity.k1.mean}}</span>, 95% interval
+                  <span class="tabular" data-fig-stat="low">{{fig.vanity.k1.low}}</span>–<span class="tabular" data-fig-stat="high">{{fig.vanity.k1.high}}</span>.
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Searches</dt><dd data-fig-stat="searches">{{fig.vanity.k1.searches}}</dd></div>
+                  <div><dt>χ² (binned)</dt><dd data-fig-stat="statistic">{{fig.vanity.k1.statistic}}</dd></div>
+                  <div><dt>p-value</dt><dd data-fig-stat="p">{{fig.vanity.k1.p}}</dd></div>
+                  <div><dt>Leading zeros Z, p</dt><dd data-fig-stat="lzP">{{fig.vanity.k1.lzP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span class="tabular" data-fig-stat="generated">{{fig.vanity.k1.generated}}</span> addresses generated,
+                  <span class="tabular" data-fig-stat="df">{{fig.vanity.k1.df}}</span> degrees of freedom, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.vanity.k1.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="addressCase" data-fig-kind="addressCase" aria-labelledby="fig12-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=addressCase --></div>
+              <div class="chart-figure__controls" data-fig-controls hidden>
+                <fieldset class="choice">
+                  <legend>Addresses</legend>
+                  <div class="choice__options">
+                    <div class="choice__option">
+                      <input type="radio" id="fig12-random" name="fig12-p" value="random" data-fig-series-choice data-fig-axis="series" checked />
+                      <label for="fig12-random">Random strings</label>
+                    </div>
+                    <div class="choice__option">
+                      <input type="radio" id="fig12-real" name="fig12-p" value="real" data-fig-series-choice data-fig-axis="series" />
+                      <label for="fig12-real">Pipeline addresses</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig12-title">
+                  <span class="pplot__fig-no">Figure 12.</span>Letters and upper-case letters per address against Bin(40, 6/16) and Bin(40, 3/16)
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Left, the number L of letters a–f among the 40 hex digits; right, the number U of letters printed in
+                  upper case by EIP-55. Bars are observed counts, steps the binomial expectations (means 15 and 7.5).
+                </p>
+                <dl class="pplot__stats">
+                  <div><dt>Mean L (exp. 15)</dt><dd data-fig-stat="lMean">{{fig.addressCase.random.lMean}}</dd></div>
+                  <div><dt>L: p-value</dt><dd data-fig-stat="lP">{{fig.addressCase.random.lP}}</dd></div>
+                  <div><dt>Mean U (exp. 7.5)</dt><dd data-fig-stat="uMean">{{fig.addressCase.random.uMean}}</dd></div>
+                  <div><dt>U: p-value</dt><dd data-fig-stat="uP">{{fig.addressCase.random.uP}}</dd></div>
+                </dl>
+                <p class="pplot__seed">
+                  <span data-fig-stat="series">{{fig.addressCase.random.series}}</span>, n =
+                  <span class="tabular" data-fig-stat="n">{{fig.addressCase.random.n}}</span>, seed
+                  <span class="tabular" data-fig-stat="seed">{{fig.addressCase.random.seed}}</span>
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption">
+              <table class="data-table data-table--compact data-table--hw02">
+                <caption id="table3-caption">Table 3. Tests of the pipeline stages against their binomial laws: observed mean (expected mean), binned chi-square statistic, degrees of freedom and p-value. Pipeline sample of {{fig.params.pipeline.n}} wallets (seed {{fig.params.pipeline.seed}}); random addresses {{fig.params.addressCase.n}} (seed {{fig.params.addressCase.seed}}).</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Law</th>
+                    <th scope="col" class="is-number">Mean (exp.)</th>
+                    <th scope="col" class="is-number">χ²</th>
+                    <th scope="col" class="is-number">df</th>
+                    <th scope="col" class="is-number">p-value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Seed, weight</th><td>Bin(512, ½)</td><td class="is-number">{{fig.stages.seed.weight.mean}} ({{fig.stages.seed.weight.expectedMean}})</td><td class="is-number">{{fig.stages.seed.weight.statistic}}</td><td class="is-number">{{fig.stages.seed.weight.df}}</td><td class="is-number">{{fig.stages.seed.weight.p}}</td></tr>
+                  <tr><th scope="row">Seed, avalanche</th><td>Bin(512, ½)</td><td class="is-number">{{fig.stages.seed.avalanche.mean}} ({{fig.stages.seed.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.seed.avalanche.statistic}}</td><td class="is-number">{{fig.stages.seed.avalanche.df}}</td><td class="is-number">{{fig.stages.seed.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Private key, weight</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.weight.mean}} ({{fig.stages.privateKey.weight.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.weight.statistic}}</td><td class="is-number">{{fig.stages.privateKey.weight.df}}</td><td class="is-number">{{fig.stages.privateKey.weight.p}}</td></tr>
+                  <tr><th scope="row">Private key, avalanche</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.avalanche.mean}} ({{fig.stages.privateKey.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.avalanche.statistic}}</td><td class="is-number">{{fig.stages.privateKey.avalanche.df}}</td><td class="is-number">{{fig.stages.privateKey.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Private key, sibling</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.privateKey.sibling.mean}} ({{fig.stages.privateKey.sibling.expectedMean}})</td><td class="is-number">{{fig.stages.privateKey.sibling.statistic}}</td><td class="is-number">{{fig.stages.privateKey.sibling.df}}</td><td class="is-number">{{fig.stages.privateKey.sibling.p}}</td></tr>
+                  <tr><th scope="row">Public key x, weight</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.publicKeyX.weight.mean}} ({{fig.stages.publicKeyX.weight.expectedMean}})</td><td class="is-number">{{fig.stages.publicKeyX.weight.statistic}}</td><td class="is-number">{{fig.stages.publicKeyX.weight.df}}</td><td class="is-number">{{fig.stages.publicKeyX.weight.p}}</td></tr>
+                  <tr><th scope="row">Public key x, avalanche</th><td>Bin(256, ½)</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.mean}} ({{fig.stages.publicKeyX.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.statistic}}</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.df}}</td><td class="is-number">{{fig.stages.publicKeyX.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Address, weight</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.weight.mean}} ({{fig.stages.address.weight.expectedMean}})</td><td class="is-number">{{fig.stages.address.weight.statistic}}</td><td class="is-number">{{fig.stages.address.weight.df}}</td><td class="is-number">{{fig.stages.address.weight.p}}</td></tr>
+                  <tr><th scope="row">Address, avalanche</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.avalanche.mean}} ({{fig.stages.address.avalanche.expectedMean}})</td><td class="is-number">{{fig.stages.address.avalanche.statistic}}</td><td class="is-number">{{fig.stages.address.avalanche.df}}</td><td class="is-number">{{fig.stages.address.avalanche.p}}</td></tr>
+                  <tr><th scope="row">Address, sibling</th><td>Bin(160, ½)</td><td class="is-number">{{fig.stages.address.sibling.mean}} ({{fig.stages.address.sibling.expectedMean}})</td><td class="is-number">{{fig.stages.address.sibling.statistic}}</td><td class="is-number">{{fig.stages.address.sibling.df}}</td><td class="is-number">{{fig.stages.address.sibling.p}}</td></tr>
+                  <tr><th scope="row">Address bit frequencies</th><td>χ²(160)</td><td class="is-number">—</td><td class="is-number">{{fig.addressBits.all.statistic}}</td><td class="is-number">{{fig.addressBits.all.df}}</td><td class="is-number">{{fig.addressBits.all.p}}</td></tr>
+                  <tr><th scope="row">Letters L, random strings</th><td>Bin(40, 6/16)</td><td class="is-number">{{fig.addressCase.random.lMean}} (15)</td><td class="is-number">{{fig.addressCase.random.lStatistic}}</td><td class="is-number">{{fig.addressCase.random.lDf}}</td><td class="is-number">{{fig.addressCase.random.lP}}</td></tr>
+                  <tr><th scope="row">Letters L, pipeline addresses</th><td>Bin(40, 6/16)</td><td class="is-number">{{fig.addressCase.real.lMean}} (15)</td><td class="is-number">{{fig.addressCase.real.lStatistic}}</td><td class="is-number">{{fig.addressCase.real.lDf}}</td><td class="is-number">{{fig.addressCase.real.lP}}</td></tr>
+                  <tr><th scope="row">Upper case U, random strings</th><td>Bin(40, 3/16)</td><td class="is-number">{{fig.addressCase.random.uMean}} (7.5)</td><td class="is-number">{{fig.addressCase.random.uStatistic}}</td><td class="is-number">{{fig.addressCase.random.uDf}}</td><td class="is-number">{{fig.addressCase.random.uP}}</td></tr>
+                  <tr><th scope="row">Upper case U, pipeline addresses</th><td>Bin(40, 3/16)</td><td class="is-number">{{fig.addressCase.real.uMean}} (7.5)</td><td class="is-number">{{fig.addressCase.real.uStatistic}}</td><td class="is-number">{{fig.addressCase.real.uDf}}</td><td class="is-number">{{fig.addressCase.real.uP}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s4-8">4.8 Undetected errors: BIP-39 and EIP-55</h3>
+            <p>
+              Consider a uniform address whose letters are given a uniformly random case, the model of a mistyped
+              address in EIP-55's rationale. Given its number of letters <span data-tex>L</span>, the pattern passes
+              the check with probability <span data-tex>2^{-L}</span>, since each letter must match one independent
+              fair bit. Averaging over <span data-tex>L \sim \mathrm{Bin}(40, 6/16)</span> with the probability
+              generating function of the binomial law, <span data-tex>\mathbb{E}[s^L] = (1 - \pi + \pi s)^{40}</span>
+              with <span data-tex>\pi = 6/16</span> and <span data-tex>s = 1/2</span>, gives
+            </p>
+            <div class="equation" id="eq-eip55-error">
+              <div data-tex-display>
+                P(\text{pass}) = \mathbb{E}\bigl[2^{-L}\bigr] = \Bigl(1 - \tfrac{6}{16} + \tfrac{3}{16}\Bigr)^{40} = \Bigl(\tfrac{13}{16}\Bigr)^{40},
+              </div>
+              <span class="equation__no">(16)</span>
+            </div>
+            <p>
+              about {{fig.eip55.exactPercent}}%, the figure of the EIP. Its "15 check bits per address on average" is
+              <span data-tex>\mathbb{E}[L] = 40 \cdot 6/16 = 15</span>. The two statements are consistent, but the
+              second does not imply the first: <span data-tex>2^{-15}</span> is about 0.0031%, eight times smaller.
+              Since <span data-tex>t \mapsto 2^{-t}</span> is convex, Jensen's inequality gives
+              <span data-tex>\mathbb{E}[2^{-L}] \ge 2^{-\mathbb{E}[L]}</span>: the average is dominated by the
+              addresses with few letters, which are poorly protected. An address with no letter at all, of
+              probability <span data-tex>(10/16)^{40}</span> = {{fig.eip55.noLetter}}, is not protected at all.
+            </p>
+            <p>
+              Two random error models were simulated with {{fig.params.errors.n}} trials each, and a third was
+              enumerated (Figure 13). For random case
+              patterns, {{fig.eip55.randomCase.accepted}} passed against {{fig.eip55.randomCase.expectedAccepted}}
+              expected (p = {{fig.eip55.randomCase.p}}). Because the indicator of acceptance is a noisy measure of
+              <span data-tex>2^{-L}</span>, the average of <span data-tex>2^{-L}</span> over the same trials, its
+              Rao–Blackwellised version, estimates the same probability with a smaller variance:
+              {{fig.eip55.randomCase.rb}} with standard error {{fig.eip55.randomCase.rbSe}}, against the exact
+              {{fig.eip55.exact}}. For the substitution of one hex digit by another, the new lower-case address has an
+              independent digest, and its letter count is again <span data-tex>\mathrm{Bin}(40, 6/16)</span> because
+              the new digit is uniform; equation (16) applies again, and {{fig.eip55.substitution.accepted}} of
+              {{fig.eip55.substitution.n}} substitutions passed (p = {{fig.eip55.substitution.p}}). For an error
+              that changes only the case of one letter, the probability of detection is exactly 1: the expected case
+              pattern depends only on the lower-case address, which such an error leaves unchanged, so the changed
+              letter necessarily disagrees with it. All {{fig.eip55.caseFlip.tested}} case errors tried on
+              {{fig.eip55.caseFlip.addresses}} addresses were detected.
+            </p>
+            <p>
+              Figure 13 sets these rates beside those of BIP-39. The two checksums answer different error models and
+              different budgets: four to eight check bits for a sentence that a person writes down and types back, about
+              fifteen on average for an address, stored in its letter case at no cost in length. Neither offers any protection against a deliberate
+              change, since anyone can recompute either checksum.
+            </p>
+
+            <figure class="chart-figure" data-fig="errorRates" data-fig-kind="errorRates" aria-labelledby="fig13-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=errorRates --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig13-title">
+                  <span class="pplot__fig-no">Figure 13.</span>Probability that a random error passes the check: exact value and simulation
+                  <span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  For each check the ink tick is the exact probability, the point the simulated proportion and the
+                  line its 95% Wilson interval, on a logarithmic scale. EIP-55, random case:
+                  {{fig.eip55.randomCase.accepted}} accepted of {{fig.eip55.randomCase.n}} (expected
+                  {{fig.eip55.randomCase.expectedAccepted}}), p = {{fig.eip55.randomCase.p}}; one substituted
+                  character: {{fig.eip55.substitution.accepted}} of {{fig.eip55.substitution.n}}, p =
+                  {{fig.eip55.substitution.p}}. Case-only errors: {{fig.eip55.caseFlip.detected}} of
+                  {{fig.eip55.caseFlip.tested}} detected.
+                </p>
+                <p class="pplot__seed">
+                  BIP-39: n = {{fig.params.acceptance.n}} per row, seeds {{fig.params.acceptance.seed}} and
+                  {{fig.params.substitution.seed}}; EIP-55: n = {{fig.params.errors.n}} per row, seed {{fig.params.errors.seed}}
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <h3 id="s4-9">4.9 The scale of a brute-force search</h3>
+            <p>
+              If a secret is uniform on <span data-tex>2^b</span> values, an exhaustive search needs
+              <span data-tex>2^b</span> trials and finds a given secret after
+              <span data-tex>(2^b + 1)/2 \approx 2^{b-1}</span> trials on average. Table 4 converts these counts into
+              time at the rate of the implementation on this page, {{fig.brute.rate}} mnemonics per second from
+              entropy to address on one thread; the cost of each trial is dominated by the 2048 iterations of PBKDF2
+              and by the scalar multiplications. An optimised attacker on many processors would be faster by many
+              orders of magnitude, so the absolute times matter less than the ratios: the gap between a 32-bit and a
+              128-bit space is a factor of <span data-tex>2^{96} \approx 7.9 \times 10^{28}</span>, which no
+              improvement in the cost per trial can bridge.
+            </p>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption">
+              <table class="data-table data-table--hw02">
+                <caption id="table4-caption">Table 4. Expected and exhaustive search over secret spaces of 2^b equally likely values, at {{fig.brute.rate}} mnemonics per second (this implementation, one thread), and the probability of at least one collision among m uniform 160-bit addresses.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Secret space</th>
+                    <th scope="col" class="is-number">Expected trials</th>
+                    <th scope="col" class="is-number">Expected time (years)</th>
+                    <th scope="col" class="is-number">Exhaustive time (years)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">32-bit generator seed</th><td class="is-number">{{fig.brute.b32.expectedTrials}}</td><td class="is-number">{{fig.brute.b32.expectedYears}}</td><td class="is-number">{{fig.brute.b32.exhaustYears}}</td></tr>
+                  <tr><th scope="row">12-word mnemonic, 128 bits</th><td class="is-number">{{fig.brute.b128.expectedTrials}}</td><td class="is-number">{{fig.brute.b128.expectedYears}}</td><td class="is-number">{{fig.brute.b128.exhaustYears}}</td></tr>
+                  <tr><th scope="row">24-word mnemonic, 256 bits</th><td class="is-number">{{fig.brute.b256.expectedTrials}}</td><td class="is-number">{{fig.brute.b256.expectedYears}}</td><td class="is-number">{{fig.brute.b256.exhaustYears}}</td></tr>
+                </tbody>
+                <tbody>
+                  <tr><th scope="col">Addresses generated m</th><th scope="col" class="is-number" colspan="3">P(at least one collision)</th></tr>
+                  <tr><th scope="row">{{fig.brute.c6.m}}</th><td class="is-number" colspan="3">{{fig.brute.c6.probability}}</td></tr>
+                  <tr><th scope="row">{{fig.brute.c9.m}}</th><td class="is-number" colspan="3">{{fig.brute.c9.probability}}</td></tr>
+                  <tr><th scope="row">{{fig.brute.c12.m}}</th><td class="is-number" colspan="3">{{fig.brute.c12.probability}}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Two other searches complete the picture. A collision between two addresses would give two different
+              private keys control of the same address; among <span data-tex>m</span> uniform 160-bit addresses its probability is
+              <span data-tex>1 - \exp\bigl(-m(m-1)/2^{161}\bigr) \approx m^2/2^{161}</span>, which is
+              {{fig.brute.c12.probability}} for <span data-tex>m = 10^{12}</span> (lower part of Table 4). An attacker
+              who holds a public key can skip the pipeline entirely and attack the discrete logarithm: Pollard's rho
+              method needs on average about <span data-tex>\sqrt{\pi n/4}</span> =
+              {{fig.brute.rhoCoefficient}} <span data-tex>\sqrt{n}</span> group additions, that is 2 to the power
+              {{fig.brute.rhoLog2}} on secp256k1, which agrees with the <span data-tex>2^{127.8}</span> of SafeCurves
+              [<a href="#ref-2">2</a>]. Guessing a 12-word mnemonic and solving the discrete logarithm of a known public key
+              therefore both cost about <span data-tex>2^{128}</span> trials or group operations respectively, the security level of the curve. A
+              24-word mnemonic raises the cost of guessing the mnemonic itself to <span data-tex>2^{256}</span>, but
+              not the security of a key whose public key is known, which remains bounded by the discrete
+              logarithm.
+            </p>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Historical context</h2>
+
+            <h3 id="s5-1">5.1 A chronology</h3>
+            <p>
+              The pipeline assembles four decades of work, in an order that Figure 14 draws to scale. Public-key
+              cryptography was described publicly by Diffie and Hellman in November 1976 [<a href="#ref-7">7</a>]. RSA followed as an MIT
+              technical memorandum in April 1977 and as a journal article in <cite>Communications of the ACM</cite> in
+              February 1978 [<a href="#ref-25">25</a>]; the assignment's "1977" is the date of the memorandum. Elliptic-curve
+              cryptography, on which secp256k1 rests, was proposed independently by Miller, at CRYPTO '85 with
+              proceedings published in 1986 [<a href="#ref-14">14</a>], and by Koblitz in 1987 [<a href="#ref-10">10</a>]. The curve secp256k1 was
+              first published in version 1.0 of SEC 2, dated 20 September 2000 [<a href="#ref-6">6</a>, version 1.0, §2.7.1]; the
+              parameters are cited on this page from version 2.0, dated 27 January 2010 [<a href="#ref-6">6</a>].
+            </p>
+            <p>
+              The hash functions came next. A draft of FIPS 180-2, adding SHA-256, SHA-384 and SHA-512 to SHA-1, was
+              announced on 30 May 2001, and the final standard is dated 1 August 2002, effective from 1 February 2003
+              [<a href="#ref-16">16</a>]. The assignment's "standardized in 2001" is therefore the date of the draft:
+              SHA-2 was standardised in 2002. The edition cited here, FIPS 180-4, is dated August 2015
+              [<a href="#ref-17">17</a>]. NIST announced the competition for SHA-3 on 2 November 2007, selected Keccak on 2 October
+              2012, published a draft of FIPS 202 in May 2014 and the final standard on 4 August 2015 [<a href="#ref-19">19</a>];
+              the assignment's 2015 is correct.
+            </p>
+            <p>
+              The wallet standards are Bitcoin Improvement Proposals, whose current files carry the status "Deployed"
+              and an "Assigned" date: 11 February 2012 for BIP-32 [<a href="#ref-30">30</a>], 10 September 2013 for BIP-39 [<a href="#ref-23">23</a>]
+              and 24 April 2014 for BIP-44 [<a href="#ref-22">22</a>], all three in the years given by the assignment. SLIP-0044, the
+              registry that gives Ether its coin type, was created on 9 July 2014 [<a href="#ref-26">26</a>]. On the Ethereum side,
+              ethereum.org dates the whitepaper to 27 November 2013 and the launch of the main network, Frontier, to
+              30 July 2015 [<a href="#ref-8">8</a>], five days before FIPS 202 was published. EIP-55 was created on 14 January 2016
+              and is now published, with status Final, as ERC-55 [<a href="#ref-5">5</a>]. Table 5 sets the dates of the assignment
+              beside the verified ones; Figure 14 adds the two failures of key generation discussed in §7, disclosed
+              in 2022 and 2023.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-timeline aria-labelledby="fig14-title">
+              <div class="chart-figure__canvas" data-timeline-canvas><!-- @figure id=timeline --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig14-title">
+                  <span class="pplot__fig-no">Figure 14.</span>Public-key cryptography, hash standards and wallet standards, 1976 to 2023
+                </p>
+                <p>
+                  One row per event, in chronological order; the space between rows grows with the time between
+                  events. Where a draft, memorandum or conference date precedes the final publication, both are
+                  printed (open mark: earlier date; filled mark: final date).
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-timeline-status aria-live="polite"></p>
+            </figure>
+
+            <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption">
+              <table class="data-table">
+                <caption id="table5-caption">Table 5. The dates given in the assignment and the dates verified in the primary sources.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Technology</th>
+                    <th scope="col" class="is-number">Assignment</th>
+                    <th scope="col">Verified date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">RSA</th><td class="is-number">1977</td><td>April 1977 (MIT memorandum); February 1978 (Communications of the ACM)</td></tr>
+                  <tr><th scope="row">SHA-2 / SHA-512</th><td class="is-number">2001</td><td>30 May 2001 (draft FIPS 180-2); 1 August 2002 (final)</td></tr>
+                  <tr><th scope="row">BIP-32</th><td class="is-number">2012</td><td>11 February 2012 (assigned)</td></tr>
+                  <tr><th scope="row">BIP-39</th><td class="is-number">2013</td><td>10 September 2013 (assigned)</td></tr>
+                  <tr><th scope="row">BIP-44</th><td class="is-number">2014</td><td>24 April 2014 (assigned)</td></tr>
+                  <tr><th scope="row">SHA-3</th><td class="is-number">2015</td><td>2 October 2012 (Keccak selected); May 2014 (draft FIPS 202); 4 August 2015 (FIPS 202)</td></tr>
+                  <tr><th scope="row">EIP-55</th><td class="is-number">2016</td><td>14 January 2016 (created)</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="s5-2">5.2 SHA-2 and Keccak / SHA-3</h3>
+            <p>
+              SHA-2 and SHA-3 are both cryptographic hash functions standardised by NIST, but they are built in
+              different ways. SHA-512, specified in FIPS 180-4 [<a href="#ref-17">17</a>, §§5.1.2, 5.2.2, 6.4], pads the message with its length,
+              splits it into 1024-bit blocks and feeds them one at a time to a compression function of 80 rounds that
+              updates a chaining value of eight 64-bit words; the digest is the final chaining value. This iterated
+              compression of fixed-size blocks is the construction known as Merkle–Damgård, and the whole internal
+              state is the output. Keccak, designed by Bertoni, Daemen, Peeters and Van Assche and selected as SHA-3,
+              is a sponge (§3.6): a fixed permutation of 1600 bits, a rate through which the message enters and the
+              digest leaves, and a capacity that is never output [<a href="#ref-3">3</a>, <a href="#ref-18">18</a>]. FIPS 202 defines four hash
+              functions, SHA3-224 to SHA3-512, and two extendable-output functions, SHAKE128 and SHAKE256, all on the
+              same permutation [<a href="#ref-18">18</a>]. The two families are specified side by side, in FIPS 180-4 and FIPS 202,
+              both dated August 2015. Within the pipeline, SHA-256 and SHA-512 belong to BIP-39 and BIP-32, and
+              Keccak-256 to Ethereum.
+            </p>
+
+            <h3 id="s5-3">5.3 Keccak-256 is not SHA3-256</h3>
+            <p>
+              "The four SHA-3 hash functions differ slightly from the instances of KECCAK that were proposed for the
+              SHA-3 competition", FIPS 202 explains: "a two-bit suffix is appended to the messages" [<a href="#ref-18">18</a>, §1]. In
+              its notation,
+            </p>
+            <div class="equation" id="eq-sha3">
+              <div data-tex-display>
+                \begin{aligned}
+                \mathrm{SHA3\text{-}256}(M) &amp;= \mathrm{KECCAK}[512](M \,\|\, 01,\ 256),\\
+                \mathrm{Keccak\text{-}256}(M) &amp;= \mathrm{KECCAK}[512](M,\ 256),
+                \end{aligned}
+              </div>
+              <span class="equation__no">(17)</span>
+            </div>
+            <p>
+              the first by [<a href="#ref-18">18</a>, §6.1], the second being the competition instance without the suffix. Both use
+              the same permutation, the same capacity <span data-tex>c = 512</span> and the same rate
+              <span data-tex>r = 1088</span>; they differ only in the bits that separate the message from the padding.
+              The Keccak team encodes these trailing bits and their number in one "delimited suffix"
+              byte, 0x06 for SHA3-256 [<a href="#ref-3">3</a>]. For the competition instance the suffix is
+              empty, and the same rule gives 0x01; this value is derived from the team's formula rather than quoted,
+              and the implementation confirms it, since the sponge with 0x01 reproduces the published Keccak-256 of
+              the empty input [<a href="#ref-9">9</a>] and with 0x06 the published SHA3-256 [<a href="#ref-20">20</a>]. The suffix is a form of
+              domain separation: it lets FIPS 202 distinguish its hash functions from its extendable-output functions,
+              which use other suffixes, on one permutation. Because the suffix is part of the padded input, the two
+              digests of the same message are unrelated, as Figure 15 shows for any text the reader types.
+            </p>
+            <p>
+              Ethereum fixed its hash before the standard was final. The yellow paper specifies Keccak-256 "as per
+              version 3 of the winning entry to the SHA-3 contest by Bertoni et al. [2011], rather than the final
+              SHA-3 specification" [<a href="#ref-29">29</a>], and the main network was launched on 30 July 2015, five days before FIPS
+              202 [<a href="#ref-8">8</a>]. The name "sha3" nonetheless survives in places: ethereum.org warns that a function called
+              "sha3_256" in Ethereum's code is "not standard sha3" but Keccak-256 [<a href="#ref-8">8</a>]. The converse mistake
+              is just as easy: an implementation of SHA3-256 in the sense of FIPS 202, used in place of Keccak-256,
+              yields different digests and therefore different addresses.
+            </p>
+
+            <figure class="chart-figure hw02-figure" data-digests aria-labelledby="fig15-title">
+              <div class="digests__controls" data-digests-controls hidden>
+                <label class="text-field">
+                  <span class="caption">Input (UTF-8), recomputed at every keystroke</span>
+                  <input type="text" data-digests-input value="" placeholder="Type any text" autocomplete="off" spellcheck="false" />
+                </label>
+              </div>
+              <div class="chart-figure__canvas" data-digests-output><!-- @figure id=digests --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig15-title">
+                  <span class="pplot__fig-no">Figure 15.</span>One input, four hash functions
+                </p>
+                <p>
+                  Digests of {{fig.digests.input}} under SHA-256, SHA-512, Keccak-256 and SHA3-256. The Keccak-256
+                  value, <code>{{fig.digests.keccak256}}</code>, and the SHA3-256 value,
+                  <code>{{fig.digests.sha3_256}}</code>, are the published values for the empty input [<a href="#ref-9">9</a>, <a href="#ref-20">20</a>] and are checked
+                  when the page is built.
+                </p>
+              </figcaption>
+              <p class="visually-hidden" data-digests-status aria-live="polite"></p>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Why several primitives</h2>
+            <p>
+              A wallet must satisfy several requirements at once, and they are not compatible with a single
+              algorithm. Taken one at a time, each requirement calls for a property, and each property is supplied by a
+              different primitive.
+            </p>
+            <ol>
+              <li>
+                <strong>A backup that a person can transcribe, with error detection.</strong> The secret must survive
+                being written on paper and typed back. BIP-39 supplies an encoding into common words and a short
+                checksum; the property needed is a bijection plus redundancy, not secrecy.
+              </li>
+              <li>
+                <strong>Slow, salted processing of possibly weak human input.</strong> A passphrase may carry little
+                entropy, so each guess must be expensive. PBKDF2-HMAC-SHA512 supplies a deliberately costly
+                deterministic map; a fast hash would be the wrong tool here, and a slow one the wrong tool everywhere
+                else.
+              </li>
+              <li>
+                <strong>Many keys from one backup, with watch-only derivation.</strong> BIP-32 supplies a tree of keys
+                from one seed, and BIP-44 a shared layout of that tree. Its normal derivation lets an extended public
+                key generate addresses without any private key, a property that rests on the group structure of the
+                curve (equation (5)); its hardened derivation limits the damage of a leak.
+              </li>
+              <li>
+                <strong>Proof of ownership that anyone can verify.</strong> Spending requires a signature that is
+                produced with a secret and verified with public data. secp256k1 with ECDSA supplies this through the
+                one-way relation K = kG and its group structure; a hash function on its own has no pair of a
+                signing key and a verification key.
+              </li>
+              <li>
+                <strong>Short, fixed-length identifiers.</strong> An account needs a name shorter than a 64-byte public
+                key that commits to it. Keccak-256 compresses the key and truncation fixes the length at 160 bits; a
+                signature scheme does not compress arbitrary data into identifiers, while a hash does so with no key
+                and no structure to exploit.
+              </li>
+              <li>
+                <strong>Protection against typing errors at no cost in length.</strong> EIP-55 supplies a cheap,
+                public checksum in the letter case. It is meant to add no security, and it adds none: anyone can
+                compute the checksum of any address.
+              </li>
+              <li>
+                <strong>Interfaces for people and programs.</strong> Words, hexadecimal and Base58 are encodings that
+                move the same information between representations without loss.
+              </li>
+            </ol>
+            <p>
+              The requirements also pull in opposite directions: a key-stretching function must be slow and a checksum
+              fast; an encoding must be invertible and a hash must not; a signature needs structure that a hash must
+              avoid. A single algorithm would have to compromise on all of them. The design follows instead the
+              principle of separation of concerns: each step does one job, and the interfaces between steps are
+              fixed byte strings. Domain separation keeps the jobs apart even where the same primitive is reused:
+              BIP-39 salts PBKDF2 with the string "mnemonic", BIP-32 keys its master HMAC with "Bitcoin seed" and,
+              in hardened derivation, pads the private key with the byte 0x00 to 33 bytes
+              [<a href="#ref-30">30</a>, "Private parent key → private child key"], which also keeps that input
+              apart from a compressed public key, whose first byte is 02 or 03 [<a href="#ref-30">30</a>, "Conventions"]; FIPS 202 separates its functions by their suffixes,
+              and EIP-55 hashes the ASCII text of the address, a different input from the public key whose digest
+              produced the address.
+            </p>
+            <p>
+              The choice of primitives also reflects history rather than a single design. BIP-39 and BIP-32 come
+              from the Bitcoin community and use SHA-256 and SHA-512 of the NIST SHA-2 family; the curve is defined by
+              SEC 2 and shared by BIP-32 and Ethereum; Ethereum chose Keccak-256 before SHA-3 was final; and EIP-55 was added to
+              Ethereum addresses after the network was running. The pipeline is a composition of standards from
+              different bodies and different years, which is one more reason why it uses several primitives.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> When the statistical assumption fails</h2>
+            <p>
+              Every argument of §4 assumed that the entropy at the start is uniform on
+              <span data-tex>2^{\mathrm{ENT}}</span> values. Inequality (11) makes the consequence of a failure
+              precise: if the generator can produce only <span data-tex>N</span> distinct entropies, every later
+              stage, the seed, the keys and the address, has at most <span data-tex>\log_2 N</span> bits of entropy,
+              however long its representation and however good the functions that follow. No derivation downstream
+              can restore what generation did not supply.
+            </p>
+            <p>
+              The Milk Sad disclosure is a documented instance. The command <code>bx seed</code> of Libbitcoin
+              Explorer, versions 3.0.0 to 3.6.0, drew wallet entropy from the Mersenne Twister generator mt19937,
+              seeded with 32 bits derived from the system clock; in the words of the CVE record, "the use of an mt19937
+              Mersenne Twister PRNG restricts the internal entropy to 32 bits regardless of settings", which "allows
+              remote attackers to recover any wallet private keys generated from "bx seed" entropy output", and the
+              weakness "was exploited in the wild in June and July 2023" [<a href="#ref-13">13</a>]. The researchers who disclosed it
+              note that the generator "can at most have 2^32 starting positions", so that a wallet is found "after a
+              maximum of about 4.29 billion attempts", and estimate that over 900,000 US dollars' worth of
+              cryptocurrency, at August 2023 exchange rates, was moved [<a href="#ref-13">13</a>]. Whatever mnemonic length a user selected, 24 words
+              included, the key space was at most <span data-tex>2^{32}</span> rather than up to
+              <span data-tex>2^{256}</span>. Table 4 shows the difference at the rate of the JavaScript implementation
+              of this page, on one thread: an expected {{fig.brute.b32.expectedYears}} years and at most
+              {{fig.brute.b32.exhaustYears}} years for the 32-bit space, against {{fig.brute.b256.expectedYears}}
+              years for a 24-word mnemonic. The 32-bit search, moreover, divides exactly among parallel workers:
+              <span data-tex>w</span> workers need <span data-tex>1/w</span> of the time.
+            </p>
+            <p>
+              The Profanity vanity-address generator failed in the same way. According to the disclosure by 1inch,
+              "Profanity used a random 32-bit vector to seed 256-bit private keys"; 1inch later built proof-of-concept
+              code able to "recover private keys from any vanity address generated with Profanity" and advised users
+              to move their assets [<a href="#ref-1">1</a>]. Since the tool started from "1 of 4 bln seed private keys" rather than
+              from a mnemonic [<a href="#ref-1">1</a>], Table 4 applies to it through the size of the seed space, not through the
+              cost per trial. Each seed, however, starts a long sequence of candidate keys, so that, by 1inch's
+              estimate, recovering every vanity address of six or seven characters "would have required thousands
+              of GPUs and months of time" [<a href="#ref-1">1</a>]. According to The Block, the market maker Wintermute said in September 2022 that 160
+              million dollars had been stolen from its Ethereum vault, and experts quoted in the same report blamed
+              a Profanity-generated address; the figure and the attribution rest on press reports, not on an official
+              post-mortem [<a href="#ref-27">27</a>].
+            </p>
+            <p>
+              Randomness is needed after generation as well. An ECDSA signature uses a fresh secret nonce (§3.5), and
+              Breitner and Heninger recovered keys from signatures whose nonces were biased: "we compute hundreds of
+              Bitcoin private keys and dozens of Ethereum, Ripple, SSH, and HTTPS private keys" [<a href="#ref-4">4</a>]. Here too the
+              defect lies in the distribution of a secret, not in the functions applied to it.
+            </p>
+            <p>
+              The statistical lesson is the one Homework 1 drew for its toy hash, and the experiments of this page
+              illustrate it directly. Their wallets were generated, for reproducibility, from Mulberry32, a statistical
+              generator whose whole state is one 32-bit integer: every wallet of Figure 8 is determined by the seed
+              {{fig.params.pipeline.seed}}, and the whole sample belongs to a space of at most
+              <span data-tex>2^{32}</span> sequences. Every test of §4 was passed nonetheless. This is to be expected:
+              with <span data-tex>2^{32}</span> equally likely entropies, a sample of
+              <span data-tex>m</span> independently seeded wallets contains a repeated one with probability about
+              <span data-tex>m^2/2^{33}</span>, which is negligible for samples of a few thousand; and without
+              repetitions, under the random-function model, distinct inputs give independent uniform outputs however
+              few the possible inputs are. The tests of §4, on weights, distances and frequencies, are therefore
+              blind to the size of the input space. Only a count of collisions could reveal a space of
+              <span data-tex>2^{32}</span> entropies, and by the same formula it would need samples of the order of
+              <span data-tex>2^{16}</span> wallets before a repetition became likely, far beyond the samples used
+              here. A wallet is secure only if its entropy is generated by a cryptographically secure source,
+              and that property must be established by inspecting the generator, not by testing what comes out of
+              the pipeline.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Conclusion</h2>
+            <p>
+              The pipeline from mnemonic to checksummed address was implemented from its standards and checked against
+              published values. The worked example reproduces the address <code>{{fig.example.address}}</code> and the
+              private key that Hardhat publishes for its development mnemonic, together with the addresses of its
+              second and third accounts, and the primitives agree with the reference vectors of BIP-39, BIP-32,
+              Keccak-256, SHA3-256 and EIP-55 (first question). The build checks the address and private key of the
+              first account and the two digests of the empty input, and stops on any disagreement; the second and
+              third accounts are checked by the test suite. The intermediate values printed in §3 are not each
+              compared with a published value: they lie on the computation that produced these verified endpoints.
+            </p>
+            <p>
+              The steps fall into distinct classes (second question). Only the draw of the entropy is key generation;
+              PBKDF2 and BIP-32 are keyed, deterministic key derivations, the first for stretching and the second
+              for hierarchy; <span data-tex>k \mapsto kG</span> on secp256k1 is public-key cryptography; Keccak-256
+              is hashing, truncated for the address; the BIP-39 checksum and EIP-55 are checksums; and words,
+              hexadecimal, Base58 and letter case are encodings. Several steps combine two classes, and the class of
+              a step is set by its purpose rather than by the primitive inside it.
+            </p>
+            <p>
+              Under the model of hash functions as random functions, every stage has an exact law, and the samples
+              are consistent with all of them (third question): the acceptance and substitution rates of the BIP-39 checksum
+              match their exact values, including the 127/2047 and 7/2047 of the last word; seeds, keys and
+              addresses have binomial weights and avalanche distances; Keccak-f[1600] reaches the binomial level of
+              diffusion within three rounds; vanity searches are geometric; and EIP-55 lets a random error pass with
+              probability <span data-tex>(13/16)^{40}</span>, about {{fig.eip55.exactPercent}}%, a value that also
+              explains the EIP's own figure. None of the 31 tests rejects at the 5% level, which is consistent with
+              the model and proves nothing more.
+            </p>
+            <p>
+              Historically (fourth question), the pipeline joins public-key ideas of 1976 to 1987, a hash standard of
+              2002 rather than 2001, wallet proposals of 2012 to 2014 and an address checksum of 2016. Ethereum
+              adopted Keccak-256 before FIPS 202 was final, and the two functions, identical in permutation and rate,
+              differ only in the suffix that separates the message from the padding, which is enough to make their
+              digests unrelated.
+            </p>
+            <p>
+              The pipeline needs several primitives because its requirements conflict (fifth question): slowness
+              against speed, invertibility against one-wayness, algebraic structure against its absence. Each
+              primitive does one job, and domain separation keeps the jobs apart. Its security, however, depends first
+              of all on a step that none of the others can repair: the generation of the entropy. The Milk Sad and
+              Profanity cases show what follows when that step produces 32 bits instead of 128 or 256, and the
+              experiments of this page show why the statistical tests of §4, at these sample sizes, could not have
+              revealed it.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every number on this page is computed when the page is built and can be recomputed by anyone from the
+              repository: <code>npm test</code> runs the test suite, and <code>npm run build</code> rebuilds the page.
+              The tests check the primitives against their published vectors (for SHA-512, HMAC-SHA512, RIPEMD-160,
+              Base58, the Keccak-f[1600] permutation step by step, Keccak-256 and SHA3-256, BIP-39, BIP-32 and EIP-55;
+              the source of every vector is named in the test file that uses it) and, where Node's
+              <code>crypto</code> module has the same primitive, against that module. The build itself checks the
+              worked example against the address and private key published by Hardhat and the two empty-input
+              digests against their published values, and stops on any difference.
+            </p>
+            <p>
+              The experiments of §4 recompute in about {{fig.params.computeSeconds}} seconds (last computed
+              {{fig.params.computedAt}}) and are cached under <code>node_modules/.cache/hw02/</code>, under a key
+              derived from their parameters, the source of the libraries they use and the source of the provider, so
+              that any change to them recomputes everything. Their seeds and sizes are: BIP-39 acceptance, seed
+              {{fig.params.acceptance.seed}}, n = {{fig.params.acceptance.n}} per mnemonic length; substitutions, seed
+              {{fig.params.substitution.seed}}, n = {{fig.params.substitution.n}}; word indices, seed
+              {{fig.params.wordIndex.seed}}, n = {{fig.params.wordIndex.n}} mnemonics; pipeline sample, seed
+              {{fig.params.pipeline.seed}}, n = {{fig.params.pipeline.n}} wallets; Keccak diffusion, seed
+              {{fig.params.diffusion.seed}}, n = {{fig.params.diffusion.n}} state pairs, and the single trace of
+              Figure 5, seed {{fig.params.trace.seed}}; vanity searches, seed {{fig.params.vanity.seed}},
+              {{fig.params.vanity.k1}} searches for one zero digit and {{fig.params.vanity.k2}} for two; address
+              letters, seed {{fig.params.addressCase.seed}}, n = {{fig.params.addressCase.n}}; EIP-55 errors, seed
+              {{fig.params.errors.seed}}, n = {{fig.params.errors.n}} per model and
+              {{fig.params.errors.caseFlipAddresses}} addresses for the case errors. The rate of Table 4 is measured
+              on {{fig.params.rate.accounts}} mnemonics (seed {{fig.params.rate.seed}}) when the experiments are
+              computed, and so depends on the machine. The control "Draw new sample" of Figure 8 redraws the pipeline
+              sample in the browser on a fresh seed, at a reduced size, and reports the seed used.
+            </p>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/bip39.js">src/lib/bip39.js</a> (with the word list <a href="{{site.repoUrl}}/blob/main/src/data/bip39-english.js">src/data/bip39-english.js</a>), <a href="{{site.repoUrl}}/blob/main/src/lib/bip32.js">src/lib/bip32.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/ethereum.js">src/lib/ethereum.js</a>: the wallet pipeline, BIP-44 paths, the address and EIP-55.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/sha512.js">src/lib/sha512.js</a> (SHA-512, HMAC-SHA512, PBKDF2), <a href="{{site.repoUrl}}/blob/main/src/lib/keccak.js">src/lib/keccak.js</a> (Keccak-f[1600], Keccak-256, SHA3-256), <a href="{{site.repoUrl}}/blob/main/src/lib/secp256k1.js">src/lib/secp256k1.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/sha256.js">src/lib/sha256.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/ripemd160.js">src/lib/ripemd160.js</a> and <a href="{{site.repoUrl}}/blob/main/src/lib/base58.js">src/lib/base58.js</a>: the primitives.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/wallet-study.js">src/lib/wallet-study.js</a>, <a href="{{site.repoUrl}}/blob/main/src/lib/keccak-diffusion.js">src/lib/keccak-diffusion.js</a> and <a href="{{site.repoUrl}}/blob/main/src/lib/stats.js">src/lib/stats.js</a>: the experiments and tests of §4, with the proofs of the exact values in their comments.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/02/figures.js">homework/02/figures.js</a>: the parameters, seeds and sizes of every figure on this page, the worked example and the build-time checks.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/hw02/render.js">src/hw02/render.js</a> and <a href="{{site.repoUrl}}/blob/main/src/hw02/timeline.js">src/hw02/timeline.js</a>: the static figures and the dated events of Figure 14.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number. Living documents
+              (specifications, source code, web pages) carry the date on which they were read; all were read on
+              9 October 2026.
+            </p>
+            <ol>
+              <li id="ref-1">1inch (2022). <cite>A vulnerability disclosed in Profanity, an Ethereum vanity address tool</cite>. 1inch blog, 15 September 2022, updated 30 October 2024. <a class="ref-link" href="https://1inch.com/blog/post/a-vulnerability-disclosed-in-profanity-an-ethereum-vanity-address-tool">https://1inch.com/blog/post/a-vulnerability-disclosed-in-profanity-an-ethereum-vanity-address-tool</a> (accessed 9 October 2026)</li>
+              <li id="ref-2">Bernstein, D. J. and Lange, T. <cite>SafeCurves: the rho method</cite>. <a class="ref-link" href="https://safecurves.cr.yp.to/rho.html">https://safecurves.cr.yp.to/rho.html</a> (accessed 9 October 2026)</li>
+              <li id="ref-3">Bertoni, G., Daemen, J., Peeters, M. and Van Assche, G. (Keccak team). <cite>Keccak specifications summary</cite>. <a class="ref-link" href="https://keccak.team/keccak_specs_summary.html">https://keccak.team/keccak_specs_summary.html</a> (accessed 9 October 2026)</li>
+              <li id="ref-4">Breitner, J. and Heninger, N. (2019). <cite>Biased Nonce Sense: Lattice Attacks Against Weak ECDSA Signatures in Cryptocurrencies</cite>. Financial Cryptography and Data Security (FC 2019), LNCS, pp. 3–20. <a class="ref-link" href="https://doi.org/10.1007/978-3-030-32101-7_1">https://doi.org/10.1007/978-3-030-32101-7_1</a>; Cryptology ePrint Archive, paper 2019/023, <a class="ref-link" href="https://eprint.iacr.org/2019/023">https://eprint.iacr.org/2019/023</a></li>
+              <li id="ref-5">Buterin, V. and Van de Sande, A. (2016). <cite>ERC-55: Mixed-case checksum address encoding</cite>. Ethereum Improvement Proposal, status Final, created 14 January 2016. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-55">https://eips.ethereum.org/EIPS/eip-55</a> (accessed 9 October 2026)</li>
+              <li id="ref-6">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>, version 2.0, 27 January 2010. Standards for Efficient Cryptography Group. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a>; first published as version 1.0, 20 September 2000, <a class="ref-link" href="https://www.secg.org/SEC2-Ver-1.0.pdf">https://www.secg.org/SEC2-Ver-1.0.pdf</a></li>
+              <li id="ref-7">Diffie, W. and Hellman, M. (1976). <cite>New directions in cryptography</cite>. IEEE Transactions on Information Theory 22(6), 644–654. <a class="ref-link" href="https://doi.org/10.1109/TIT.1976.1055638">https://doi.org/10.1109/TIT.1976.1055638</a></li>
+              <li id="ref-8">ethereum.org. <cite>The history of Ethereum</cite> and <cite>Ethash</cite>. <a class="ref-link" href="https://ethereum.org/en/ethereum-forks/">https://ethereum.org/en/ethereum-forks/</a>; <a class="ref-link" href="https://ethereum.org/en/developers/docs/consensus-mechanisms/pow/mining/mining-algorithms/ethash/">https://ethereum.org/en/developers/docs/consensus-mechanisms/pow/mining/mining-algorithms/ethash/</a> (accessed 9 October 2026)</li>
+              <li id="ref-9">Johnson, N. and Bylica, P. (2018). <cite>EIP-1052: EXTCODEHASH opcode</cite>. Ethereum Improvement Proposal. <a class="ref-link" href="https://eips.ethereum.org/EIPS/eip-1052">https://eips.ethereum.org/EIPS/eip-1052</a> (accessed 9 October 2026)</li>
+              <li id="ref-10">Koblitz, N. (1987). <cite>Elliptic curve cryptosystems</cite>. Mathematics of Computation 48(177), 203–209. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1987-0866109-5">https://doi.org/10.1090/S0025-5718-1987-0866109-5</a></li>
+              <li id="ref-11">Krawczyk, H., Bellare, M. and Canetti, R. (1997). <cite>HMAC: Keyed-Hashing for Message Authentication</cite>. RFC 2104, Internet Engineering Task Force. <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc2104">https://www.rfc-editor.org/rfc/rfc2104</a></li>
+              <li id="ref-12">MetaMask (Consensys). <cite>Importing a seed phrase from another wallet software: derivation path</cite> and <cite>User Guide to your Secret Recovery Phrase, password, and private keys</cite>, MetaMask Support; source files <cite>packages/keyring-eth-hd/src/hd-keyring.ts</cite> (MetaMask/accounts, commit 7e77d53) and <cite>shared/constants/hardware-wallets.ts</cite> (MetaMask/metamask-extension, commit b032525). <a class="ref-link" href="https://support.metamask.io/configure/wallet/importing-a-seed-phrase-from-another-wallet-software-derivation-path">https://support.metamask.io/configure/wallet/importing-a-seed-phrase-from-another-wallet-software-derivation-path</a>; <a class="ref-link" href="https://support.metamask.io/start/user-guide-secret-recovery-phrase-password-and-private-keys">https://support.metamask.io/start/user-guide-secret-recovery-phrase-password-and-private-keys</a>; <a class="ref-link" href="https://github.com/MetaMask/accounts/blob/7e77d53100e583e637a0db23485ce01e11c9809a/packages/keyring-eth-hd/src/hd-keyring.ts">https://github.com/MetaMask/accounts/blob/7e77d53100e583e637a0db23485ce01e11c9809a/packages/keyring-eth-hd/src/hd-keyring.ts</a>; <a class="ref-link" href="https://github.com/MetaMask/metamask-extension/blob/b03252588ba94ff898111cdd11ab9dd3094b1786/shared/constants/hardware-wallets.ts">https://github.com/MetaMask/metamask-extension/blob/b03252588ba94ff898111cdd11ab9dd3094b1786/shared/constants/hardware-wallets.ts</a> (accessed 9 October 2026)</li>
+              <li id="ref-13">Milk Sad research team (2023). <cite>Milk Sad disclosure</cite>, 8 August 2023, <a class="ref-link" href="https://milksad.info/disclosure.html">https://milksad.info/disclosure.html</a>; and CVE Program, <cite>CVE-2023-39910</cite>, <a class="ref-link" href="https://www.cve.org/CVERecord?id=CVE-2023-39910">https://www.cve.org/CVERecord?id=CVE-2023-39910</a> (accessed 9 October 2026)</li>
+              <li id="ref-14">Miller, V. S. (1986). <cite>Use of Elliptic Curves in Cryptography</cite>. Advances in Cryptology, CRYPTO '85 Proceedings, ed. H. C. Williams, Lecture Notes in Computer Science, Springer, pp. 417–426. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_31">https://doi.org/10.1007/3-540-39799-X_31</a></li>
+              <li id="ref-15">Moriarty, K. (ed.), Kaliski, B. and Rusch, A. (2017). <cite>PKCS #5: Password-Based Cryptography Specification Version 2.1</cite>. RFC 8018, Internet Engineering Task Force; obsoletes RFC 2898 (Kaliski, 2000). <a class="ref-link" href="https://www.rfc-editor.org/rfc/rfc8018">https://www.rfc-editor.org/rfc/rfc8018</a></li>
+              <li id="ref-16">National Institute of Standards and Technology (2002). <cite>FIPS 180-2, Secure Hash Standard</cite>: publication record (final, 1 August 2002), change notice of 25 February 2004, announcement of the draft (30 May 2001) and Federal Register notice of approval (26 August 2002). <a class="ref-link" href="https://csrc.nist.gov/pubs/fips/180-2/final">https://csrc.nist.gov/pubs/fips/180-2/final</a>; <a class="ref-link" href="https://csrc.nist.gov/pubs/fips/180-2/upd1/final">https://csrc.nist.gov/pubs/fips/180-2/upd1/final</a>; <a class="ref-link" href="https://csrc.nist.gov/News/2001/Announcing-Draft-FIPS-180-2-and-Request-for-Commen">https://csrc.nist.gov/News/2001/Announcing-Draft-FIPS-180-2-and-Request-for-Commen</a>; <a class="ref-link" href="https://www.govinfo.gov/content/pkg/FR-2002-08-26/html/02-21599.htm">https://www.govinfo.gov/content/pkg/FR-2002-08-26/html/02-21599.htm</a> (accessed 9 October 2026)</li>
+              <li id="ref-17">National Institute of Standards and Technology (2015a). <cite>FIPS PUB 180-4: Secure Hash Standard (SHS)</cite>, August 2015. doi:10.6028/NIST.FIPS.180-4. <a class="ref-link" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf">https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf</a></li>
+              <li id="ref-18">National Institute of Standards and Technology (2015b). <cite>FIPS PUB 202: SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions</cite>, August 2015. doi:10.6028/NIST.FIPS.202. <a class="ref-link" href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf">https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf</a></li>
+              <li id="ref-19">National Institute of Standards and Technology. <cite>SHA-3 Project</cite> and <cite>FIPS 202 (final)</cite>, Computer Security Resource Center. <a class="ref-link" href="https://csrc.nist.gov/projects/hash-functions/sha-3-project">https://csrc.nist.gov/projects/hash-functions/sha-3-project</a>; <a class="ref-link" href="https://csrc.nist.gov/pubs/fips/202/final">https://csrc.nist.gov/pubs/fips/202/final</a> (accessed 9 October 2026)</li>
+              <li id="ref-20">National Institute of Standards and Technology. <cite>SHA3-256 sample of 0-bit message</cite> (SHA3-256_Msg0), Cryptographic Standards and Guidelines, examples with intermediate values. <a class="ref-link" href="https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA3-256_Msg0.pdf">https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA3-256_Msg0.pdf</a> (accessed 9 October 2026)</li>
+              <li id="ref-21">Nomic Foundation. <cite>Hardhat Network reference</cite> and <cite>Hardhat Network overview</cite>, Hardhat 2 documentation. <a class="ref-link" href="https://v2.hardhat.org/hardhat-network/docs/reference">https://v2.hardhat.org/hardhat-network/docs/reference</a>; <a class="ref-link" href="https://v2.hardhat.org/hardhat-network/docs/overview">https://v2.hardhat.org/hardhat-network/docs/overview</a> (accessed 9 October 2026)</li>
+              <li id="ref-22">Palatinus, M. and Rusnak, P. (2014). <cite>BIP 44: Multi-Account Hierarchy for Deterministic Wallets</cite>. Bitcoin Improvement Proposal, status Deployed, assigned 24 April 2014. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki</a> (accessed 9 October 2026)</li>
+              <li id="ref-23">Palatinus, M., Rusnak, P., Voisine, A. and Bowe, S. (2013). <cite>BIP 39: Mnemonic code for generating deterministic keys</cite>. Bitcoin Improvement Proposal, status Deployed, assigned 10 September 2013. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki</a> (accessed 9 October 2026)</li>
+              <li id="ref-24">Rainbow. Source file <cite>src/features/wallet/core/walletLibrary.ts</cite> (rainbow-me/rainbow, commit 486d833). <a class="ref-link" href="https://github.com/rainbow-me/rainbow/blob/486d8337bdae2efca730390f6cc93d7fad58f75e/src/features/wallet/core/walletLibrary.ts">https://github.com/rainbow-me/rainbow/blob/486d8337bdae2efca730390f6cc93d7fad58f75e/src/features/wallet/core/walletLibrary.ts</a> (accessed 9 October 2026)</li>
+              <li id="ref-25">Rivest, R. L., Shamir, A. and Adleman, L. M. (1978). <cite>A method for obtaining digital signatures and public-key cryptosystems</cite>. Communications of the ACM 21(2), 120–126. <a class="ref-link" href="https://doi.org/10.1145/359340.359342">https://doi.org/10.1145/359340.359342</a>; earlier as MIT technical memorandum MIT-LCS-TM-082, April 1977, <a class="ref-link" href="https://hdl.handle.net/1721.1/148910">https://hdl.handle.net/1721.1/148910</a></li>
+              <li id="ref-26">Rusnak, P. and Palatinus, M. (2014). <cite>SLIP-0044: Registered coin types for BIP-0044</cite>. SatoshiLabs Improvement Proposal, created 9 July 2014. <a class="ref-link" href="https://github.com/satoshilabs/slips/blob/master/slip-0044.md">https://github.com/satoshilabs/slips/blob/master/slip-0044.md</a> (accessed 9 October 2026)</li>
+              <li id="ref-27">The Block (2022). <cite>Experts blame a 'vanity address' bug for Wintermute's $160 million hack</cite>. Press report, 20 September 2022. <a class="ref-link" href="https://www.theblock.co/news/defi/2022-09-20-experts-blame-a-vanity-address-bug-for-wintermutes-160-million-hack-171192">https://www.theblock.co/news/defi/2022-09-20-experts-blame-a-vanity-address-bug-for-wintermutes-160-million-hack-171192</a> (accessed 9 October 2026)</li>
+              <li id="ref-28">Trezor (SatoshiLabs). <cite>python-mnemonic: vectors.json</cite>, the reference test vectors of BIP-39 (last changed 2024). <a class="ref-link" href="https://github.com/trezor/python-mnemonic/blob/master/vectors.json">https://github.com/trezor/python-mnemonic/blob/master/vectors.json</a> (accessed 9 October 2026)</li>
+              <li id="ref-29">Wood, G. (2025). <cite>Ethereum: A Secure Decentralised Generalised Transaction Ledger</cite>. Ethereum yellow paper, Shanghai version efc5f9a of 4 February 2025. <a class="ref-link" href="https://ethereum.github.io/yellowpaper/paper.pdf">https://ethereum.github.io/yellowpaper/paper.pdf</a> (accessed 9 October 2026)</li>
+              <li id="ref-30">Wuille, P. (2012). <cite>BIP 32: Hierarchical Deterministic Wallets</cite>. Bitcoin Improvement Proposal, status Deployed, assigned 11 February 2012. <a class="ref-link" href="https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki">https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki</a> (accessed 9 October 2026)</li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
