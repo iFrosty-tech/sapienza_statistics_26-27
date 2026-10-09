@@ -5,11 +5,14 @@
  * stagger under 900 ms. Under reduced motion the printed list stays as is.
  */
 
-import { EASE_OUT, animationGroup, inViewport, onFirstView, reducedMotion } from './motion.js';
+import { EASE_OUT, animationGroup, deferMount, inViewport, onFirstView, reducedMotion } from './motion.js';
 
 const TOTAL_STAGGER_MS = 860;
 
-export function mountTimeline(figure) {
+/** Mounted when the figure comes near the viewport (see deferMount). */
+export const mountTimeline = deferMount(mountTimelineNow);
+
+function mountTimelineNow(figure) {
   const events = [...figure.querySelectorAll('[data-timeline-event]')];
   if (!events.length) throw new Error('Timeline: no events.');
   if (reducedMotion() || !('IntersectionObserver' in globalThis)) return {};

@@ -6,13 +6,16 @@ import {
   LATTICE_SIZE,
   Z_GAP,
   PITCH_LIMIT,
+  YAW_LIMIT,
   decodeMask,
   latticePoints,
   rotate,
   project,
   depthOrder,
   clampPitch,
+  clampYaw,
   fitScale,
+  canvasHeight,
   maskTransition,
 } from '../src/hw02/lattice.js';
 
@@ -75,23 +78,49 @@ test('clampPitch keeps the view within the pitch limit', () => {
   assert.equal(clampPitch(0.1), 0.1);
 });
 
-test('fitScale keeps the lattice inside the canvas at every yaw within the pitch limit', () => {
-  const pts = latticePoints();
-  for (const [width, height] of [
-    [720, 380],
-    [358, 260],
-  ]) {
-    const pad = 16;
-    const scale = fitScale(width, height, pad);
-    for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.2) {
-      for (const pitch of [-PITCH_LIMIT, 0, PITCH_LIMIT]) {
-        for (const p of pts) {
-          const s = project(p, { yaw, pitch, scale, cx: width / 2, cy: height / 2 });
-          assert.ok(s.x >= pad - 1e-6 && s.x <= width - pad + 1e-6, `x inside at yaw ${yaw}`);
-          assert.ok(s.y >= pad - 1e-6 && s.y <= height - pad + 1e-6, `y inside at yaw ${yaw}, pitch ${pitch}`);
-        }
+test('clampYaw keeps the view within the yaw limit, which contains the default view', () => {
+  assert.equal(YAW_LIMIT, 0.6);
+  assert.equal(clampYaw(5), YAW_LIMIT);
+  assert.equal(clampYaw(-5), -YAW_LIMIT);
+  assert.equal(clampYaw(-0.5), -0.5);
+});
+
+test('canvasHeight is 0.34 of the width, clamped to [160, 300] px', () => {
+  assert.equal(canvasHeight(300), 160);
+  assert.equal(canvasHeight(600), 204);
+  assert.equal(canvasHeight(1200), 300);
+});
+
+/* Largest extents of the projected lattice over a grid of admissible angles, in pixels from the centre. */
+function extents(pts, scale) {
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i <= 24; i += 1) {
+    const yaw = -YAW_LIMIT + (2 * YAW_LIMIT * i) / 24;
+    for (let j = 0; j <= 12; j += 1) {
+      const pitch = -PITCH_LIMIT + (2 * PITCH_LIMIT * j) / 12;
+      for (const p of pts) {
+        const s = project(p, { yaw, pitch, scale, cx: 0, cy: 0 });
+        x = Math.max(x, Math.abs(s.x));
+        y = Math.max(y, Math.abs(s.y));
       }
     }
+  }
+  return { x, y };
+}
+
+test('fitScale keeps the lattice inside the canvas at every admissible yaw and pitch, and fills it', () => {
+  const pts = latticePoints();
+  for (const width of [358, 720, 1000]) {
+    const height = canvasHeight(width);
+    const pad = 16;
+    const scale = fitScale(width, height, pad);
+    const e = extents(pts, scale);
+    assert.ok(e.x <= width / 2 - pad + 1e-6, `x inside at width ${width}`);
+    assert.ok(e.y <= height / 2 - pad + 1e-6, `y inside at width ${width}`);
+    // The limiting dimension is used to within 2%: no empty band around the drawing.
+    const fill = Math.max(e.x / (width / 2 - pad), e.y / (height / 2 - pad));
+    assert.ok(fill > 0.98, `fill ${fill.toFixed(3)} at width ${width}`);
   }
 });
 

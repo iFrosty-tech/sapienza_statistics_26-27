@@ -45,8 +45,8 @@ function renderAvalanche(rows, bit) {
     })
     .join('');
   return (
-    `<p class="avalanche__head" data-avalanche-head>${head}</p>` +
-    `<div class="data-table--scroll avalanche__frame"><table class="data-table avalanche">` +
+    `<p class="avalanche__head" id="explorer-avalanche-head" data-avalanche-head>${head}</p>` +
+    `<div class="data-table--scroll avalanche__frame"><table class="data-table avalanche" aria-labelledby="explorer-avalanche-head">` +
     `<thead><tr><th scope="col">Stage</th><th scope="col" class="is-number">Bits</th><th scope="col" class="is-number">Changed</th><th scope="col" class="is-number">Expected</th><th scope="col"><span class="visually-hidden">Changed bits against the expected number</span></th></tr></thead>` +
     `<tbody>${body}</tbody></table></div>`
   );
@@ -130,11 +130,11 @@ export function mountExplorer(figure) {
       setInvalid(parsed.field);
       output.classList.add('is-stale');
       if (parsed.field === 'mnemonic') {
-        showNote(parsed.message, 'error');
+        showNote(`Error: ${parsed.message}`, 'error');
         pathLine.textContent = 'The values below belong to the last valid input.';
       } else {
         showNote('', 'none');
-        pathLine.textContent = parsed.message;
+        pathLine.textContent = `Error: ${parsed.message}`;
         pathLine.dataset.kind = 'error';
       }
       flip.disabled = parsed.field === 'mnemonic';

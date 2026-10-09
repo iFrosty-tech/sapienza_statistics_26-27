@@ -6,19 +6,19 @@
  * trace (input, then θ ρ π χ ι of rounds 1 to 3) and "Play" steps through it
  * with the marks fading between masks.
  *
- * A slow idle rotation runs only while the figure is on screen, the tab is
+ * A slow idle rocking, within the yaw limit, runs only while the figure is on screen, the tab is
  * visible, the reader has not turned the lattice, and reduced motion is off;
  * the animation loop stops whenever none of its reasons holds. The printed
  * SVG remains as the fallback and is hidden only after the canvas has drawn.
  */
 
-import { clampPitch, decodeMask, depthOrder, fitScale, latticePoints, maskTransition, project } from './lattice.js';
-import { announce, blink, reducedMotion, trackVisibility } from './motion.js';
+import { YAW_LIMIT, canvasHeight, clampPitch, clampYaw, decodeMask, depthOrder, fitScale, latticePoints, maskTransition, project } from './lattice.js';
+import { announce, blink, deferMount, reducedMotion, trackVisibility } from './motion.js';
 
 const DEFAULT_VIEW = Object.freeze({ yaw: -0.5, pitch: 0.38 });
 const STEP_MS = 600;
 const FADE_MS = 300;
-const IDLE_SPEED = 0.00012; // radians per millisecond, about one turn in 52 s
+const IDLE_PERIOD = 24000; // ms for one full rock, left and back, within ±YAW_LIMIT
 const PAD = 22;
 
 const STEP_NAME = Object.freeze({ input: 'the input', theta: 'θ', rho: 'ρ', pi: 'π', chi: 'χ', iota: 'ι' });
@@ -28,7 +28,10 @@ function describeStep(step) {
   return `${step.label}: ${step.count} of 1600 bits differ`;
 }
 
-export function mountKeccak3d(figure) {
+/** Mounted when the figure comes near the viewport (see deferMount). */
+export const mountKeccak3d = deferMount(mountKeccak3dNow);
+
+function mountKeccak3dNow(figure) {
   const holder = figure.querySelector('[data-keccak3d-canvas]');
   const traceScript = holder?.querySelector('[data-keccak3d-trace]');
   const frame = holder?.querySelector('.lattice-frame');
@@ -68,6 +71,8 @@ export function mountKeccak3d(figure) {
     visible: false,
     raf: 0,
     lastTime: 0,
+    phase: Math.asin(DEFAULT_VIEW.yaw / YAW_LIMIT), // idle rocking: yaw = YAW_LIMIT sin(phase)
+    playSuspended: false,
     size: { width: 0, height: 0, dpr: 1, scale: 1 },
   };
   const colours = {};
@@ -85,8 +90,8 @@ export function mountKeccak3d(figure) {
   }
 
   function resize() {
-    const width = Math.max(240, Math.round(holder.getBoundingClientRect().width));
-    const height = Math.round(Math.min(400, Math.max(240, width * 0.5)));
+    const width = Math.max(200, Math.round(holder.getBoundingClientRect().width));
+    const height = canvasHeight(width);
     const dpr = Math.min(3, globalThis.devicePixelRatio || 1);
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
@@ -169,7 +174,10 @@ export function mountKeccak3d(figure) {
     state.raf = 0;
     const dt = state.lastTime ? Math.min(64, now - state.lastTime) : 16;
     state.lastTime = now;
-    if (idle()) view.yaw += IDLE_SPEED * dt;
+    if (idle()) {
+      state.phase += (2 * Math.PI * dt) / IDLE_PERIOD;
+      view.yaw = YAW_LIMIT * Math.sin(state.phase);
+    }
     let t = 1;
     if (state.from !== null) {
       t = Math.min(1, (now - state.t0) / FADE_MS);
@@ -212,6 +220,7 @@ export function mountKeccak3d(figure) {
   function stopPlay() {
     clearTimeout(state.playTimer);
     state.playing = false;
+    state.playSuspended = false;
     if (playButton) {
       playButton.textContent = 'Play the steps';
       playButton.setAttribute('aria-pressed', 'false');
@@ -221,7 +230,9 @@ export function mountKeccak3d(figure) {
   function playStep() {
     if (!state.playing) return;
     if (!state.visible) {
-      stopPlay();
+      // Off screen: hold the sequence and resume it when the figure is back in view.
+      state.playSuspended = true;
+      if (playButton) playButton.textContent = 'Pause (resumes in view)';
       return;
     }
     if (state.index >= masks.length - 1) {
@@ -275,7 +286,7 @@ export function mountKeccak3d(figure) {
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!drag || event.pointerId !== drag.id) return;
-    view.yaw = drag.yaw + (event.clientX - drag.x) * 0.01;
+    view.yaw = clampYaw(drag.yaw + (event.clientX - drag.x) * 0.01);
     view.pitch = clampPitch(drag.pitch + (event.clientY - drag.y) * 0.008);
     requestFrame();
   });
@@ -287,8 +298,8 @@ export function mountKeccak3d(figure) {
   canvas.addEventListener('pointercancel', endDrag);
   canvas.addEventListener('keydown', (event) => {
     const step = event.shiftKey ? 0.3 : 0.1;
-    if (event.key === 'ArrowLeft') view.yaw -= step;
-    else if (event.key === 'ArrowRight') view.yaw += step;
+    if (event.key === 'ArrowLeft') view.yaw = clampYaw(view.yaw - step);
+    else if (event.key === 'ArrowRight') view.yaw = clampYaw(view.yaw + step);
     else if (event.key === 'ArrowUp') view.pitch = clampPitch(view.pitch - step);
     else if (event.key === 'ArrowDown') view.pitch = clampPitch(view.pitch + step);
     else if (event.key === 'Home') Object.assign(view, DEFAULT_VIEW);
@@ -309,8 +320,15 @@ export function mountKeccak3d(figure) {
 
   trackVisibility(holder, (visible) => {
     state.visible = visible;
-    if (!visible) stopPlay();
-    if (visible) requestFrame();
+    if (visible) {
+      requestFrame();
+      if (state.playing && state.playSuspended) {
+        state.playSuspended = false;
+        if (playButton) playButton.textContent = 'Pause';
+        clearTimeout(state.playTimer);
+        state.playTimer = setTimeout(playStep, STEP_MS);
+      }
+    }
   });
   if ('ResizeObserver' in globalThis) {
     let last = state.size.width;

@@ -113,7 +113,7 @@
 .chart__group-label,
 .chart__legend-label {
   fill: var(--ruling-ink);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
@@ -135,7 +135,7 @@
 
 .chart__row-label {
   fill: var(--ink);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -200,7 +200,7 @@
 }
 
 .ledger__name {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   color: var(--ink);
 }
@@ -331,7 +331,7 @@
   padding: 0 0.4em;
   background: var(--paper);
   font-family: var(--font-form);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -588,6 +588,34 @@
   font-family: var(--font-form);
 }
 
+/* Phones get the compact drawing (leaves stacked under the trunk), drawn at
+   about 1:1 so that its text stays at 11px or more. */
+.hdtree--compact {
+  display: none;
+  max-width: 380px;
+  min-width: 0;
+}
+
+@media (max-width: 36rem) {
+  .hdtree--wide {
+    display: none;
+  }
+
+  .hdtree--compact {
+    display: block;
+  }
+
+  .hdtree--compact .hdtree__label {
+    font-size: 14px;
+  }
+
+  .hdtree--compact .hdtree__role,
+  .hdtree--compact .hdtree__path,
+  .hdtree--compact .hdtree__address {
+    font-size: 12.5px;
+  }
+}
+
 .hdtree__rule {
   stroke: var(--ink);
   stroke-width: 1.25;
@@ -608,7 +636,7 @@
 
 .hdtree__role {
   fill: var(--ruling-ink);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
@@ -748,7 +776,7 @@
 
 .timeline__year {
   font-family: var(--font-form);
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   color: var(--ruling-ink);
   font-variant-numeric: tabular-nums lining-nums;
@@ -806,7 +834,7 @@
 }
 
 .timeline__detail {
-  font-size: 0.875rem;
+  font-size: var(--text-small);
   line-height: 1.45;
   color: var(--ink-soft);
 }
@@ -945,7 +973,7 @@
 
 .explorer__path[data-kind='error'],
 .text-field__note[data-kind='error'] {
-  color: var(--plot-deep);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -968,8 +996,8 @@
 }
 
 .text-field [aria-invalid='true'] {
-  border-color: var(--plot-deep);
-  box-shadow: inset 0 -2px 0 var(--plot);
+  border: 1.5px dashed var(--ink);
+  box-shadow: none;
 }
 
 .explorer__out {
@@ -1105,9 +1133,17 @@
   transition: opacity var(--dur-state) var(--ease-out);
 }
 
-.hdtree__edge.is-dim,
-.hdtree__node.is-dim {
+.hdtree__edge.is-dim {
   opacity: 0.38;
+}
+
+/* A leaf not selected: its box fades, its text stays legible (ink-faint, 5.4:1). */
+.hdtree__node.is-dim rect {
+  stroke-opacity: 0.38;
+}
+
+.hdtree__node.is-dim text {
+  fill: var(--ink-faint);
 }
 
 .hdtree__node.is-selected rect,
@@ -1188,12 +1224,52 @@
 }
 
 .keccak3d__range input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   min-height: 2.75rem;
   margin: 0;
-  accent-color: var(--plot);
   background: transparent;
   cursor: pointer;
+}
+
+/* A hairline ink track and a plot-red mark for the thumb. */
+.keccak3d__range input[type='range']::-webkit-slider-runnable-track {
+  height: 1px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+}
+
+.keccak3d__range input[type='range']::-moz-range-track {
+  height: 1px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+}
+
+.keccak3d__range input[type='range']::-moz-range-progress {
+  height: 1px;
+  background: var(--ink);
+}
+
+.keccak3d__range input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--plot);
+}
+
+.keccak3d__range input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--plot);
 }
 
 .keccak3d__range input[type='range']:focus-visible {
@@ -1244,6 +1320,10 @@
 .eip55-check__echo {
   margin: 0;
   min-height: 1.5em;
+}
+
+.eip55-check__echo code:empty {
+  display: none;
 }
 
 .eip55-check__echo code {
@@ -1355,6 +1435,7 @@
   .figure-bar,
   .hdtree__controls,
   .hdtree__leak-out,
+  .hdtree--compact,
   .eip55-check,
   .digests__delta,
   .lattice-canvas,
@@ -1377,4 +1458,36 @@
   .prose .placeholder {
     outline: 0;
   }
+}
+
+/* ---------- Fig. 8: visible progress of a new sample ---------- */
+.fig-progress {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.fig-progress[hidden] {
+  display: none;
+}
+
+/* ---------- Fig. 2: explorer values in the form face ---------- */
+.explorer .demo__value:not(.demo__value--mono) {
+  font-family: var(--font-form);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- Section anchors: a 2.75rem touch target without moving the heading ---------- */
+.hw-section .section-anchor {
+  position: relative;
+}
+
+.hw-section .section-anchor::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 2.75rem);
+  min-height: 2.75rem;
+  transform: translate(-50%, -50%);
 }

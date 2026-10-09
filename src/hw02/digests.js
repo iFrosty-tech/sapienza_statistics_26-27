@@ -13,7 +13,7 @@ import { sha512Hex } from '../lib/sha512.js';
 import { keccak256Hex, sha3_256Hex } from '../lib/keccak.js';
 import { utf8Bytes } from '../lib/bytes.js';
 import { bitDistance, digitDiff, hexToBitString } from './bits.js';
-import { announce } from './motion.js';
+import { announce, deferMount } from './motion.js';
 
 const FUNCTIONS = Object.freeze({ sha256: sha256Hex, sha512: sha512Hex, keccak256: keccak256Hex, sha3_256: sha3_256Hex });
 
@@ -25,7 +25,10 @@ function markDigits(hexValue, changed) {
   return html;
 }
 
-export function mountDigests(figure) {
+/** Mounted when the figure comes near the viewport (see deferMount). */
+export const mountDigests = deferMount(mountDigestsNow);
+
+function mountDigestsNow(figure) {
   const controls = figure.querySelector('[data-digests-controls]');
   const input = figure.querySelector('[data-digests-input]');
   if (!controls || !input) throw new Error('Digest comparator: missing its controls.');

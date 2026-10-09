@@ -6,12 +6,16 @@
  * m/44'/60'/0'/0 and the private key of its normal child i,
  *   k_par = k_i − I_L (mod n),  I_L = left half of HMAC-SHA512(c_par, K_par ‖ ser32(i)),
  * and the recovered key is printed next to the true one.
+ *
+ * The build prints two drawings of the same tree, a wide one and a compact
+ * one for phones, and CSS shows one of them; marks apply to both, and the
+ * animations run on the one on screen.
  */
 
 import { ckdPriv, parseExtendedKey, recoverParentPrivateKey } from '../lib/bip32.js';
 import { hmacSha512 } from '../lib/sha512.js';
 import { bytesEqual, bytesToHex, concatBytes } from '../lib/bytes.js';
-import { EASE_OUT, animationGroup, announce, blink, drawStroke, exampleAccount, inViewport, onFirstView, reducedMotion } from './motion.js';
+import { EASE_OUT, animationGroup, announce, blink, deferMount, drawStroke, exampleAccount, inViewport, onFirstView, reducedMotion } from './motion.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const EDGE_MS = 230;
@@ -20,11 +24,16 @@ function ser32(i) {
   return Uint8Array.from([(i >>> 24) & 0xff, (i >>> 16) & 0xff, (i >>> 8) & 0xff, i & 0xff]);
 }
 
-export function mountHdTree(figure) {
+/** Mounted when the figure comes near the viewport (see deferMount). */
+export const mountHdTree = deferMount(mountHdTreeNow);
+
+function mountHdTreeNow(figure) {
   const canvas = figure.querySelector('[data-hdtree-canvas]');
-  const svg = canvas?.querySelector('svg.hdtree');
+  const svgs = [...(canvas?.querySelectorAll('svg.hdtree') ?? [])];
   const modelScript = canvas?.querySelector('[data-hdtree-model]');
-  if (!svg || !modelScript) throw new Error('HD tree: missing the SVG or its model.');
+  if (!svgs.length || !modelScript) throw new Error('HD tree: missing the SVG or its model.');
+  /** The drawing on screen (the other one is display: none). */
+  const shown = () => svgs.find((s) => s.getClientRects().length > 0) ?? svgs[0];
   const model = JSON.parse(modelScript.textContent);
   const status = figure.querySelector('[data-hdtree-status]');
   const radios = [...figure.querySelectorAll('[data-hdtree-index]')];
@@ -36,17 +45,19 @@ export function mountHdTree(figure) {
   let selected = 0;
   let hasRun = false;
 
-  const edge = (k) => svg.querySelector(`[data-hdtree-edge="${k}"]`);
-  const node = (path) => svg.querySelector(`[data-hdtree-node="${CSS.escape(path)}"]`);
-  const leafEdge = (j) => edge(trunkEdges + j);
+  const edge = (k, svg = shown()) => svg.querySelector(`[data-hdtree-edge="${k}"]`);
+  const node = (path, svg = shown()) => svg.querySelector(`[data-hdtree-node="${CSS.escape(path)}"]`);
+  const leafEdge = (j, svg = shown()) => edge(trunkEdges + j, svg);
 
   function mark() {
-    model.leaves.forEach((leaf, j) => {
-      const on = j === selected;
-      leafEdge(j)?.classList.toggle('is-dim', !on);
-      node(leaf.path)?.classList.toggle('is-dim', !on);
-      node(leaf.path)?.classList.toggle('is-selected', on);
-    });
+    for (const svg of svgs) {
+      model.leaves.forEach((leaf, j) => {
+        const on = j === selected;
+        leafEdge(j, svg)?.classList.toggle('is-dim', !on);
+        node(leaf.path, svg)?.classList.toggle('is-dim', !on);
+        node(leaf.path, svg)?.classList.toggle('is-selected', on);
+      });
+    }
   }
 
   function drawEdge(g, delay) {
@@ -65,7 +76,7 @@ export function mountHdTree(figure) {
     const leaf = model.leaves[selected];
     const text = `Path ${leaf.path}: three hardened derivations, then two normal ones; address ${leaf.address}.`;
     if (reducedMotion()) {
-      blink(svg);
+      blink(shown());
       announce(status, text);
       return;
     }
@@ -117,8 +128,10 @@ export function mountHdTree(figure) {
 
   function clearLeak() {
     leakGroup.reset();
-    svg.querySelector('.hdtree__leak')?.remove();
-    node(model.trunk.at(-1).path)?.classList.remove('is-recovered');
+    for (const svg of svgs) {
+      svg.querySelector('.hdtree__leak')?.remove();
+      node(model.trunk.at(-1).path, svg)?.classList.remove('is-recovered');
+    }
     for (const [key, text] of placeholders) {
       const el = out(key);
       if (el) el.textContent = text;
@@ -144,13 +157,14 @@ export function mountHdTree(figure) {
       out('true').textContent = bytesToHex(parentPrivate.privateKey);
       out('equal').textContent = equal ? 'Yes: the two keys are identical' : 'No';
       leakOut.classList.add('is-shown');
-      node(model.trunk.at(-1).path)?.classList.add('is-recovered');
+      for (const svg of svgs) node(model.trunk.at(-1).path, svg)?.classList.add('is-recovered');
       blink(leakOut);
       announce(status, `Parent private key of ${model.changePath} recovered from its extended public key and the private key of child ${i}; ${equal ? 'it equals' : 'it differs from'} the key derived from the seed.`);
     };
 
     // An arrow travels up the normal edge, from the leaf to its parent.
-    const line = leafEdge(i)?.querySelector('line');
+    const svg = shown();
+    const line = leafEdge(i, svg)?.querySelector('line');
     if (!line || reducedMotion()) {
       print();
       return;

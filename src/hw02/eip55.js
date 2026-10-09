@@ -110,7 +110,7 @@ export function mountEip55(figure) {
         message = 'Paste an address to check its letter case against EIP-55.';
         break;
       case 'malformed':
-        message = r.message;
+        message = `Error: ${r.message}`;
         break;
       case 'unchecked':
         message = 'Every letter is in the same case, so the address carries no EIP-55 checksum: a mistyped digit in it cannot be detected.';
@@ -123,7 +123,7 @@ export function mountEip55(figure) {
       case 'invalid': {
         const bad = r.digits[r.offending];
         const want = r.expected[2 + r.offending];
-        message = `Invalid checksum: the first offending character is number ${r.offending + 1}, "${bad}", which EIP-55 writes as "${want}". The checksummed form is ${r.expected}.`;
+        message = `Error: invalid checksum. The first offending character is number ${r.offending + 1}, "${bad}", which EIP-55 writes as "${want}". The checksummed form is ${r.expected}.`;
         shown =
           escapeHtml(r.digits.slice(0, r.offending)) +
           `<mark class="eip55__offending">${escapeHtml(bad)}</mark>` +

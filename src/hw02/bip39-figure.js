@@ -4,6 +4,8 @@
  * SHA-256 of the entropy) append in their outlined cells, then an 11-bit
  * bracket draws under each group and the word it indexes drops beneath it.
  * Pointing at or focusing a word highlights its 11 bits and its bracket.
+ * The words are one tab stop (roving tabindex): the arrow keys, Home and End
+ * move the focus, and the highlight, from word to word.
  */
 
 import { renderBip39Grouping } from './render.js';
@@ -17,16 +19,31 @@ export function mountBip39(figure) {
   const group = animationGroup();
   let hasRun = false;
 
+  let current = 0;
+
   function bindWords() {
-    for (const word of canvas.querySelectorAll('[data-bip39-word]')) {
-      word.tabIndex = 0;
+    const words = [...canvas.querySelectorAll('[data-bip39-word]')];
+    current = Math.min(current, words.length - 1);
+    words.forEach((word, i) => {
+      word.tabIndex = i === current ? 0 : -1;
+      word.addEventListener('keydown', (event) => {
+        const last = words.length - 1;
+        const to = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: last }[event.key];
+        if (to === undefined) return;
+        event.preventDefault();
+        const j = Math.max(0, Math.min(last, to));
+        words[i].tabIndex = -1;
+        words[j].tabIndex = 0;
+        current = j;
+        words[j].focus();
+      });
       const on = () => word.classList.add('is-active');
       const off = () => word.classList.remove('is-active');
       word.addEventListener('pointerenter', on);
       word.addEventListener('pointerleave', off);
       word.addEventListener('focus', on);
       word.addEventListener('blur', off);
-    }
+    });
   }
 
   const describe = () => {

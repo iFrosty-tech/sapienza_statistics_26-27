@@ -723,58 +723,59 @@ export function hdTreeModel(example) {
   return { trunk, leaves };
 }
 
-/**
- * The HD tree as SVG: hardened edges as double rules, normal edges as single
- * rules, so the distinction prints in ink alone.
- * @param {{ trunk: { path: string, label: string, hardened: boolean, role: string }[],
- *   leaves: { path: string, label: string, address: string }[] }} model
- * @param {{ id: string }} options
- */
-export function renderHdTree(model, { id }) {
-  const W = 600;
-  const box = { w: 46, h: 26 };
-  const step = 54;
-  const x0 = 18;
-  const trunkY = (i) => 14 + i * step;
-  const leafTop = trunkY(model.trunk.length - 1) + step;
-  const leafStep = 44;
-  const leafX = x0 + 120;
-  const H = leafTop + (model.leaves.length - 1) * leafStep + box.h + 14;
-  const out = [
-    `<svg class="hdtree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-labelledby="${id}-title ${id}-desc">`,
-    `<title id="${id}-title">Derivation tree of the BIP-44 path m/44'/60'/0'/0 and its first ${model.leaves.length} addresses</title>`,
-    `<desc id="${id}-desc">From the master node m, three hardened derivations (purpose 44', coin type 60', account 0') drawn as double rules, then the normal derivation of the external chain 0 and of the address indices ${model.leaves.map((l) => l.label).join(', ')}, drawn as single rules. Leaves: ${model.leaves.map((l) => `${l.path}, ${l.address}`).join('; ')}.</desc>`,
-  ];
-  const edge = (x1, y1, x2, y2, hardened, k) => {
-    const lines = [];
-    if (hardened) {
-      // Two parallel rules, offset perpendicular to the edge.
-      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-      const nx = (-(y2 - y1) / len) * 2;
-      const ny = ((x2 - x1) / len) * 2;
-      for (const s of [-1, 1]) {
-        lines.push(`<line class="hdtree__rule" x1="${(x1 + s * nx).toFixed(1)}" y1="${(y1 + s * ny).toFixed(1)}" x2="${(x2 + s * nx).toFixed(1)}" y2="${(y2 + s * ny).toFixed(1)}"/>`);
-      }
-    } else {
-      lines.push(`<line class="hdtree__rule" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`);
+function hdTreeHead(model, id, layout, W, H) {
+  return (
+    `<svg class="hdtree hdtree--${layout}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-labelledby="${id}-title ${id}-desc">` +
+    `<title id="${id}-title">Derivation tree of the BIP-44 path m/44'/60'/0'/0 and its first ${model.leaves.length} addresses</title>` +
+    `<desc id="${id}-desc">From the master node m, three hardened derivations (purpose 44', coin type 60', account 0') drawn as double rules, then the normal derivation of the external chain 0 and of the address indices ${model.leaves.map((l) => l.label).join(', ')}, drawn as single rules. Leaves: ${model.leaves.map((l) => `${l.path}, ${l.address}`).join('; ')}.</desc>`
+  );
+}
+
+/** One edge: a double rule when hardened (offset perpendicular to the edge), a single rule otherwise. */
+function hdTreeEdge(x1, y1, x2, y2, hardened, k) {
+  const lines = [];
+  if (hardened) {
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const nx = (-(y2 - y1) / len) * 2;
+    const ny = ((x2 - x1) / len) * 2;
+    for (const s of [-1, 1]) {
+      lines.push(`<line class="hdtree__rule" x1="${(x1 + s * nx).toFixed(1)}" y1="${(y1 + s * ny).toFixed(1)}" x2="${(x2 + s * nx).toFixed(1)}" y2="${(y2 + s * ny).toFixed(1)}"/>`);
     }
-    return `<g class="hdtree__edge" data-edge="${hardened ? 'hardened' : 'normal'}" data-hdtree-edge="${k}">${lines.join('')}</g>`;
-  };
+  } else {
+    lines.push(`<line class="hdtree__rule" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`);
+  }
+  return `<g class="hdtree__edge" data-edge="${hardened ? 'hardened' : 'normal'}" data-hdtree-edge="${k}">${lines.join('')}</g>`;
+}
+
+function hdTreeLegend(x, y) {
+  return (
+    `<g class="hdtree__legend" aria-hidden="true">` +
+    `<line class="hdtree__rule hdtree__swatch" x1="${x}" y1="${y}" x2="${x + 30}" y2="${y}"/><line class="hdtree__rule hdtree__swatch" x1="${x}" y1="${y + 4}" x2="${x + 30}" y2="${y + 4}"/>` +
+    `<text class="hdtree__role" x="${x + 38}" y="${y + 6}">hardened, index ≥ 2³¹</text>` +
+    `<line class="hdtree__rule hdtree__swatch" x1="${x}" y1="${y + 24}" x2="${x + 30}" y2="${y + 24}"/>` +
+    `<text class="hdtree__role" x="${x + 38}" y="${y + 28}">normal, index &lt; 2³¹</text>` +
+    `</g>`
+  );
+}
+
+/**
+ * Draws the trunk (one column of boxes) and the leaves of the tree. `geometry`
+ * places the boxes; `leafText` writes the address of a leaf.
+ */
+function hdTreeBody(model, { box, x0, trunkY, leafX, leafY, textGap, leafText }) {
   const cx = x0 + box.w / 2;
   const edges = [];
   let k = 0;
   model.trunk.forEach((n, i) => {
     if (i === 0) return;
-    edges.push(edge(cx, trunkY(i - 1) + box.h, cx, trunkY(i), n.hardened, k));
+    edges.push(hdTreeEdge(cx, trunkY(i - 1) + box.h, cx, trunkY(i), n.hardened, k));
     k += 1;
   });
   const parentBottom = trunkY(model.trunk.length - 1) + box.h;
   model.leaves.forEach((leaf, j) => {
-    edges.push(edge(cx, parentBottom, leafX, leafTop + j * leafStep + box.h / 2, false, k));
+    edges.push(hdTreeEdge(cx, parentBottom, leafX, leafY(j) + box.h / 2, false, k));
     k += 1;
   });
-  out.push(`<g class="hdtree__layer hdtree__layer--edges">${edges.join('')}</g>`);
-
   const nodes = [];
   model.trunk.forEach((n, i) => {
     const y = trunkY(i);
@@ -782,33 +783,70 @@ export function renderHdTree(model, { id }) {
       `<g class="hdtree__node" data-hdtree-node="${escapeXml(n.path)}">` +
         `<rect x="${x0}" y="${y}" width="${box.w}" height="${box.h}"/>` +
         `<text class="hdtree__label" x="${cx}" y="${y + 17}" text-anchor="middle">${escapeXml(n.label)}</text>` +
-        `<text class="hdtree__role" x="${x0 + box.w + 14}" y="${y + 11}">${escapeXml(n.role)}</text>` +
-        `<text class="hdtree__path" x="${x0 + box.w + 14}" y="${y + 24}">${escapeXml(n.path)}</text>` +
+        `<text class="hdtree__role" x="${x0 + box.w + textGap}" y="${y + 11}">${escapeXml(n.role)}</text>` +
+        `<text class="hdtree__path" x="${x0 + box.w + textGap}" y="${y + 24}">${escapeXml(n.path)}</text>` +
         `</g>`,
     );
   });
   model.leaves.forEach((leaf, j) => {
-    const y = leafTop + j * leafStep;
+    const y = leafY(j);
     nodes.push(
       `<g class="hdtree__node hdtree__node--leaf" data-hdtree-node="${escapeXml(leaf.path)}">` +
         `<rect x="${leafX}" y="${y}" width="${box.w}" height="${box.h}"/>` +
         `<text class="hdtree__label" x="${leafX + box.w / 2}" y="${y + 17}" text-anchor="middle">${escapeXml(leaf.label)}</text>` +
-        `<text class="hdtree__path" x="${leafX + box.w + 12}" y="${y + 11}">${escapeXml(leaf.path)}</text>` +
-        `<text class="hdtree__address" x="${leafX + box.w + 12}" y="${y + 25}">${escapeXml(leaf.address)}</text>` +
+        `<text class="hdtree__path" x="${leafX + box.w + textGap}" y="${y + 11}">${escapeXml(leaf.path)}</text>` +
+        `<text class="hdtree__address" x="${leafX + box.w + textGap}" y="${y + 25}">${escapeXml(leafText(leaf.address))}</text>` +
         `</g>`,
     );
   });
-  out.push(`<g class="hdtree__layer hdtree__layer--nodes">${nodes.join('')}</g>`);
-  out.push(
-    `<g class="hdtree__legend" aria-hidden="true">` +
-      `<line class="hdtree__rule hdtree__swatch" x1="${W - 196}" y1="16" x2="${W - 166}" y2="16"/><line class="hdtree__rule hdtree__swatch" x1="${W - 196}" y1="20" x2="${W - 166}" y2="20"/>` +
-      `<text class="hdtree__role" x="${W - 158}" y="22">hardened, index ≥ 2³¹</text>` +
-      `<line class="hdtree__rule hdtree__swatch" x1="${W - 196}" y1="40" x2="${W - 166}" y2="40"/>` +
-      `<text class="hdtree__role" x="${W - 158}" y="44">normal, index &lt; 2³¹</text>` +
-      `</g>`,
+  return `<g class="hdtree__layer hdtree__layer--edges">${edges.join('')}</g><g class="hdtree__layer hdtree__layer--nodes">${nodes.join('')}</g>`;
+}
+
+/**
+ * The HD tree as SVG: hardened edges as double rules, normal edges as single
+ * rules, so the distinction prints in ink alone.
+ * @param {{ trunk: { path: string, label: string, hardened: boolean, role: string }[],
+ *   leaves: { path: string, label: string, address: string }[] }} model
+ * @param {{ id: string, layout?: 'both' | 'wide' | 'compact' }} options `compact`
+ *   is the phone drawing (at most 360 units wide): leaves stacked under the
+ *   trunk, addresses shortened to 0x1234…abcd; the full values stay in the
+ *   description, the caption and the explorer. `both` (the default, printed by
+ *   the build) is the wide drawing followed by the compact one, with the id
+ *   suffix "-compact"; CSS shows one of them.
+ */
+export function renderHdTree(model, { id, layout = 'both' }) {
+  if (layout === 'both') return renderHdTree(model, { id, layout: 'wide' }) + renderHdTree(model, { id: `${id}-compact`, layout: 'compact' });
+  const box = { w: 46, h: 26 };
+  const x0 = 18;
+  if (layout === 'compact') {
+    const W = 340;
+    const step = 46;
+    const trunkY = (i) => 10 + i * step;
+    const leafTop = trunkY(model.trunk.length - 1) + step + 4;
+    const leafStep = 40;
+    const leafY = (j) => leafTop + j * leafStep;
+    const legendY = leafY(model.leaves.length - 1) + box.h + 24;
+    const H = legendY + 40;
+    return (
+      hdTreeHead(model, id, 'compact', W, H) +
+      hdTreeBody(model, { box, x0, trunkY, leafX: x0 + 66, leafY, textGap: 10, leafText: (a) => `${a.slice(0, 6)}…${a.slice(-4)}` }) +
+      hdTreeLegend(x0, legendY) +
+      '</svg>'
+    );
+  }
+  const W = 600;
+  const step = 54;
+  const trunkY = (i) => 14 + i * step;
+  const leafTop = trunkY(model.trunk.length - 1) + step;
+  const leafStep = 44;
+  const leafY = (j) => leafTop + j * leafStep;
+  const H = leafY(model.leaves.length - 1) + box.h + 14;
+  return (
+    hdTreeHead(model, id, 'wide', W, H) +
+    hdTreeBody(model, { box, x0, trunkY, leafX: x0 + 120, leafY, textGap: 14, leafText: (a) => a }) +
+    hdTreeLegend(W - 196, 16) +
+    '</svg>'
   );
-  out.push('</svg>');
-  return out.join('');
 }
 
 /* ------------------------------------------------------- Keccak lattice */

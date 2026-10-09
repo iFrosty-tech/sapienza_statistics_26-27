@@ -18,6 +18,7 @@
 
 import { freshSeed } from '../lib/normal.js';
 import { DEFAULT_SERIES, compactData, renderChart, stagesSeriesOf, statsOf } from './render.js';
+import { whenNear } from './motion.js';
 
 const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
@@ -84,6 +85,7 @@ export function mountChartFigure(figure) {
   if (!kind || !canvas) throw new Error('Chart figure: missing data-fig-kind or [data-fig-canvas].');
   const statusEl = figure.querySelector('[data-fig-status]');
   const button = figure.querySelector('[data-fig-resample]');
+  const progress = figure.querySelector('[data-fig-progress]');
   const id = figure.dataset.fig;
 
   const stats = JSON.parse(figure.querySelector('[data-fig-stats]')?.textContent ?? '{}');
@@ -192,9 +194,15 @@ export function mountChartFigure(figure) {
     const seed = freshSeed();
     const n = RESAMPLE[kind].n;
     if (statusEl) statusEl.textContent = `Computing a new sample of ${n} wallets with seed ${seed}…`;
+    // The visible line follows every step of the worker; the polite region only every quarter.
+    if (progress) {
+      progress.hidden = false;
+      progress.textContent = `Computing: 0 of ${n} wallets (seed ${seed})…`;
+    }
     let lastReport = 0;
     try {
       const result = await runExperiment({ kind, seed, ...RESAMPLE[kind] }, (done, total) => {
+        if (progress) progress.textContent = `Computing: ${done} of ${total} wallets (seed ${seed})…`;
         // A polite region is read when it settles; report every quarter of the work.
         if (statusEl && (done === total || done - lastReport >= total / 4)) {
           lastReport = done;
@@ -212,9 +220,11 @@ export function mountChartFigure(figure) {
         const s = stats[current];
         statusEl.textContent = `New sample drawn: ${s.series}, n = ${s.n}, seed ${s.seed}, p-value ${s.p}.`;
       }
+      if (progress) progress.textContent = `Shown: a new sample of ${n} wallets, seed ${seed}.`;
     } catch (error) {
       console.error(error);
       if (statusEl) statusEl.textContent = 'The new sample could not be computed; the printed figure is unchanged.';
+      if (progress) progress.textContent = 'Error: the new sample could not be computed; the printed figure is unchanged.';
     } finally {
       busy = false;
       if (button) button.disabled = false;
@@ -253,15 +263,19 @@ export function mountChartFigure(figure) {
   return { show, resample };
 }
 
-/** Enhances every experiment figure under `root`; a failure leaves that figure static. */
+/**
+ * Enhances every experiment figure under `root`, each when it comes near the
+ * viewport (the printed figure is complete until then); a failure leaves that
+ * figure static.
+ */
 export function mountChartFigures(root = document) {
-  const mounted = [];
   for (const figure of root.querySelectorAll('[data-fig]')) {
-    try {
-      mounted.push(mountChartFigure(figure));
-    } catch (error) {
-      console.error(error);
-    }
+    whenNear(figure, () => {
+      try {
+        mountChartFigure(figure);
+      } catch (error) {
+        console.error(error);
+      }
+    });
   }
-  return mounted;
 }

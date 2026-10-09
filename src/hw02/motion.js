@@ -62,6 +62,47 @@ export function onFirstView(element, callback, threshold = 0.4) {
   return () => io.disconnect();
 }
 
+/**
+ * Calls `callback` once, the first time `element` comes within `margin` of
+ * the viewport (at once without IntersectionObserver). Defers the mounting of
+ * figures far below the fold, early enough that they are live before they
+ * are seen.
+ */
+export function whenNear(element, callback, margin = '100% 0px') {
+  if (!('IntersectionObserver' in globalThis)) {
+    callback();
+    return;
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        io.disconnect();
+        callback();
+      }
+    },
+    { rootMargin: margin },
+  );
+  io.observe(element);
+}
+
+/**
+ * Wraps a figure's mount function so that it runs when the figure comes near
+ * the viewport; a failure is logged and leaves the printed figure in place,
+ * as for the figures mounted at once. Figures that follow the explorer's
+ * account (1, 3, 6) are not deferred, so that they never miss its event.
+ */
+export function deferMount(mount) {
+  return (figure) => {
+    whenNear(figure, () => {
+      try {
+        mount(figure);
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  };
+}
+
 /** Whether an element is at least partly inside the viewport now. */
 export function inViewport(element) {
   const r = element.getBoundingClientRect();

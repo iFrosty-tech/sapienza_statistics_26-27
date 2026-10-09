@@ -123,13 +123,35 @@ test('the BIP-39 grouping prints the 132-bit stream bit by bit under 11-bit brac
 
 test('the HD tree draws hardened edges as double rules and normal edges as single rules', () => {
   const model = hdTreeModel(example);
-  const svg = renderHdTree(model, { id: 'hd' });
+  const svg = renderHdTree(model, { id: 'hd', layout: 'wide' });
   assert.ok(svg.startsWith('<svg'));
   assert.equal(count(svg, 'data-edge="hardened"'), 3);
   assert.equal(count(svg, 'data-edge="normal"'), 4);
   assert.equal(count(svg, 'class="hdtree__rule"'), 3 * 2 + 4);
   assert.equal(count(svg, 'class="hdtree__node'), 8);
   assert.ok(svg.includes("m/44'/60'/0'/0/2"));
+});
+
+test('the compact HD tree for phones keeps every edge and node in a 360-unit width with shortened addresses', () => {
+  const model = hdTreeModel(example);
+  const svg = renderHdTree(model, { id: 'hdc', layout: 'compact' });
+  assert.ok(svg.includes('class="hdtree hdtree--compact"'));
+  const width = Number(svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) /)[1]);
+  assert.ok(width <= 360, `width ${width}`);
+  assert.equal(count(svg, 'data-edge="hardened"'), 3);
+  assert.equal(count(svg, 'data-edge="normal"'), 4);
+  assert.equal(count(svg, 'class="hdtree__node'), 8);
+  const a0 = model.leaves[0].address;
+  assert.ok(svg.includes(`${a0.slice(0, 6)}…${a0.slice(-4)}`));
+  // The full addresses stay in the description.
+  assert.ok(svg.includes(a0));
+  // Every text starts inside the drawing.
+  for (const m of svg.matchAll(/<text[^>]* x="([\d.]+)"/g)) assert.ok(Number(m[1]) < width);
+  // By default the build prints both drawings, the wide one first.
+  const both = renderHdTree(model, { id: 'hdb' });
+  assert.ok(both.startsWith('<svg class="hdtree hdtree--wide"'));
+  assert.equal(count(both, 'class="hdtree hdtree--compact"'), 1);
+  assert.ok(both.includes('id="hdb-compact-title"'));
 });
 
 test('the Keccak lattice draws all 1600 bits and marks the differing ones', () => {

@@ -14,6 +14,8 @@ export const LATTICE_SIZE = 1600;
 export const Z_GAP = 0.62;
 /** Largest tilt of the view above or below the lane plane, in radians. */
 export const PITCH_LIMIT = 0.45;
+/** Largest turn of the view about the vertical axis, either way from the lanes seen side on, in radians. */
+export const YAW_LIMIT = 0.6;
 
 /**
  * The difference mask of one checkpoint as 1600 values 0/1: state bit
@@ -84,23 +86,42 @@ export function clampPitch(pitch) {
   return Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, pitch));
 }
 
+export function clampYaw(yaw) {
+  return Math.min(YAW_LIMIT, Math.max(-YAW_LIMIT, yaw));
+}
+
+/** Height of the canvas for a given width: 0.34 of it, clamped to [160, 300] px. */
+export function canvasHeight(width) {
+  return Math.round(Math.min(300, Math.max(160, width * 0.34)));
+}
+
 /*
- * Half-extents of the lattice on screen over every yaw and every pitch in
- * [−PITCH_LIMIT, PITCH_LIMIT]: horizontally at most the half-diagonal of the
- * (u, v) footprint; vertically the same footprint tilted by the pitch plus
- * the half-height of the lanes.
+ * Half-extents of the lattice on screen over every admissible view, yaw in
+ * [−YAW_LIMIT, YAW_LIMIT] and pitch in [−PITCH_LIMIT, PITCH_LIMIT]. A corner
+ * (±U, ±V, ±W) of the box projects to sx = u cos(yaw) − v sin(yaw) and
+ * sy = −(w cos(pitch) + (u sin(yaw) + v cos(yaw)) sin(pitch)), so
+ *   max |sx| = max over yaw of U |cos| + V |sin|,
+ *   max |u sin(yaw) + v cos(yaw)| = max over yaw of U |sin| + V |cos|  (= D),
+ *   max |sy| = max over pitch of W |cos| + D |sin|,
+ * each of the form a |cos t| + b |sin t| on [−L, L]: its maximum is
+ * hypot(a, b) when the peak atan(b / a) lies inside the range, else the value at L.
  */
 const U_HALF = 31.5 * Z_GAP;
 const V_HALF = 2;
 const W_HALF = 2;
-const FOOTPRINT = Math.hypot(U_HALF, V_HALF);
-const HALF_WIDTH = FOOTPRINT;
-const HALF_HEIGHT = FOOTPRINT * Math.sin(PITCH_LIMIT) + W_HALF;
+
+function peak(a, b, limit) {
+  return Math.atan2(b, a) <= limit ? Math.hypot(a, b) : a * Math.cos(limit) + b * Math.sin(limit);
+}
+
+const HALF_WIDTH = peak(U_HALF, V_HALF, YAW_LIMIT);
+const DEPTH_HALF = peak(V_HALF, U_HALF, YAW_LIMIT);
+const HALF_HEIGHT = peak(W_HALF, DEPTH_HALF, PITCH_LIMIT);
 
 /**
  * The largest scale (pixels per model unit) at which the lattice, centred,
- * stays inside a width × height canvas with `pad` pixels of margin at any yaw
- * and any admissible pitch, so the drawing never changes size as it turns.
+ * stays inside a width × height canvas with `pad` pixels of margin at every
+ * admissible yaw and pitch, so the drawing never changes size as it turns.
  */
 export function fitScale(width, height, pad = 16) {
   return Math.max(0, Math.min((width / 2 - pad) / HALF_WIDTH, (height / 2 - pad) / HALF_HEIGHT));
