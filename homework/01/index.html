@@ -77,9 +77,26 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 properties specifically associated with cryptographic hash functions.
               </p>
             </blockquote>
-            <p data-draft>
-              To be written: how the assignment is read, and how the sections that follow answer its three parts, the
-              program of §3, the slowed-down view of §4 and the statistical exploration of §5, before the discussion of §6.
+            <p>
+              The assignment has three practical parts and a question. The program of §3 computes the toy public key
+              <span data-tex>Q = 6G</span> = {{fig.toy.Q}} by repeated point addition, printing
+              <span data-tex>G, 2G, \dots, 6G</span>, and by the faster double-and-add method; it is also provided as a
+              standalone file. The slowed-down view of §4 answers the optional "guru level" by replaying each group
+              operation on the lattice of the toy curve. The statistical exploration of §5 repeats the experiment over
+              many keys and base points, and §6 answers the question by classifying each property explored as
+              meaningful for a one-way function, specific to hash functions, or both; §7 concludes.
+            </p>
+            <p>
+              "One-way" is meant in its computational sense: a function is one-way when it is easy to compute and hard
+              to invert, in that no efficient algorithm given <span data-tex>f(x)</span>, for a uniformly random input
+              <span data-tex>x</span>, finds a preimage with more than negligible probability [<a href="#ref-7">7</a>, §8.1.1];
+              it is the notion on which Diffie and Hellman founded public-key cryptography [<a href="#ref-5">5</a>, §IV]. The
+              toy curve cannot have this property. Its private keys fit on one line and the logarithm of any of its
+              points can be read off a table: it teaches the mechanism, not the security. For this reason §5 runs the
+              same experiments on a ladder of curves of growing size, up to secp256k1 itself, so as to separate the
+              artefacts of smallness from the properties of the map <span data-tex>k \mapsto kG</span>. The research
+              question is therefore twofold: which statistical properties of <span data-tex>Q = kG</span> can a sample
+              of keys reveal, and which of them matter for the one-wayness on which an Ethereum key rests?
             </p>
           </section>
 
@@ -88,11 +105,50 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Background</h2>
 
             <h3 id="s2-1">2.1 Elliptic curves over a prime field</h3>
-            <p data-draft>
-              To be written: the curve <span data-tex>y^2 = x^3 + 7</span> over the field
-              <span data-tex>\mathbb{F}_p</span>, its points and the point at infinity <span data-tex>O</span>, and the
-              chord-and-tangent group law with the formulas for the slope <span data-tex>\lambda</span>, the third
-              intersection and its reflection, illustrated over the real numbers by Figure 1.
+            <p>
+              Let <span data-tex>p &gt; 3</span> be a prime and <span data-tex>\mathbb{F}_p</span> the field of the
+              integers modulo <span data-tex>p</span>. An elliptic curve over <span data-tex>\mathbb{F}_p</span> is the
+              set of solutions <span data-tex>(x, y) \in \mathbb{F}_p^2</span> of an equation
+              <span data-tex>y^2 = x^3 + ax + b</span> with <span data-tex>4a^3 + 27b^2 \not\equiv 0 \pmod p</span>,
+              together with an extra point <span data-tex>O</span>, the point at infinity [<a href="#ref-3">3</a>, §2.2.1]. The
+              condition excludes singular curves. For the curves of this page, <span data-tex>a = 0</span> and
+              <span data-tex>b = 7</span>, it reads <span data-tex>27 \cdot 49 = 3^3 \cdot 7^2 \not\equiv 0</span>,
+              which holds for every prime <span data-tex>p &gt; 3</span> except <span data-tex>p = 7</span>.
+            </p>
+            <p>
+              The points form an abelian group under the chord-and-tangent rule, with <span data-tex>O</span> as
+              identity (Figure 1, over the real numbers). To add <span data-tex>P = (x_1, y_1)</span> and
+              <span data-tex>Q = (x_2, y_2)</span>, draw the line through them, or the tangent when
+              <span data-tex>P = Q</span>; it meets the curve in a third point <span data-tex>R'</span>, and
+              <span data-tex>P + Q</span> is the reflection of <span data-tex>R'</span> in the horizontal axis. The
+              negative of <span data-tex>(x, y)</span> is <span data-tex>(x, -y)</span>: the line through a point and its
+              negative is vertical, meets the curve nowhere else, and their sum is <span data-tex>O</span>. Over
+              <span data-tex>\mathbb{F}_p</span> the geometry gives way to algebra, with the same formulas
+              [<a href="#ref-3">3</a>, §2.2.1]: the slope of the line is
+            </p>
+            <div class="equation" id="eq-slope">
+              <div data-tex-display>
+                \lambda = \frac{y_2 - y_1}{x_2 - x_1} \quad (P \ne Q), \qquad
+                \lambda = \frac{3x_1^2 + a}{2y_1} \quad (P = Q),
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>and the sum <span data-tex>P + Q = (x_3, y_3)</span> has the coordinates</p>
+            <div class="equation" id="eq-sum">
+              <div data-tex-display>
+                x_3 = \lambda^2 - x_1 - x_2, \qquad y_3 = \lambda(x_1 - x_3) - y_1 .
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              All the arithmetic is modular. A division is a multiplication by the inverse of the denominator modulo
+              <span data-tex>p</span>, which exists because <span data-tex>p</span> is prime and is computed by the
+              extended Euclidean algorithm; the reflection <span data-tex>-y</span> is the residue
+              <span data-tex>p - y</span>. The number of points cannot stray far from <span data-tex>p + 1</span>: by
+              Hasse's theorem, <span data-tex>|\#E(\mathbb{F}_p) - (p + 1)| \le 2\sqrt{p}</span>
+              [<a href="#ref-13">13</a>, Thm 4.2]. Elliptic curves were proposed for cryptography independently by Miller
+              [<a href="#ref-9">9</a>] and Koblitz [<a href="#ref-8">8</a>], as groups in which to run cryptosystems based on the
+              discrete logarithm.
             </p>
 
             <figure class="chart-figure group-law" data-group-law aria-labelledby="fig1-title">
@@ -119,18 +175,93 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s2-2">2.2 Scalar multiplication and the discrete logarithm</h3>
-            <p data-draft>
-              To be written: scalar multiplication <span data-tex>Q = kG</span> as repeated addition, the order
-              <span data-tex>n</span> of <span data-tex>G</span> and the cyclic subgroup it generates, and the
-              elliptic-curve discrete logarithm problem of recovering <span data-tex>k</span> from
-              <span data-tex>Q</span>, with the generic cost of about <span data-tex>\sqrt{n}</span> operations.
+            <p>
+              For a positive integer <span data-tex>k</span>, scalar multiplication repeats the group law,
+              <span data-tex>kG = G + G + \cdots + G</span> with <span data-tex>k</span> terms, and
+              <span data-tex>0G = O</span>. If <span data-tex>n</span>, the order of <span data-tex>G</span>, is the
+              smallest positive integer with <span data-tex>nG = O</span>, the multiples of <span data-tex>G</span> form
+              a cyclic subgroup <span data-tex>\langle G \rangle</span> of <span data-tex>n</span> points, and
+              <span data-tex>k \mapsto kG</span> is a group homomorphism from <span data-tex>\mathbb{Z}/n\mathbb{Z}</span>
+              onto <span data-tex>\langle G \rangle</span>: <span data-tex>(a + b)G = aG + bG</span>, and
+              <span data-tex>kG</span> depends only on <span data-tex>k</span> modulo <span data-tex>n</span>. Restricted
+              to <span data-tex>\{0, 1, \dots, n - 1\}</span> it is a bijection, so every point of
+              <span data-tex>\langle G \rangle</span> has exactly one discrete logarithm in that range.
+            </p>
+            <p>
+              Computed from its definition, <span data-tex>kG</span> costs <span data-tex>k - 1</span> additions, which
+              is out of reach for the 256-bit keys of practice. The left-to-right binary method, or double-and-add, reads
+              the bits of <span data-tex>k</span> from the most significant one, doubles an accumulator at every bit and
+              adds <span data-tex>G</span> at every bit equal to one [<a href="#ref-6">6</a>, Alg. 3.27]; it needs at most
+              <span data-tex>2\log_2 k</span> group operations (§3.3).
+            </p>
+            <p>
+              The inverse problem, to find <span data-tex>k</span> from <span data-tex>G</span> and
+              <span data-tex>Q = kG</span>, is the elliptic-curve discrete logarithm problem (ECDLP). Exhaustive search
+              tries <span data-tex>k = 1, 2, \dots</span> and needs about <span data-tex>n/2</span> additions on average.
+              Generic algorithms, which use nothing but the group operations, do better, though not by much:
+              baby-step giant-step needs of the order of <span data-tex>\sqrt{n}</span> operations and as many stored
+              points [<a href="#ref-13">13</a>, §5.2.1], and Pollard's rho method an expected
+              <span data-tex>\sqrt{\pi n/2}</span> steps with negligible memory [<a href="#ref-6">6</a>, §4.1.2]. When
+              <span data-tex>n</span> is composite, the Pohlig–Hellman method reduces the problem to subgroups of prime
+              order, so that its cost is governed by the largest prime factor of <span data-tex>n</span>
+              [<a href="#ref-6">6</a>, §4.1.1], [<a href="#ref-13">13</a>, §5.2.3]; this is why cryptographic base points have
+              prime order. Supersingular curves are weaker still, because the MOV attack transfers the problem to a
+              discrete logarithm in the multiplicative group of a small extension of <span data-tex>\mathbb{F}_p</span>
+              [<a href="#ref-13">13</a>, §5.3.1].
+            </p>
+            <p>
+              The asymmetry between a forward cost that grows with <span data-tex>\log n</span> and an inverse cost that
+              grows with <span data-tex>\sqrt{n}</span> for the best generic algorithms is what makes
+              <span data-tex>k \mapsto kG</span> a candidate one-way function: a function that is easy to compute but
+              hard to invert on uniformly random inputs [<a href="#ref-7">7</a>, §8.1.1]. Diffie and Hellman framed
+              public-key cryptography in terms of such functions and of trap-door one-way functions, which become easy
+              to invert with a secret [<a href="#ref-5">5</a>, §IV–V]. For scalar multiplication the hardness of inversion
+              is an assumption, not a theorem: it rests on the absence of known algorithms substantially faster than
+              the generic ones on curves of prime order that avoid the special cases above.
             </p>
 
             <h3 id="s2-3">2.3 From a private key to an Ethereum address</h3>
-            <p data-draft>
-              To be written: the private key as an integer in <span data-tex>[1, n - 1]</span> on secp256k1, the public
-              key <span data-tex>Q = kG</span>, and the address as the last 20 bytes of the Keccak-256 digest of the
-              coordinates of <span data-tex>Q</span>: the one-way step is the scalar multiplication, the hash comes after.
+            <p>
+              Ethereum uses the curve secp256k1 of the SEC 2 standard: the equation <span data-tex>y^2 = x^3 + 7</span>,
+              so <span data-tex>a = 0</span> and <span data-tex>b = 7</span>, over <span data-tex>\mathbb{F}_p</span> with
+              <span data-tex>p = 2^{256} - 2^{32} - 977</span>, and a base point <span data-tex>G</span> of prime order
+              <span data-tex>n</span>, slightly below <span data-tex>2^{256}</span>, with cofactor 1, so that
+              <span data-tex>G</span> generates the whole group [<a href="#ref-4">4</a>, §2.4.1]. It is the toy curve's
+              equation with a different prime; its parameters are printed in the appendix. Key pairs are generated as in
+              SEC 1: an integer <span data-tex>d</span> (<span data-tex>k</span> on this page) is selected randomly or
+              pseudorandomly in <span data-tex>[1, n - 1]</span> and the public key is <span data-tex>Q = dG</span>
+              [<a href="#ref-3">3</a>, §3.2.1], and the standard asks that private keys have a distribution as close as
+              possible to uniform [<a href="#ref-3">3</a>, §3.10.3].
+            </p>
+            <p>
+              The Ethereum yellow paper adopts this scheme. A private key is an integer in
+              <span data-tex>[1, \mathtt{secp256k1n} - 1]</span>; the public key is the 64-byte concatenation
+              <span data-tex>x \,\|\, y</span> of the coordinates of <span data-tex>Q</span>, without the
+              <code>04</code> prefix of the uncompressed encoding of SEC 1 [<a href="#ref-3">3</a>, §2.3.3]; and the address is
+              the rightmost 160 bits of the Keccak-256 hash of those 64 bytes [<a href="#ref-15">15</a>, App. F, eqs (309) and
+              (316)]. Keccak-256 is the function KEC of the yellow paper, the Keccak submitted to the SHA-3 competition
+              rather than the final SHA-3 standard [<a href="#ref-15">15</a>, §3]. The two are not interchangeable: SHA3-256
+              appends the domain-separation suffix <code>01</code> to the message before padding
+              [<a href="#ref-10">10</a>, §6.1], whereas the Keccak-256 used by Ethereum, defined before standardisation, does not.
+            </p>
+            <p>
+              The path from a private key to an address therefore passes through two one-way maps in series, of
+              different kinds. The first, <span data-tex>k \mapsto kG</span>, is algebraic: it is a homomorphism, and it
+              is hard to invert only because the ECDLP is hard. The second, Keccak-256, is a hash: it compresses its
+              input and is designed to have no algebraic structure at all. <a href="{{base}}homework/02/">Homework 2</a>
+              follows the whole wallet pipeline, from a mnemonic sentence to the address; this page studies the first
+              map, with the second as the baseline against which its statistics are compared.
+            </p>
+            <p>
+              One difference between the toy curve and secp256k1 matters later. For <span data-tex>p \ge 5</span>, a
+              curve over <span data-tex>\mathbb{F}_p</span> is supersingular exactly when it has
+              <span data-tex>p + 1</span> points [<a href="#ref-13">13</a>, Cor. 4.32], and a curve
+              <span data-tex>y^2 = x^3 + b</span> is supersingular whenever <span data-tex>p \equiv 2 \pmod 3</span>
+              [<a href="#ref-13">13</a>, Prop. 4.33]. The toy prime is <span data-tex>17 \equiv 2 \pmod 3</span>, so the toy
+              curve is supersingular, with <span data-tex>p + 1 = 18</span> points. For secp256k1,
+              <span data-tex>p \equiv 1 \pmod 3</span> and the number of points is the odd prime
+              <span data-tex>n</span>, which cannot equal the even number <span data-tex>p + 1</span>: the curve is
+              ordinary [<a href="#ref-13">13</a>, Cor. 4.32].
             </p>
           </section>
 
@@ -139,10 +270,31 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The toy program</h2>
 
             <h3 id="s3-1">3.1 The curve y² = x³ + 7 (mod 17)</h3>
-            <p data-draft>
-              To be written: the {{fig.toy.points}} affine points of the toy curve and the point at infinity, a group of
-              order {{fig.toy.order}}; the base point <span data-tex>G = (1, 5)</span> of the assignment and its order
-              {{fig.toy.orderG}}; why every ordinate occurs exactly once when <span data-tex>p \equiv 2 \pmod 3</span>.
+            <p>
+              Over <span data-tex>\mathbb{F}_{17}</span> the equation <span data-tex>y^2 = x^3 + 7</span> has
+              {{fig.toy.points}} solutions (Figure 2), and with <span data-tex>O</span> the group has {{fig.toy.order}}
+              elements: exactly <span data-tex>p + 1</span>, as for every supersingular curve, and well inside the Hasse
+              interval. Each row of the lattice in Figure 2 holds exactly one point. Since
+              <span data-tex>\gcd(3, 16) = 1</span> and 16 is the order of the multiplicative group of
+              <span data-tex>\mathbb{F}_{17}</span>, cubing is a bijection of the field; so for every ordinate
+              <span data-tex>y</span> the equation <span data-tex>x^3 = y^2 - 7</span> has exactly one solution, and each
+              of the 17 values of <span data-tex>y</span> occurs once. The abscissas are less even. As
+              <span data-tex>x</span> runs over the field, <span data-tex>x^3 + 7</span> also takes every value once, and
+              only 9 of these values, the 8 non-zero squares and zero, are of the form <span data-tex>y^2</span>: 9
+              abscissas occur, 8 of them twice, as <span data-tex>(x, y)</span> and <span data-tex>(x, 17 - y)</span>, and
+              <span data-tex>x = 3</span> once, as the point <span data-tex>(3, 0)</span>. The mirror
+              <span data-tex>(x, y) \leftrightarrow (x, 17 - y)</span> about the dashed line
+              <span data-tex>y = 17/2</span> is the map <span data-tex>P \mapsto -P</span>.
+            </p>
+            <p>
+              Table 1 groups the points by order. The group is cyclic of order 18, so for every divisor
+              <span data-tex>d</span> of 18 it has exactly <span data-tex>\varphi(d)</span> elements of order
+              <span data-tex>d</span>, where <span data-tex>\varphi</span> is Euler's function: six generators of order
+              18, among them {{fig.toy.generator}}; six points of order 9; two of order 6; two of order 3; and
+              <span data-tex>(3, 0)</span>, of order 2. The base point of the assignment, <span data-tex>G</span> =
+              {{fig.toy.G}}, has order {{fig.toy.orderG}}. It does not generate the whole group but its subgroup of index
+              2, the nine points <span data-tex>G, 2G, \dots, 8G, O</span>; the statistical exploration of §5 therefore
+              also uses the generator {{fig.toy.generator}}, whose multiples visit all 17 affine points.
             </p>
 
             <figure class="chart-figure lattice-figure" aria-labelledby="fig2-title">
@@ -179,10 +331,26 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s3-2">3.2 Computing Q = 6G step by step</h3>
-            <p data-draft>
-              To be written: the computation of <span data-tex>2G, 3G, \dots, 6G</span> by repeated point addition,
-              one row of Table 2 per operation, with the modular inverse in the slope; the program prints the same
-              multiples (Listing 1) and ends with the toy public key <span data-tex>Q = 6G</span> = {{fig.toy.Q}}.
+            <p>
+              Table 2 computes <span data-tex>2G, 3G, \dots, 6G</span> by five successive group operations, each an
+              application of formulas (1) and (2) with all arithmetic modulo 17. The first is a doubling, since
+              <span data-tex>2G = G + G</span>, and its slope is
+              <span data-tex>\lambda = (3 \cdot 1^2 + 0)/(2 \cdot 5) = 3/10</span>. Dividing by 10 means multiplying by
+              its inverse, <span data-tex>10^{-1} \equiv 12 \pmod{17}</span> because
+              <span data-tex>10 \cdot 12 = 120 = 7 \cdot 17 + 1</span>; hence
+              <span data-tex>\lambda \equiv 3 \cdot 12 = 36</span>, which reduces to {{fig.toy.slope.2}}. Then
+              <span data-tex>x_3 = 2^2 - 1 - 1 = 2</span> and <span data-tex>y_3 = 2(1 - 2) - 5 = -7 \equiv 10</span>, so
+              that <span data-tex>2G</span> = {{fig.toy.multiple.2}}. The other four rows add <span data-tex>G</span> to
+              the previous multiple in the same way. The program prints the same sequence (Listing 1) and ends with the
+              toy public key <span data-tex>Q = 6G</span> = {{fig.toy.Q}}.
+            </p>
+            <p>
+              Since <span data-tex>9G = O</span>, only the residue of <span data-tex>k</span> modulo 9 matters:
+              <span data-tex>k</span> and <span data-tex>k + 9</span> give the same point, and
+              <span data-tex>k = 9</span> gives <span data-tex>O</span>, which has no coordinates and cannot serve as a
+              public key; the program says so if asked for it. The usable keys for <span data-tex>G = (1, 5)</span> are
+              therefore <span data-tex>k \in \{1, \dots, 8\}</span>, the toy counterpart of the interval
+              <span data-tex>[1, n - 1]</span> of SEC 1 [<a href="#ref-3">3</a>, §3.2.1].
             </p>
 
             <figure class="table-figure" aria-labelledby="table2-caption">
@@ -205,21 +373,39 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="listing1-title">
-                  <span class="pplot__fig-no">Listing 1.</span>The output of the toy program for G = (1, 5) and k = 6
+                  <span class="pplot__fig-no">Listing 1.</span>The output of the toy program for the assignment, G = (1, 5) and k = 6
                 </p>
                 <p>
                   The program prints every multiple <span data-tex>G, 2G, \dots, kG</span> obtained by repeated point
-                  addition, then the last one as the toy public key. The lines above were computed when this page was
-                  built, by the same arithmetic as the standalone program of §3.4.
+                  addition, then the last one as the toy public key. The lines shown when the page opens are the output
+                  for the parameters of the assignment, computed when this page was built by the same arithmetic as the
+                  standalone program of §3.4. Where scripts run, the controls above the listing recompute it for another
+                  private key, base point or method, or on secp256k1, where the program also derives the Ethereum
+                  address of the key.
                 </p>
               </figcaption>
             </figure>
 
             <h3 id="s3-3">3.3 A faster method: double-and-add</h3>
-            <p data-draft>
-              To be written: the left-to-right binary method, which reads the bits of <span data-tex>k</span> from the
-              most significant, doubles the accumulator at every bit and adds <span data-tex>G</span> at every bit equal
-              to one (Table 3), and its cost, logarithmic in <span data-tex>k</span> instead of linear (Figure 3).
+            <p>
+              The assignment's key is <span data-tex>k = 6</span>, or {{fig.toy.bits}} in binary. Double-and-add reads
+              these bits from the most significant one (Table 3): the leading 1 loads <span data-tex>G</span>; the second
+              bit doubles the accumulator to <span data-tex>2G</span> and, being 1, adds <span data-tex>G</span> to give
+              <span data-tex>3G</span>; the last bit, 0, doubles <span data-tex>3G</span> to <span data-tex>6G</span>.
+              The method reaches {{fig.toy.Q}} in {{fig.toy.dblAddOperations}} group operations,
+              {{fig.toy.dblAddDoublings}} doublings and {{fig.toy.dblAddAdditions}} addition, instead of the
+              {{fig.toy.repeatedOperations}} additions of the repeated method.
+            </p>
+            <p>
+              In general, a key of <span data-tex>L = \lfloor \log_2 k \rfloor + 1</span> bits, <span data-tex>w</span> of
+              them equal to one, costs <span data-tex>L - 1</span> doublings and <span data-tex>w - 1</span> additions.
+              For a 256-bit key with uniformly random lower bits this is 255 doublings and on average 127.5 additions,
+              {{fig.dblAddCost.meanDoubleAndAdd256}} group operations in all, whereas repeated addition would need on
+              average about 2<sup>{{fig.dblAddCost.log2Repeated256}}</sup> (Figure 3). The gap is the quantitative content
+              of the word "one-way": the forward direction costs a number of operations proportional to
+              <span data-tex>\log_2 n</span>, while the best known generic inversion costs about
+              <span data-tex>\sqrt{n}</span>, which for <span data-tex>n \approx 2^{256}</span> is about
+              <span data-tex>2^{128}</span> (§5.8).
             </p>
 
             <figure class="table-figure" aria-labelledby="table3-caption">
@@ -260,10 +446,28 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s3-4">3.4 The program</h3>
-            <p data-draft>
-              To be written: how the program is organised, from the definition of the curve, of <span data-tex>G</span>
-              and of <span data-tex>k</span> to point addition, the two methods of scalar multiplication and the printed
-              report, and how its output was checked against the values of Table 2.
+            <p>
+              The standalone program is a single HTML file, with its style sheet and script inline, and follows the
+              steps of the assignment in order. It defines the curve (<span data-tex>p = 17</span>,
+              <span data-tex>a = 0</span>, <span data-tex>b = 7</span>), the base point <span data-tex>G = (1, 5)</span>
+              and the private key <span data-tex>k = 6</span> as constants. It computes inverses modulo
+              <span data-tex>p</span> by the extended Euclidean algorithm and implements point addition by formulas (1)
+              and (2), with the special cases of the identity <span data-tex>O</span>, of a point and its negative, whose
+              sum is <span data-tex>O</span>, and of doubling. It multiplies by both methods: repeated addition, which
+              keeps every multiple, and double-and-add, which keeps a record of each operation. Its report prints
+              <span data-tex>G, 2G, \dots, kG</span>, or the record of double-and-add, and ends with the line
+              <code>TOY PUBLIC KEY</code>. A small form lets the reader choose another key, any of the 17 points as base
+              point, and the method; repeated addition is limited to <span data-tex>k \le 10\,000</span>.
+            </p>
+            <p>
+              Automated tests run the program's own code and check that its report for the assignment is exactly
+              Listing 1, and that it agrees with the arithmetic library that produces Tables 1 to 3 for every one of the
+              17 base points and every <span data-tex>k</span> from 1 to 40, by both methods. The live version of the
+              program in Listing 1 uses that library and adds the real curve: on secp256k1 it computes
+              <span data-tex>Q = kG</span> for any key in <span data-tex>[1, n - 1]</span>, prints its coordinates and
+              derives the Ethereum address of §2.3. The private key 1, whose public key is <span data-tex>G</span>
+              itself, gives the address <code>0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf</code>, a value the test suite
+              also checks.
             </p>
             <p>
               The program runs on its own, without the rest of this site:
@@ -279,11 +483,41 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <!-- ===================================================== §4 -->
           <section class="hw-section" id="s4" aria-labelledby="s4-title">
             <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> A slowed-down view of the algorithm</h2>
-            <p data-draft>
-              To be written: what the slowed-down view shows at each step of the computation, the line modulo 17 as
-              parallel segments on the sheet, the third intersection, its reflection across the mirror line and the new
-              multiple of <span data-tex>G</span>, and why the order of the multiples in <span data-tex>k</span> is
-              invisible in their positions.
+            <p>
+              Figure 4 replays the computation of <span data-tex>Q = kG</span> one group operation at a time, at a pace
+              the eye can follow, and in the order of formulas (1) and (2). The two operands pulse. The line through
+              them, or the tangent for a doubling, is the set of solutions of
+              <span data-tex>y \equiv \lambda x + \nu \pmod{17}</span>; on the flat sheet it appears as parallel segments
+              of slope <span data-tex>\lambda</span> that leave the sheet at one edge and re-enter at the opposite one,
+              passing through exactly 17 lattice points, one in each column, unless the line is vertical. Its third
+              intersection with the curve, <span data-tex>R' = (x_3, y')</span>, appears as an open ring. A dashed drop
+              then reflects <span data-tex>R'</span> across the line <span data-tex>y = 17/2</span>, because the
+              negative of a point has the ordinate <span data-tex>-y' \equiv 17 - y'</span>, and the red accumulator
+              lands on the result. Beside the sheet, the arithmetic panel writes the same steps in numbers: the slope
+              <span data-tex>\lambda</span> with its modular inverse spelled out, the intercept <span data-tex>\nu</span>,
+              the abscissa <span data-tex>x_3</span>, the ordinate <span data-tex>y'</span> of <span data-tex>R'</span>
+              and the ordinate <span data-tex>y_3</span> of the result.
+            </p>
+            <p>
+              The torus view makes the wrapping literal. Gluing the top edge of the sheet to the bottom one and the left
+              edge to the right one turns the square into a torus, on which the parallel segments of a line modulo 17
+              join into a single closed curve, and the reflection <span data-tex>y \mapsto 17 - y</span> becomes the
+              mirror symmetry through the plane of the two equators.
+            </p>
+            <p>
+              The dial beside the sheet shows the same computation in the group. Its <span data-tex>n</span> ticks are
+              the multiples of <span data-tex>G</span> in the order of their index, and its hand marks the index of the
+              accumulator modulo <span data-tex>n</span>: one tick forward for each addition of
+              <span data-tex>G</span>, a jump from <span data-tex>i</span> to <span data-tex>2i</span> for each doubling.
+              Repeated addition is therefore a regular rotation, one tick per step. On the sheet the same steps jump
+              between distant points with no visible order: for the assignment the accumulator visits
+              {{fig.toy.multiple.1}}, {{fig.toy.multiple.2}}, {{fig.toy.multiple.3}}, {{fig.toy.multiple.4}},
+              {{fig.toy.multiple.5}} and {{fig.toy.multiple.6}}. This contrast is the one-way property in miniature. A
+              public key tells where the accumulator stopped on the sheet; the private key is where the hand stopped
+              on the dial; recovering the second from the first is the ECDLP. For the assignment the dial has
+              {{fig.toy.orderG}} ticks and can be read by inspection, or by replaying the rotation until the accumulator reaches <span data-tex>Q</span>. On
+              secp256k1 the dial has about <span data-tex>2^{256}</span> ticks, and no known generic method locates the
+              hand in substantially fewer than about <span data-tex>\sqrt{n}</span> steps (§5.8).
             </p>
 
             <figure class="chart-figure slowmo" data-slowmo aria-labelledby="fig4-title">
@@ -330,12 +564,36 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Statistical exploration</h2>
 
             <h3 id="s5-1">5.1 Experimental design</h3>
-            <p data-draft>
-              To be written: why the experiment is repeated on a ladder of curves rather than on the toy curve alone;
-              the difference between an exhaustive enumeration of every <span data-tex>k</span> from 1 to
-              <span data-tex>n - 1</span>, whose results are exact population values, and the sample of
-              {{fig.params.sampleN}} keys on secp256k1, whose results are estimates; Keccak-256 of the same keys as the
-              baseline of a hash function; and the null hypotheses tested in §5.2 to §5.7.
+            <p>
+              A statistical property observed on the toy curve could belong to scalar multiplication or be an artefact
+              of having only 17 points, on which almost any pattern, or none, can arise by chance. The experiments are
+              therefore repeated on the ladder of curves <span data-tex>y^2 = x^3 + 7</span> of Table 4: the toy curve,
+              with the assignment's base point and with a generator; a supersingular curve with
+              <span data-tex>p = 1031 \equiv 2 \pmod 3</span>, like the toy; two curves of prime order with
+              <span data-tex>p = 1051</span> and <span data-tex>p = 16477</span>, both <span data-tex>\equiv 1 \pmod 3</span>
+              like secp256k1; and secp256k1 itself. A property that persists from <span data-tex>\mathbb{F}_{17}</span>
+              to secp256k1 belongs to the map; one that fades as <span data-tex>p</span> grows belongs to smallness; one
+              that follows the residue of <span data-tex>p</span> modulo 3 belongs to the arithmetic of the field.
+            </p>
+            <p>
+              The small and medium curves are enumerated: every key from 1 to <span data-tex>n - 1</span> is used once.
+              Since <span data-tex>k \mapsto kG</span> is a bijection from <span data-tex>\{1, \dots, n - 1\}</span>
+              onto <span data-tex>\langle G \rangle \setminus \{O\}</span>, the enumeration is the exact distribution of
+              the public key under a uniformly random private key, and its statistics are population values, not
+              estimates. A chi-square p-value computed on them does not test a hypothesis about a population that has
+              been observed in full; it answers a counterfactual question, whether <span data-tex>n - 1</span>
+              independent uniform draws would often differ from the reference as much as these points do, and it is
+              quoted as a yardstick only. On secp256k1 enumeration is impossible: the {{fig.params.sampleN}} private keys
+              are a sample, drawn uniformly from <span data-tex>[1, n - 1]</span> with the seed {{fig.params.seed}}
+              (appendix), and there the tests are genuine inference about the population of all public keys.
+            </p>
+            <p>
+              Keccak-256 is applied to the same keys, written as 32 bytes, as the baseline of a hash function, so that
+              both maps receive exactly the same inputs. The null models are those of an ideal function. For the
+              coordinates it is the uniform law on the integers of <span data-tex>[0, p)</span>. For the frequencies of
+              values, the bits and the avalanche it is a random function, which gives every input an independent,
+              uniformly distributed output: the random oracle through which Bellare and Rogaway idealise a hash function
+              in the design of protocols [<a href="#ref-1">1</a>, §1.1].
             </p>
 
             <figure class="table-figure" aria-labelledby="table4-caption">
@@ -351,10 +609,34 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-2">5.2 Distribution of the coordinates</h3>
-            <p data-draft>
-              To be written: the null hypothesis that <span data-tex>x</span> and <span data-tex>y</span> are uniform on
-              the integers of <span data-tex>[0, p)</span>, the chi-square statistic, and what Figure 5 shows for each
-              curve, for secp256k1 and for Keccak-256.
+            <p>
+              If the public key were a uniformly random point of the plane, its abscissa and its ordinate would each be
+              uniform on the integers of <span data-tex>[0, p)</span>. Figure 5 sorts <span data-tex>x/p</span> and
+              <span data-tex>y/p</span> into equal bins and compares the counts with their exact expectation under that
+              law by a chi-square statistic. At this resolution the larger curves look uniform: on
+              <span data-tex>\mathbb{F}_{1051}</span> the abscissas give <span data-tex>\chi^2</span> =
+              {{fig.coordHist.O1051.xStatistic}} on {{fig.coordHist.O1051.xDf}} degrees of freedom
+              ({{fig.coordHist.O1051.xPEq}}), and on <span data-tex>\mathbb{F}_{16477}</span> both coordinates stay within
+              the range of the reference ({{fig.coordHist.O16477.xPEq}} and {{fig.coordHist.O16477.yPEq}}). The sample of
+              secp256k1 passes genuine tests, with {{fig.coordHist.secp256k1.xPEq}} for <span data-tex>x</span> and
+              {{fig.coordHist.secp256k1.yPEq}} for <span data-tex>y</span>, and so do the Keccak-256 digests of the same
+              keys ({{fig.coordHist.keccak.xPEq}}).
+            </p>
+            <p>
+              The ordinates of <span data-tex>\mathbb{F}_{1051}</span> are the exception, with
+              <span data-tex>\chi^2</span> = {{fig.coordHist.O1051.yStatistic}} ({{fig.coordHist.O1051.yPEq}}). They show
+              no preference for particular values, but a multiplicity: when <span data-tex>p \equiv 1 \pmod 3</span>
+              every ordinate that occurs belongs to exactly three points (§5.3), so the bin counts move in steps of three
+              and tend to be more dispersed than counts of independent draws, for which the reference is built; on
+              <span data-tex>\mathbb{F}_{16477}</span> the same effect stays within the range of the reference. Behind the bins, the
+              support is structured on every curve. Only about half the abscissas occur,
+              {{fig.occupancy.O1051.xHits2}} of the {{fig.ladder.O1051.p}} values of <span data-tex>\mathbb{F}_{1051}</span>,
+              because <span data-tex>x^3 + 7</span> must be a square. When <span data-tex>p \equiv 2 \pmod 3</span>, on
+              the other hand, the ordinates are exactly uniform, each value of the field occurring once (§3.1): their
+              statistic is {{fig.coordHist.S1031.yStatistic}} on <span data-tex>\mathbb{F}_{1031}</span>
+              ({{fig.coordHist.S1031.yPEq}}) and {{fig.coordHist.T17g.yStatistic}} on the toy curve with the generator. The
+              statistic of a random sample would scatter around its {{fig.coordHist.S1031.yDf}} degrees of freedom; a fit
+              this good is itself a sign of structure.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="coordHist" data-fig-kind="coordHist" aria-labelledby="fig5-title">
@@ -436,12 +718,48 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-3">5.3 Frequency of individual values</h3>
-            <p data-draft>
-              To be written: how often each field value occurs as a coordinate, against the Poisson law of a random
-              function, and why the multiplicities of <span data-tex>x</span> and <span data-tex>y</span> are fixed by
-              the residue of <span data-tex>p</span> modulo 3 (Figure 6); the observed multiplicities on
-              <span data-tex>\mathbb{F}_{1051}</span> are {{fig.occupancy.O1051.xMultiplicity}} for
-              <span data-tex>x</span> and {{fig.occupancy.O1051.yMultiplicity}} for <span data-tex>y</span>.
+            <p>
+              A random function that sends <span data-tex>n - 1</span> inputs into the <span data-tex>p</span> values of
+              <span data-tex>\mathbb{F}_p</span> hits each value a number of times that follows, approximately, the
+              Poisson law of mean <span data-tex>\lambda = (n - 1)/p</span>: for <span data-tex>\lambda</span> near 1,
+              values hit once are about as common as values never hit, and a few are hit three times or more. Figure 6
+              counts how many values of the field occur <span data-tex>m</span> times as a coordinate of
+              <span data-tex>kG</span>, and the curves look nothing like a random function. On
+              <span data-tex>\mathbb{F}_{1051}</span> the abscissas take {{fig.occupancy.O1051.xPattern}}, and the
+              ordinates {{fig.occupancy.O1051.yPattern}}; against the Poisson law the chi-square statistics are
+              {{fig.occupancy.O1051.xStatistic}} for the abscissas ({{fig.occupancy.O1051.xPEq}}) and
+              {{fig.occupancy.O1051.yStatistic}} for the ordinates ({{fig.occupancy.O1051.yPEq}}). Keccak-256 reduced
+              modulo the same <span data-tex>p</span> and applied to the same keys follows the Poisson law, with
+              {{fig.occupancy.keccakO1051.xPattern}} (<span data-tex>\chi^2</span> =
+              {{fig.occupancy.keccakO1051.xStatistic}}, {{fig.occupancy.keccakO1051.xPEq}}).
+            </p>
+            <p>
+              Both patterns are exact consequences of the equation. An abscissa is shared by the points
+              <span data-tex>(x, y)</span> and <span data-tex>(x, p - y)</span>, that is by <span data-tex>Q</span> and
+              <span data-tex>-Q</span>, the images of <span data-tex>k</span> and <span data-tex>n - k</span>; so every
+              abscissa occurs twice or never, except that of a point with <span data-tex>y = 0</span>, which has order 2,
+              belongs to the orbit when the order of <span data-tex>G</span> is even (on <span data-tex>\mathbb{F}_{1031}</span> and on the toy
+              curve with the generator) and occurs once. When <span data-tex>p \equiv 1 \pmod 3</span> the field contains
+              a cube root of unity <span data-tex>\beta \ne 1</span>, the equation <span data-tex>x^3 = y^2 - 7</span>
+              has three solutions or none, and the points <span data-tex>(x, y)</span>,
+              <span data-tex>(\beta x, y)</span> and <span data-tex>(\beta^2 x, y)</span> share their ordinate, which
+              therefore occurs three times or never; a point with <span data-tex>x = 0</span> would be the exception, and
+              neither of these two curves has one. When <span data-tex>p \equiv 2 \pmod 3</span> cubing is a bijection
+              and every ordinate occurs exactly once (§3.1), the pattern of <span data-tex>\mathbb{F}_{1031}</span> and
+              of the toy curve with the generator.
+            </p>
+            <p>
+              The frequency test thus detects structure at once, and with certainty. The structure is the known
+              symmetry of the group, however, not a leak of the key. <span data-tex>Q</span> and
+              <span data-tex>-Q</span> come from <span data-tex>k</span> and <span data-tex>n - k</span>; and since
+              <span data-tex>(x, y) \mapsto (\beta x, y)</span> is an automorphism of a cyclic group of prime order, it
+              multiplies every key by one fixed <span data-tex>\mu</span>, so that the three points sharing an ordinate
+              come from <span data-tex>k</span>, <span data-tex>\mu k</span> and <span data-tex>\mu^2 k</span> modulo
+              <span data-tex>n</span>. Knowing this shortens a search by a small constant factor, nothing more. The
+              same patterns hold exactly on secp256k1, whose prime is also <span data-tex>\equiv 1 \pmod 3</span>, but a
+              sample of {{fig.params.sampleN}} keys out of about <span data-tex>2^{256}</span> contains, with
+              overwhelming probability, no two points with a coordinate in common, so the test cannot even be computed
+              there (Table 7).
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="occupancy" data-fig-kind="occupancy" aria-labelledby="fig6-title">
@@ -502,12 +820,33 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-4">5.4 Distribution of bits</h3>
-            <p data-draft>
-              To be written: the proportion of ones at each bit position of <span data-tex>x</span>, compared with one
-              half and with the exact proportion <span data-tex>q_j</span> of a uniform integer on
-              <span data-tex>[0, p)</span>, which differs from one half in the top bits because <span data-tex>p</span>
-              is not a power of two; the monobit and chi-square tests on the 256 bits of secp256k1 and Keccak-256
-              (Figure 7).
+            <p>
+              Figure 7 counts the ones at each bit position <span data-tex>j</span> of the abscissa. The natural
+              reference, one half, is wrong for a coordinate. A uniform integer on <span data-tex>[0, p)</span> has bit
+              <span data-tex>j</span> equal to one with an exact probability <span data-tex>q_j</span>, which differs
+              from one half in the top bits whenever <span data-tex>p</span> is not a power of two. On
+              <span data-tex>\mathbb{F}_{1051}</span> the top bit is set only for the 27 integers from 1024 to 1050, so
+              that <span data-tex>q_{10}</span> = {{fig.bitFreq.O1051.topExpected}}, and the multiples of
+              <span data-tex>G</span> give {{fig.bitFreq.O1051.topObserved}}. Against one half the largest standardised
+              deviation over the bit positions is <span data-tex>|z|</span> = {{fig.bitFreq.O1051.maxAbsZHalf}}; against
+              <span data-tex>q_j</span> it is {{fig.bitFreq.O1051.maxAbsZExact}}. On <span data-tex>\mathbb{F}_{17}</span>
+              the top bit of <span data-tex>x</span> is never one, because the only value below 17 that sets it, 16, is
+              not an abscissa.
+            </p>
+            <p>
+              secp256k1 is the opposite extreme. Its prime falls short of <span data-tex>2^{256}</span> by only
+              <span data-tex>c = 2^{32} + 977</span>, so the top bit of a uniform integer on
+              <span data-tex>[0, p)</span> is one with probability <span data-tex>\tfrac12 - c/(2p) \approx \tfrac12 -
+              2^{-225}</span>, and no bit departs from one half by more: removing the <span data-tex>c</span> integers of
+              <span data-tex>[p, 2^{256})</span> from <span data-tex>[0, 2^{256})</span>, where every bit is exactly
+              balanced, changes each count of ones by at most <span data-tex>c</span>. The sample agrees. The sum of the
+              squared standardised counts over the 256 positions is {{fig.bitFreq.secp256k1.statistic}} on
+              {{fig.bitFreq.secp256k1.df}} degrees of freedom ({{fig.bitFreq.secp256k1.pEq}}), and the frequency
+              (monobit) test of NIST SP 800-22, applied to all the bits of the sample as one sequence
+              [<a href="#ref-12">12</a>, §2.1], gives {{fig.bitFreq.secp256k1.monobitPEq}}; for the Keccak-256 digests the
+              same tests give {{fig.bitFreq.keccak.pEq}} and {{fig.bitFreq.keccak.monobitPEq}}. A bias in the bits of a
+              coordinate is thus a property of the size of the field, shared by every point whatever its key, and not
+              a property of the map from keys to points.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="bitFreq" data-fig-kind="bitFreq" aria-labelledby="fig7-title">
@@ -580,10 +919,21 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-5">5.5 Apparent uniformity</h3>
-            <p data-draft>
-              To be written: whether the multiples <span data-tex>kG</span> spread evenly over the plane, the
-              two-dimensional cell test and its reference, the mirror symmetry that every subgroup must show, and what
-              the eye can and cannot see in Figure 8.
+            <p>
+              Drawn as clouds of points (Figure 8), the multiples <span data-tex>kG</span> look like noise: no line,
+              cluster or gap stands out. The cell test agrees, with <span data-tex>\chi^2</span> =
+              {{fig.pointCloud.O1051.cellsStatistic}} on {{fig.pointCloud.O1051.cells}} cells for
+              <span data-tex>\mathbb{F}_{1051}</span> ({{fig.pointCloud.O1051.cellsPEq}}) and
+              {{fig.pointCloud.O16477.cellsStatistic}} on {{fig.pointCloud.O16477.cells}} cells for
+              <span data-tex>\mathbb{F}_{16477}</span> ({{fig.pointCloud.O16477.cellsPEq}}); even the 17 points of the toy
+              curve spread evenly over {{fig.pointCloud.T17g.cells}} cells ({{fig.pointCloud.T17g.cellsPEq}}). Yet the
+              mirror image <span data-tex>(x, p - y)</span> of every point is present, {{fig.pointCloud.O1051.mirrored}}
+              of {{fig.pointCloud.O1051.total}} on <span data-tex>\mathbb{F}_{1051}</span> and
+              {{fig.pointCloud.O16477.mirrored}} of {{fig.pointCloud.O16477.total}} on
+              <span data-tex>\mathbb{F}_{16477}</span>: an exact symmetry, which a uniform scatter of the same size would
+              show with vanishing probability, and which a comparison of cell counts with their expectation is not
+              designed to see. "Looks uniform" is a statement about one test at one resolution; "is random"
+              is a statement about every test, and the clouds pass the first while failing the second by construction.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="pointCloud" data-fig-kind="pointCloud" aria-labelledby="fig8-title">
@@ -615,11 +965,31 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-6">5.6 Correlation between input and output</h3>
-            <p data-draft>
-              To be written: whether the output <span data-tex>kG</span> carries any trace of the input
-              <span data-tex>k</span>: the periodicity of the sequence, the coefficients of Table 5, the exact zero of
-              <span data-tex>r(k, x)</span> over a full orbit and the exact one of the mirror pairs, both consequences
-              of <span data-tex>(n - k)G = -kG</span>, and the sampled estimate on secp256k1.
+            <p>
+              Table 5 asks whether the output carries a linear or monotone trace of the input. Over every full orbit,
+              Pearson's <span data-tex>r</span> between <span data-tex>k</span> and <span data-tex>x(kG)</span> is exactly
+              zero, and so is Spearman's <span data-tex>\rho</span>. The reason is not independence. Since
+              <span data-tex>(n - k)G = -kG</span>, the keys <span data-tex>k</span> and <span data-tex>n - k</span>,
+              placed symmetrically about their mean <span data-tex>n/2</span>, have the same abscissa, and their
+              contributions to the covariance cancel in pairs. Yet the abscissa is a deterministic function of the key,
+              the strongest dependence there is. Zero correlation and independence are different things, and the orbit
+              shows it without any sampling error.
+            </p>
+            <p>
+              The other coefficients are small on the larger curves: <span data-tex>r(k, y)</span> =
+              {{fig.correlation.O1051.kyR}} on <span data-tex>\mathbb{F}_{1051}</span> and
+              {{fig.correlation.O16477.kyR}} on <span data-tex>\mathbb{F}_{16477}</span>, and the lag-one correlation of
+              consecutive abscissas {{fig.correlation.O1051.lag1R}} and {{fig.correlation.O16477.lag1R}}. On the eight
+              points of the toy orbit they are larger, {{fig.correlation.T17.kyR}} and {{fig.correlation.T17.lag1R}},
+              which says more about eight points than about the map. A test aimed at the right structure finds it with
+              certainty: the correlation of the mirror pairs <span data-tex>x(kG)</span>,
+              <span data-tex>x((n - k)G)</span> is {{fig.correlation.O1051.mirrorR}} on every enumerated curve, and on the
+              toy curve the sequence <span data-tex>x(kG)</span> repeats with period {{fig.sequence.T17.period}}, the
+              order of <span data-tex>G</span> (Figure 9). On secp256k1 the sample gives
+              <span data-tex>r(k/n, x/p)</span> = {{fig.correlation.secp256k1.kxR}} ({{fig.correlation.secp256k1.kxPEq}}),
+              indistinguishable from zero, as is the coefficient for Keccak-256, {{fig.correlation.keccak.kxR}}
+              ({{fig.correlation.keccak.kxPEq}}). Correlation tests are a necessary screen, since a strong correlation
+              would betray the key, but a weak one: they see only the relations they are built to see.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="sequence" data-fig-kind="sequence" aria-labelledby="fig9-title">
@@ -664,11 +1034,32 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-7">5.7 Avalanche-like behaviour</h3>
-            <p data-draft>
-              To be written: how many output bits change when one bit of <span data-tex>k</span> is flipped (Figure 10),
-              the strict avalanche criterion of each pair of input and output bits (Figure 11), and the decisive
-              difference of Table 6: for scalar multiplication the new output follows from the old one by a single
-              point addition, for Keccak-256 it does not.
+            <p>
+              The avalanche experiments ask how much the output changes when one bit of the input changes. On
+              secp256k1, flipping one random bit <span data-tex>i</span> of each key, <span data-tex>k' = k \oplus
+              2^i</span>, changes on average {{fig.avalanche.secp256k1.mean}} of the 256 bits of
+              <span data-tex>x(Q)</span>, against {{fig.avalanche.secp256k1.expectedMean}} for independent fair bits, and
+              the distribution of the Hamming distance is consistent with <span data-tex>\mathrm{Bin}(256,
+              \tfrac12)</span> ({{fig.avalanche.secp256k1.pEq}}); Keccak-256 behaves in the same way on the same flips,
+              with mean {{fig.avalanche.keccak.mean}} ({{fig.avalanche.keccak.pEq}}) (Figure 10). The strict avalanche
+              criterion of Webster and Tavares asks more: that each output bit change with probability one half
+              whenever a single input bit is complemented [<a href="#ref-14">14</a>]. Figure 11 estimates all
+              <span data-tex>256 \times 256</span> of these probabilities from {{fig.sac.secp256k1.trials}} keys, and both
+              functions meet the criterion within sampling error. The largest deviation from one half is
+              {{fig.sac.secp256k1.maxAbsDeviation}} for scalar multiplication and {{fig.sac.keccak.maxAbsDeviation}} for
+              Keccak-256, and the cells with <span data-tex>|z| &gt; 3.29</span> number {{fig.sac.secp256k1.beyond}} and
+              {{fig.sac.keccak.beyond}}, where chance alone would give {{fig.sac.secp256k1.expectedBeyond}}.
+            </p>
+            <p>
+              On the enumerated curves the reference is the Poisson-binomial law built from the bit frequencies of each
+              orbit. The mean distances agree with it closely, {{fig.avalanche.O1051.mean}} against
+              {{fig.avalanche.O1051.expectedMean}} on <span data-tex>\mathbb{F}_{1051}</span> and
+              {{fig.avalanche.O16477.mean}} against {{fig.avalanche.O16477.expectedMean}} on
+              <span data-tex>\mathbb{F}_{16477}</span>, but the shapes do not ({{fig.avalanche.O1051.pEq}} and
+              {{fig.avalanche.O16477.pEq}}). This is a limit of the reference rather than a finding: an enumeration
+              counts every pair <span data-tex>\{k, k \oplus 2^i\}</span> twice, once from each end, and the bits of
+              <span data-tex>x</span> and <span data-tex>y</span> are not independent, as the reference assumes. The
+              {{fig.avalanche.T17.trials}} admissible flips of the toy orbit are too few to say anything.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="avalanche" data-fig-kind="avalanche" aria-labelledby="fig10-title">
@@ -767,6 +1158,23 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               </figcaption>
             </figure>
 
+            <p>
+              The decisive difference lies elsewhere. Flipping bit <span data-tex>i</span> changes the key by
+              <span data-tex>\pm 2^i</span>: <span data-tex>k' = k + 2^i</span> if the bit was 0 and
+              <span data-tex>k - 2^i</span> if it was 1. By the homomorphism, <span data-tex>Q' = Q \pm 2^i G</span>, so
+              that, given <span data-tex>Q</span> and <span data-tex>i</span>, the new public key is one of two points that
+              anyone can compute with one point addition, without knowing <span data-tex>k</span>. Table 6 compares each
+              <span data-tex>Q'</span> of the sample, computed from scratch, with these two candidates: the prediction
+              holds in {{fig.relatedOutputs.secp256k1.hits}} of {{fig.relatedOutputs.secp256k1.trials}} cases. For
+              Keccak-256 no such relation is known, and the simplest guess, that flipping bit <span data-tex>i</span>
+              always changes the digest by the same mask, holds in {{fig.relatedOutputs.keccak.hits}} of
+              {{fig.relatedOutputs.keccak.trials}} cases; applied to the bits of <span data-tex>x(Q)</span> it holds in
+              {{fig.relatedOutputs.secp256k1.xorHits}} of {{fig.relatedOutputs.secp256k1.xorTrials}}. The matrix of
+              Figure 11 was in fact computed with the relation, by one point addition per key and input bit rather than
+              by a fresh scalar multiplication. The coordinates avalanche; the points do not. The relation between
+              <span data-tex>Q</span> and <span data-tex>Q'</span> lives in the group, where no bitwise test looks.
+            </p>
+
             <figure class="table-figure" aria-labelledby="table6-caption">
               <figcaption id="table6-caption">
                 <span class="table-figure__no">Table 6.</span>Related outputs: can the output after flipping bit
@@ -782,12 +1190,22 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </figure>
 
             <h3 id="s5-8">5.8 The cost of inversion</h3>
-            <p data-draft>
-              To be written: the one property a statistical test of the outputs cannot see, the cost of recovering
-              <span data-tex>k</span> from <span data-tex>Q</span>: exhaustive search and baby-step giant-step on curves
-              of growing prime order (Figure 12), the effect of a smooth order such as
-              {{fig.ladder.T17g.n}} = {{fig.ladder.T17g.factors}} (Pohlig and Hellman), and the extrapolation to
-              secp256k1.
+            <p>
+              None of the statistics of §5.2 to §5.7 measures the property that defines a one-way function, the cost of
+              inversion. Figure 12 measures it directly on {{fig.ecdlp.curves}} curves <span data-tex>y^2 = x^3 + 7</span>
+              of prime order, from <span data-tex>p</span> = {{fig.ecdlp.smallestP}} to <span data-tex>p</span> =
+              {{fig.ecdlp.largestP}}, by recovering {{fig.ecdlp.targets}} random keys on each with exhaustive search and
+              with baby-step giant-step. On logarithmic axes the mean costs lie on straight lines with fitted slopes
+              {{fig.ecdlp.bruteSlope}} and {{fig.ecdlp.bsgsSlope}}, close to the theoretical 1 and ½: exhaustive search
+              costs about <span data-tex>n/2</span> group operations, baby-step giant-step about
+              <span data-tex>1.5\sqrt{n}</span> in this implementation. Carried to the order of secp256k1, the fitted
+              lines give about 2<sup>{{fig.ecdlp.bruteAt256}}</sup> and 2<sup>{{fig.ecdlp.bsgsAt256}}</sup> operations,
+              against the theoretical 2<sup>{{fig.ecdlp.theoryBruteAt256}}</sup> and
+              2<sup>{{fig.ecdlp.theoryBsgsAt256}}</sup>. This is a long extrapolation, from orders of at most
+              {{fig.ecdlp.largestN}}, below <span data-tex>2^{19}</span>, to about <span data-tex>2^{256}</span>, and the
+              gap for exhaustive search shows how sensitive it is to the fitted slope. Its value lies in its agreement
+              with the theory, which puts the generic cost of the ECDLP on secp256k1 at about
+              <span data-tex>2^{128}</span> group operations [<a href="#ref-6">6</a>, §4.1.2], [<a href="#ref-13">13</a>, §5.2].
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="ecdlp" data-fig-kind="ecdlp" aria-labelledby="fig12-title">
@@ -817,9 +1235,35 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <p class="visually-hidden" data-fig-status aria-live="polite"></p>
             </figure>
 
+            <p>
+              The toy curve fails this test for reasons that no output statistic shows. Its order
+              <span data-tex>n</span> = {{fig.ladder.T17.n}} = {{fig.ladder.T17.factors}} is a power of a small prime, so
+              the Pohlig–Hellman method reduces the logarithm to subgroups of order 3 [<a href="#ref-6">6</a>, §4.1.1],
+              [<a href="#ref-13">13</a>, §5.2.3]. The assignment's key needs even less: <span data-tex>Q = 6G</span> has
+              order <span data-tex>9/\gcd(6, 9) = 3</span>, which alone reveals <span data-tex>k \equiv 0 \pmod 3</span>
+              and leaves <span data-tex>k \in \{3, 6\}</span>. The curve is also supersingular (§2.3), and
+              <span data-tex>n = 9</span> divides <span data-tex>17^2 - 1 = 288</span>, so the MOV attack transfers the
+              problem to the multiplicative group of the field of <span data-tex>17^2</span> elements
+              [<a href="#ref-13">13</a>, §5.3.1]. The supersingular curve over <span data-tex>\mathbb{F}_{1031}</span> shares
+              both weaknesses: its order {{fig.ecdlp.smooth.S1031.n}} = {{fig.ecdlp.smooth.S1031.factors}} has no prime
+              factor larger than {{fig.ecdlp.smooth.S1031.largestPrime}}. Yet the statistics of §5.2 to §5.7 barely set it
+              apart from the curves of prime order: its ordinates are exactly uniform, which follows from
+              <span data-tex>p \equiv 2 \pmod 3</span>, and one abscissa occurs once, that of its point of order 2, which
+              betrays the factor 2 of its order and nothing of the rest. The weaknesses that matter are
+              computational and structural, and the statistics of the outputs do not reveal them.
+            </p>
+
             <h3 id="s5-9">5.9 Summary</h3>
-            <p data-draft>
-              To be written: a reading of Table 7, property by property, as the bridge to the discussion of §6.
+            <p>
+              Table 7 collects the results. Read by rows, it separates three kinds of property. Some are departures
+              from a random function that the symmetries of the group explain exactly and that do not fade as
+              <span data-tex>p</span> grows: the frequencies of values, the mirror images, the related outputs after a
+              bit flip. Some are artefacts of the field size or of smallness that vanish on secp256k1: the bias of the
+              top bits and the correlations of the toy orbit. The rest agree with an ideal function on the larger curves
+              and on secp256k1: the binned coordinates, apart from the ordinates of
+              <span data-tex>\mathbb{F}_{1051}</span> explained in §5.2, the balance of the bits, the avalanche of the bits of
+              <span data-tex>x</span>. Only the last row measures what makes a function one-way, and it is the row in
+              which the toy curve and secp256k1 differ most. The last two columns anticipate the discussion of §6.
             </p>
 
             <figure class="table-figure" aria-labelledby="table7-caption">
@@ -848,8 +1292,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>x: {{fig.coordHist.O1051.xPEq}} and {{fig.coordHist.O16477.xPEq}}; y: {{fig.coordHist.O1051.yPEq}} and {{fig.coordHist.O16477.yPEq}}</td>
                       <td>x: {{fig.coordHist.secp256k1.xPEq}}; y: {{fig.coordHist.secp256k1.yPEq}}</td>
                       <td>H(k): {{fig.coordHist.keccak.xPEq}}</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>No. What must be uniform is the key: <span data-tex>k \mapsto kG</span> is a bijection onto <span data-tex>\langle G \rangle \setminus \{O\}</span>, so a uniform key gives a uniform point, whatever its coordinates look like.</td>
+                      <td>Yes. The outputs of a random oracle are uniform, and a skewed digest would be distinguishable from them.</td>
                     </tr>
                     <tr>
                       <th scope="row">Frequency of individual values (§5.3)</th>
@@ -857,8 +1301,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>p = 1051: x, {{fig.occupancy.O1051.xPattern}}; y, {{fig.occupancy.O1051.yPattern}}; χ² against Poisson {{fig.occupancy.O1051.xStatistic}} and {{fig.occupancy.O1051.yStatistic}}</td>
                       <td>Not measurable: N = {{fig.params.sampleN}} values in a field of about 2<sup>256</sup></td>
                       <td>mod 1051: χ² = {{fig.occupancy.keccakO1051.xStatistic}}, {{fig.occupancy.keccakO1051.xPEq}}</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>No. Abscissas in pairs and ordinates in threes, or once, are symmetries of the curve known in advance; they shorten a search by a small constant factor only.</td>
+                      <td>Yes. Poisson occupancy of the range is how a random function behaves, and Keccak-256 shows it.</td>
                     </tr>
                     <tr>
                       <th scope="row">Distribution of bits (§5.4)</th>
@@ -866,8 +1310,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>max |z| against q<sub>j</sub>: {{fig.bitFreq.O1051.maxAbsZExact}} and {{fig.bitFreq.O16477.maxAbsZExact}}; against ½: {{fig.bitFreq.O1051.maxAbsZHalf}} and {{fig.bitFreq.O16477.maxAbsZHalf}}</td>
                       <td>χ²(256): {{fig.bitFreq.secp256k1.pEq}}; monobit {{fig.bitFreq.secp256k1.monobitPEq}}</td>
                       <td>χ²(256): {{fig.bitFreq.keccak.pEq}}; monobit {{fig.bitFreq.keccak.monobitPEq}}</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>No. The bias of the top bits comes from the size of <span data-tex>p</span>, is the same for every key and does not help to find <span data-tex>k</span>.</td>
+                      <td>Yes. Unbiased, independent output bits are part of the random-oracle idealisation; the monobit test is a standard check.</td>
                     </tr>
                     <tr>
                       <th scope="row">Apparent uniformity (§5.5)</th>
@@ -875,8 +1319,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>Cells: {{fig.pointCloud.O1051.cellsPEq}} and {{fig.pointCloud.O16477.cellsPEq}}; every point mirrored</td>
                       <td>—</td>
                       <td>—</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>No. A cosmetic property: the exact mirror symmetry is present on every curve and harmless.</td>
+                      <td>Yes, in the stronger form of indistinguishability from a random function, which an exact symmetry would violate.</td>
                     </tr>
                     <tr>
                       <th scope="row">Correlation between input and output (§5.6)</th>
@@ -884,8 +1328,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>r(k, y) = {{fig.correlation.O1051.kyR}} and {{fig.correlation.O16477.kyR}}; mirror r = {{fig.correlation.O1051.mirrorR}}</td>
                       <td>r(k/n, x/p) = {{fig.correlation.secp256k1.kxR}}, {{fig.correlation.secp256k1.kxPEq}}</td>
                       <td>r(k/n, H/2<sup>256</sup>) = {{fig.correlation.keccak.kxR}}, {{fig.correlation.keccak.kxPEq}}</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>As a screen only. A correlation would betray the key, but <span data-tex>r(k, x) = 0</span> exactly coexists with total dependence.</td>
+                      <td>As a screen only: necessary for a function that should look random, never sufficient.</td>
                     </tr>
                     <tr>
                       <th scope="row">Avalanche-like behaviour (§5.7)</th>
@@ -893,8 +1337,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>Mean {{fig.avalanche.O1051.mean}} against {{fig.avalanche.O1051.expectedMean}}, {{fig.avalanche.O1051.pEq}}; {{fig.avalanche.O16477.mean}} against {{fig.avalanche.O16477.expectedMean}}, {{fig.avalanche.O16477.pEq}}</td>
                       <td>Mean {{fig.avalanche.secp256k1.mean}}, {{fig.avalanche.secp256k1.pEq}}; SAC max |f − ½| = {{fig.sac.secp256k1.maxAbsDeviation}}; related outputs {{fig.relatedOutputs.secp256k1.hits}} of {{fig.relatedOutputs.secp256k1.trials}}</td>
                       <td>Mean {{fig.avalanche.keccak.mean}}, {{fig.avalanche.keccak.pEq}}; SAC max |f − ½| = {{fig.sac.keccak.maxAbsDeviation}}; related outputs {{fig.relatedOutputs.keccak.hits}} of {{fig.relatedOutputs.keccak.trials}}</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>No. Met at the level of bits, yet <span data-tex>Q' = Q \pm 2^i G</span> exactly: the homomorphism on which public-key protocols rely.</td>
+                      <td>Yes. Avalanche and the strict avalanche criterion are design criteria, and an exact related-input relation would disqualify a hash.</td>
                     </tr>
                     <tr>
                       <th scope="row">Cost of inversion (§5.8)</th>
@@ -902,8 +1346,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                       <td>Fitted slopes: exhaustive search {{fig.ecdlp.bruteSlope}}, baby-step giant-step {{fig.ecdlp.bsgsSlope}}</td>
                       <td>About 2<sup>{{fig.ecdlp.theoryBsgsAt256}}</sup> operations by baby-step giant-step</td>
                       <td>—</td>
-                      <td data-draft>To be completed.</td>
-                      <td data-draft>To be completed.</td>
+                      <td>Yes: the defining property. It rests on a large prime order and on the absence of exploitable structure, which no output statistic reveals.</td>
+                      <td>Shared as preimage resistance; second-preimage and collision resistance concern compressing functions, and <span data-tex>k \mapsto kG</span> has no collisions on <span data-tex>[1, n - 1]</span>.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -914,23 +1358,129 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <!-- ===================================================== §6 -->
           <section class="hw-section" id="s6" aria-labelledby="s6-title">
             <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Discussion: one-way function versus hash function</h2>
-            <p data-draft>
-              To be written: the definitions of a one-way function and of a cryptographic hash function, and what each
-              requires of its outputs.
+            <p>
+              The question of the assignment needs two definitions. A one-way function is easy to compute and hard to
+              invert: no efficient algorithm, given <span data-tex>f(x)</span> for a uniformly random input
+              <span data-tex>x</span>, finds a preimage with more than negligible probability
+              [<a href="#ref-7">7</a>, §8.1.1], [<a href="#ref-5">5</a>, §IV]. Nothing in this definition concerns the
+              appearance of the outputs; it constrains only the cost of inversion, on average over a uniform input. A
+              cryptographic hash function compresses inputs of arbitrary length to a fixed length and must resist three
+              attacks: finding an input with a given digest (preimage resistance), a second input with the same digest
+              as a given one (second-preimage resistance), and any two inputs with the same digest (collision
+              resistance) [<a href="#ref-11">11</a>, Defs 1–3], [<a href="#ref-7">7</a>, §6.1]. In the design and analysis of
+              protocols, hash functions are moreover idealised as random oracles, functions whose every output bit is
+              uniform and independent of everything else [<a href="#ref-1">1</a>, §1.1, §2], and the avalanche of their bits is judged
+              by the strict avalanche criterion that Webster and Tavares introduced for the components of ciphers
+              [<a href="#ref-14">14</a>]. A hash is therefore expected to behave like a random function in every statistic
+              that can be computed on it; a one-way function is not.
             </p>
-            <p data-draft>
-              To be written: each property of §5 classified as meaningful for a one-way function, specific to hash
-              functions, or neither, with the evidence of Table 7: what the statistics confirm, what they cannot see,
-              and why scalar multiplication, a homomorphism, is a one-way function but not a hash function.
+            <p>
+              With these definitions the properties explored in §5 can be classified, as in the last two columns of
+              Table 7.
+            </p>
+            <p>
+              <em>Distribution of the coordinates.</em> It is not required of a one-way function. What must be uniform
+              is the input: SEC 1 asks for private keys as close to uniform as possible [<a href="#ref-3">3</a>, §3.10.3],
+              and since <span data-tex>k \mapsto kG</span> is a bijection from <span data-tex>[1, n - 1]</span> onto
+              <span data-tex>\langle G \rangle \setminus \{O\}</span>, a uniform key gives a uniform point of the group,
+              whatever its coordinates look like as integers. The exactly uniform ordinates of the supersingular curves
+              and the lumped ordinates of <span data-tex>\mathbb{F}_{1051}</span> are equally harmless. For a hash,
+              uniform outputs are part of the requirement: a digest that favoured some values would be distinguishable
+              from a random oracle.
+            </p>
+            <p>
+              <em>Frequency of individual values.</em> The multiplicities of §5.3 are exact symmetries of the curve, and
+              they are harmless beyond a small constant factor: they tell an attacker that <span data-tex>Q</span> and
+              <span data-tex>-Q</span> come from <span data-tex>k</span> and <span data-tex>n - k</span>, and that the
+              three points sharing an ordinate come from keys related by a fixed multiplier, which shortens a search but
+              does not change its order of magnitude. For a hash, the Poisson occupancy that Keccak-256 shows is part of
+              behaving like a random function.
+            </p>
+            <p>
+              <em>Distribution of bits.</em> The bias of the top bits is inherited from the size of
+              <span data-tex>p</span>, is identical for every key and is irrelevant to inversion. A hash whose outputs
+              cover exactly <span data-tex>2^{256}</span> values must have unbiased bits, and the frequency test of
+              [<a href="#ref-12">12</a>, §2.1] is a standard check of this.
+            </p>
+            <p>
+              <em>Apparent uniformity.</em> It is cosmetic for a one-way function, whose outputs may display any
+              symmetry that does not lead back to the key. For a hash the requirement is stronger than looking uniform:
+              it is indistinguishability from a random function, which an exact symmetry such as the mirror images of
+              §5.5 would violate.
+            </p>
+            <p>
+              <em>Correlation between input and output.</em> It is relevant to both as a screen and conclusive for
+              neither. A correlation between <span data-tex>k</span> and <span data-tex>Q</span> would leak the key,
+              and one between an input and its digest would make a hash distinguishable; but §5.6 exhibits a
+              correlation of exactly zero alongside total dependence.
+            </p>
+            <p>
+              <em>Avalanche-like behaviour.</em> Avalanche is a design criterion of hash functions. Scalar
+              multiplication satisfies it at the level of bits, yet it carries an exact related-input structure,
+              <span data-tex>Q' = Q \pm 2^i G</span>, that would disqualify a hash, since the output for one input
+              becomes predictable from the output for another. For public-key cryptography the same structure is not a
+              defect but the point. It is the homomorphism <span data-tex>(a + b)G = aG + bG</span>, which ECDSA
+              verification uses when it computes the combination <span data-tex>u_1 G + u_2 Q</span> of public points
+              [<a href="#ref-3">3</a>, §4.1.4], and which the non-hardened key derivation of BIP-32, examined in
+              <a href="{{base}}homework/02/">Homework 2</a>, uses to compute a child public key
+              <span data-tex>Q + tG</span> from the parent public key alone.
+            </p>
+            <p>
+              Collisions separate the two notions most sharply. On <span data-tex>[1, n - 1]</span> the map
+              <span data-tex>k \mapsto kG</span> is injective: distinct keys give distinct public keys, so it has no
+              collisions at all, and collision resistance is not a question for it. A hash compresses an unbounded
+              domain into a finite range, so collisions must exist, and collision resistance means only that none can be
+              found [<a href="#ref-11">11</a>, Def. 3]. A function can thus be one-way without resembling a hash, and the two
+              maps that lead to an Ethereum address are asked for different things.
+            </p>
+            <p>
+              What carries the one-wayness of <span data-tex>k \mapsto kG</span>, then, is not a statistic of its
+              outputs. It is, first, the group: a prime order large enough to put <span data-tex>\sqrt{n}</span>
+              operations out of reach, and the absence of exploitable structure, such as the smooth order and the
+              supersingularity that make the toy curve and the curve over <span data-tex>\mathbb{F}_{1031}</span> easy to
+              invert (§5.8). It is, second, the key. The definition of a one-way function assumes a uniformly random
+              input, and the security of a key pair rests on that assumption being met: Breitner and Heninger computed
+              hundreds of Bitcoin and dozens of Ethereum private keys from signatures whose secret nonces were only
+              slightly biased [<a href="#ref-2">2</a>]. The defect there lay in the distribution of an input, not in the
+              behaviour of the outputs that §5 examines.
+            </p>
+            <p>
+              The statistics of the outputs can therefore refute one-wayness but not certify it. A correlation, a
+              visible pattern linking <span data-tex>k</span> to <span data-tex>Q</span>, or a cost of inversion growing
+              too slowly would be evidence against it; their absence is not evidence for it, as the toy curve shows by
+              passing several of the same tests while being invertible by inspection. For a hash the statistics carry
+              more weight, because behaving like a random function is part of what is asked of it, although even there
+              passing them is necessary rather than sufficient. The derivation of an Ethereum address uses each map for
+              what it offers: <span data-tex>k \mapsto kG</span> supplies the algebra that signatures need, and
+              Keccak-256 supplies compression and the behaviour of a random function, turning a structured 64-byte
+              public key into a 20-byte address.
             </p>
           </section>
 
           <!-- ===================================================== §7 -->
           <section class="hw-section" id="s7" aria-labelledby="s7-title">
             <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Conclusion</h2>
-            <p data-draft>
-              To be written: the answer to the assignment in one paragraph, from the toy public key
-              {{fig.toy.Q}} to the classification of the properties.
+            <p>
+              The program of §3 computes the toy public key <span data-tex>Q = 6G</span> = {{fig.toy.Q}} from
+              <span data-tex>G</span> = {{fig.toy.G}} and <span data-tex>k</span> = {{fig.toy.k}}, printing every multiple
+              on the way, and double-and-add reaches the same point in {{fig.toy.dblAddOperations}} group operations
+              instead of {{fig.toy.repeatedOperations}}. On secp256k1 the same method needs about
+              {{fig.dblAddCost.meanDoubleAndAdd256}} operations, where the best generic inversion needs about
+              <span data-tex>2^{128}</span>. The slowed-down view of §4 shows where the asymmetry comes from: the
+              computation advances regularly on the dial of the group and erratically on the sheet of coordinates, and
+              a public key reveals only the second.
+            </p>
+            <p>
+              To the research question the exploration gives a two-sided answer. A sample of keys reveals a good deal
+              about the outputs of <span data-tex>k \mapsto kG</span>: exact symmetries, with abscissas in pairs,
+              ordinates in threes or once and every point mirrored; biases of the top bits set by the size of the field;
+              and an exact related-input structure behind an avalanche that otherwise matches that of Keccak-256. None
+              of these weakens the one-wayness of an Ethereum key, and the only one still visible in a sample of
+              secp256k1 is the last, the homomorphism on which public-key cryptography is built. What one-wayness
+              requires, a large prime order free of exploitable structure and a uniformly random private key, is not a
+              property of the distribution of the outputs, and no statistic of the outputs can certify it. Output
+              statistics that mimic a random function are the business of hash functions; one-wayness belongs to the
+              hardness of the discrete logarithm and to the randomness of the key.
             </p>
           </section>
 
@@ -962,7 +1512,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               browser the sampled series of Figures 5, 7 and 10 can be redrawn on {{fig.params.resampleN}} fresh keys; the
               caption then prints the new seed and sample size.
             </p>
-            <p>The domain parameters of secp256k1, as used by the study, in hexadecimal:</p>
+            <p>The domain parameters of secp256k1 [<a href="#ref-4">4</a>, §2.4.1], as used by the study, in hexadecimal:</p>
             <div class="worked">
               <div><span class="caption">p, the field size</span><span class="worked__value">{{fig.curve.secp256k1.pHex}}</span></div>
               <div><span class="caption">n, the order of G</span><span class="worked__value">{{fig.curve.secp256k1.nHex}}</span></div>
@@ -982,11 +1532,28 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <!-- ================================================= References -->
           <section class="hw-section references" id="references" aria-labelledby="references-title">
             <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
-            <p class="references__note" data-draft>
-              To be written: the fifteen sources cited in the text, ordered alphabetically by first author and cited by
-              number, with the date on which living documents were read.
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the section,
+              theorem, algorithm or equation in which the cited statement is found. Documents read online, the SEC
+              standards and the Ethereum yellow paper, carry the date on which they were read.
             </p>
-            <ol></ol>
+            <ol>
+              <li id="ref-1">Bellare, M. and Rogaway, P. (1993). <cite>Random oracles are practical: a paradigm for designing efficient protocols</cite>. Proceedings of the 1st ACM Conference on Computer and Communications Security (CCS '93), ACM, pp. 62–73. <a class="ref-link" href="https://doi.org/10.1145/168588.168596">https://doi.org/10.1145/168588.168596</a></li>
+              <li id="ref-2">Breitner, J. and Heninger, N. (2019). <cite>Biased Nonce Sense: Lattice Attacks Against Weak ECDSA Signatures in Cryptocurrencies</cite>. Financial Cryptography and Data Security (FC 2019), LNCS 11598, Springer, pp. 3–20. <a class="ref-link" href="https://doi.org/10.1007/978-3-030-32101-7_1">https://doi.org/10.1007/978-3-030-32101-7_1</a></li>
+              <li id="ref-3">Certicom Research (2009). <cite>SEC 1: Elliptic Curve Cryptography</cite>. Standards for Efficient Cryptography, version 2.0, 21 May 2009. <a class="ref-link" href="https://www.secg.org/sec1-v2.pdf">https://www.secg.org/sec1-v2.pdf</a> (accessed 13 October 2026)</li>
+              <li id="ref-4">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>. Standards for Efficient Cryptography, version 2.0, 27 January 2010. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a> (accessed 13 October 2026)</li>
+              <li id="ref-5">Diffie, W. and Hellman, M. E. (1976). <cite>New directions in cryptography</cite>. IEEE Transactions on Information Theory, 22(6), pp. 644–654. <a class="ref-link" href="https://doi.org/10.1109/TIT.1976.1055638">https://doi.org/10.1109/TIT.1976.1055638</a></li>
+              <li id="ref-6">Hankerson, D., Menezes, A. and Vanstone, S. (2004). <cite>Guide to Elliptic Curve Cryptography</cite>. Springer Professional Computing, Springer, New York. <a class="ref-link" href="https://doi.org/10.1007/b97644">https://doi.org/10.1007/b97644</a></li>
+              <li id="ref-7">Katz, J. and Lindell, Y. (2020). <cite>Introduction to Modern Cryptography</cite>. 3rd edn, Chapman &amp; Hall/CRC, Boca Raton, FL. <a class="ref-link" href="https://doi.org/10.1201/9781351133036">https://doi.org/10.1201/9781351133036</a></li>
+              <li id="ref-8">Koblitz, N. (1987). <cite>Elliptic curve cryptosystems</cite>. Mathematics of Computation, 48(177), pp. 203–209. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1987-0866109-5">https://doi.org/10.1090/S0025-5718-1987-0866109-5</a></li>
+              <li id="ref-9">Miller, V. S. (1986). <cite>Use of elliptic curves in cryptography</cite>. Advances in Cryptology — CRYPTO '85 Proceedings, LNCS 218, Springer, pp. 417–426. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_31">https://doi.org/10.1007/3-540-39799-X_31</a></li>
+              <li id="ref-10">National Institute of Standards and Technology (2015). <cite>SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions</cite>. FIPS PUB 202, NIST, Gaithersburg, MD. <a class="ref-link" href="https://doi.org/10.6028/NIST.FIPS.202">https://doi.org/10.6028/NIST.FIPS.202</a></li>
+              <li id="ref-11">Rogaway, P. and Shrimpton, T. (2004). <cite>Cryptographic Hash-Function Basics: Definitions, Implications, and Separations for Preimage Resistance, Second-Preimage Resistance, and Collision Resistance</cite>. Fast Software Encryption (FSE 2004), LNCS 3017, Springer, pp. 371–388. <a class="ref-link" href="https://doi.org/10.1007/978-3-540-25937-4_24">https://doi.org/10.1007/978-3-540-25937-4_24</a></li>
+              <li id="ref-12">Rukhin, A., Soto, J., Nechvatal, J., Smid, M., Barker, E., Leigh, S., Levenson, M., Vangel, M., Banks, D., Heckert, A., Dray, J., Vo, S. and Bassham, L. (2010). <cite>A Statistical Test Suite for Random and Pseudorandom Number Generators for Cryptographic Applications</cite>. NIST Special Publication 800-22 Rev. 1a, NIST, Gaithersburg, MD. <a class="ref-link" href="https://doi.org/10.6028/NIST.SP.800-22r1a">https://doi.org/10.6028/NIST.SP.800-22r1a</a></li>
+              <li id="ref-13">Washington, L. C. (2008). <cite>Elliptic Curves: Number Theory and Cryptography</cite>. 2nd edn, Chapman &amp; Hall/CRC, Boca Raton, FL. <a class="ref-link" href="https://doi.org/10.1201/9781420071474">https://doi.org/10.1201/9781420071474</a></li>
+              <li id="ref-14">Webster, A. F. and Tavares, S. E. (1986). <cite>On the design of S-boxes</cite>. Advances in Cryptology — CRYPTO '85 Proceedings, LNCS 218, Springer, pp. 523–534. <a class="ref-link" href="https://doi.org/10.1007/3-540-39799-X_41">https://doi.org/10.1007/3-540-39799-X_41</a></li>
+              <li id="ref-15">Wood, G. (2025). <cite>Ethereum: A Secure Decentralised Generalised Transaction Ledger</cite>. Ethereum Yellow Paper, Shanghai version efc5f9a, 4 February 2025. <a class="ref-link" href="https://ethereum.github.io/yellowpaper/paper.pdf">https://ethereum.github.io/yellowpaper/paper.pdf</a> (accessed 13 October 2026)</li>
+            </ol>
           </section>
         </article>
       </div>
