@@ -118,19 +118,6 @@ test('z-scores and birthday probabilities', () => {
   assert.ok(collisionProbability(400, 365, { exact: true }) === 1);
 });
 
-test("Nakamoto's attacker catch-up probability reproduces the whitepaper table", async () => {
-  const { attackerSuccessProbability } = await import('../src/lib/stats.js');
-  // Section 11 of the Bitcoin whitepaper, "Calculations": q = 0.1 and q = 0.3 rows.
-  assert.ok(Math.abs(attackerSuccessProbability(0.1, 0) - 1) < 1e-12);
-  assert.ok(Math.abs(attackerSuccessProbability(0.1, 1) - 0.2045873) < 1e-7);
-  assert.ok(Math.abs(attackerSuccessProbability(0.1, 5) - 0.0009137) < 1e-7);
-  assert.ok(Math.abs(attackerSuccessProbability(0.1, 10) - 0.0000012) < 1e-7);
-  assert.ok(Math.abs(attackerSuccessProbability(0.3, 5) - 0.1773523) < 1e-7);
-  assert.ok(Math.abs(attackerSuccessProbability(0.3, 10) - 0.0416605) < 1e-7);
-  assert.ok(Math.abs(attackerSuccessProbability(0.3, 50) - 0.0000006) < 1e-7);
-  assert.equal(attackerSuccessProbability(0.5, 20), 1, 'an attacker with half the hash rate always catches up');
-});
-
 test('exact null distribution of the runs-test p-value for short strings', async () => {
   const { runsCount, runsTestPValueDistribution, binomialPmf } = await import('../src/lib/stats.js');
   // Strings of length n with r runs number 2·C(n − 1, r − 1), summed over the number of ones.
@@ -194,4 +181,88 @@ test('collision probability keeps tiny values (no cancellation in 1 − e^−x)'
   const p = collisionProbability(1e6, 2 ** 160);
   const approx = (1e6 * (1e6 - 1)) / 2 ** 161;
   assert.ok(p > 0 && Math.abs(p / approx - 1) < 1e-9, `p = ${p}`);
+});
+
+test('Poisson pmf: known values, unit mass and the m = 0 term', async () => {
+  const { poissonPmf } = await import('../src/lib/stats.js');
+  near(poissonPmf(2, 3), (9 / 2) * Math.exp(-3), 1e-15);
+  near(poissonPmf(0, 0.5), Math.exp(-0.5), 1e-15);
+  assert.equal(poissonPmf(-1, 2), 0);
+  assert.equal(poissonPmf(0, 0), 1);
+  assert.equal(poissonPmf(3, 0), 0);
+  let s = 0;
+  for (let m = 0; m <= 60; m += 1) s += poissonPmf(m, 7.5);
+  near(s, 1, 1e-12);
+});
+
+test('Monte Carlo summary: replicate mean, 95th percentile and the +1-corrected p-value', async () => {
+  const { monteCarloSummary } = await import('../src/lib/stats.js');
+  const replicates = [10, 1, 9, 2, 8, 3, 7, 4, 6, 5];
+  const s = monteCarloSummary(5, replicates);
+  assert.equal(s.replicates, 10);
+  near(s.mean, 5.5, 1e-15);
+  // Type-7 quantile of 1 … 10 at 0.95: 9 + 0.55 · (10 − 9).
+  near(s.q95, 9.55, 1e-12);
+  // Six replicates are at least 5 (ties count): (1 + 6) / (10 + 1).
+  near(s.pValue, 7 / 11, 1e-15);
+  // An observed value beyond every replicate gets the smallest attainable p-value, never 0.
+  near(monteCarloSummary(11, replicates).pValue, 1 / 11, 1e-15);
+  // Round-off does not break a tie between equal statistics computed in different orders.
+  near(monteCarloSummary(0.1 + 0.2, [0.3, 0.3]).pValue, 1, 1e-15);
+  assert.throws(() => monteCarloSummary(1, []));
+});
+
+test('Pearson correlation: exact lines and Anscombe (1973), data set I', async () => {
+  const { pearson } = await import('../src/lib/stats.js');
+  near(pearson([1, 2, 3, 4], [2, 4, 6, 8]), 1, 1e-15);
+  near(pearson([1, 2, 3, 4], [8, 6, 4, 2]), -1, 1e-15);
+  const x = [10, 8, 13, 9, 11, 14, 6, 4, 12, 7, 5];
+  const y = [8.04, 6.95, 7.58, 8.81, 8.33, 9.96, 7.24, 4.26, 10.84, 4.82, 5.68];
+  near(pearson(x, y), 0.81642, 5e-6);
+  // A symmetric design gives r = 0 exactly in exact arithmetic.
+  near(pearson([1, 2, 3, 4, 5], [4, 1, 0, 1, 4]), 0, 1e-15);
+  assert.ok(Number.isNaN(pearson([1, 1, 1], [1, 2, 3])), 'a constant variable has no correlation');
+  assert.throws(() => pearson([1, 2], [1]));
+});
+
+test('Spearman correlation with average ranks for ties', async () => {
+  const { spearman, averageRanks } = await import('../src/lib/stats.js');
+  assert.deepEqual(averageRanks([10, 20, 20, 30]), [1, 2.5, 2.5, 4]);
+  assert.deepEqual(averageRanks([3, 1, 2]), [3, 1, 2]);
+  // A monotone transform does not change the ranks.
+  const x = [0.3, 2.5, 1.1, 7, 4.2, 3.3, 0.01];
+  assert.equal(spearman(x, x.map((v) => Math.exp(3 * v))), 1);
+  assert.equal(spearman(x, x.map((v) => -(v ** 3))), -1);
+  // Hours of television against IQ (the textbook example): ρ = −29/165.
+  const iq = [106, 100, 86, 101, 99, 103, 97, 113, 112, 110];
+  const tv = [7, 27, 2, 50, 28, 29, 20, 12, 6, 17];
+  near(spearman(iq, tv), -29 / 165, 1e-12);
+});
+
+test('Fisher z-test of a correlation coefficient (large-sample approximation)', async () => {
+  const { fisherZTest } = await import('../src/lib/stats.js');
+  const zero = fisherZTest(0, 50);
+  assert.equal(zero.z, 0);
+  near(zero.p, 1, 1e-6);
+  // r = 0.5, n = 28: z = atanh(0.5)·5 = 2.74653, two-sided p = 0.006023.
+  const t = fisherZTest(0.5, 28);
+  near(t.z, Math.atanh(0.5) * 5, 1e-12);
+  near(t.p, 0.006023, 2e-6);
+  near(fisherZTest(-0.5, 28).p, t.p, 1e-15);
+  assert.equal(fisherZTest(1, 10).p, 0);
+  assert.ok(Number.isNaN(fisherZTest(0.2, 3).p), 'n ≤ 3 leaves no degrees of freedom');
+});
+
+test('pooled chi-square merges small expected counts from the left', async () => {
+  const { pooledChiSquare } = await import('../src/lib/stats.js');
+  const r = pooledChiSquare([10, 3, 2, 1], [9, 4, 2, 1]);
+  assert.deepEqual(r.bins.map((b) => [b.from, b.to]), [[0, 0], [1, 3]]);
+  near(r.statistic, 1 / 9 + 1 / 7, 1e-12);
+  assert.equal(r.df, 1);
+  const exact = pooledChiSquare([5, 10, 5], [5, 10, 5]);
+  assert.equal(exact.statistic, 0);
+  assert.equal(exact.df, 2);
+  const tiny = pooledChiSquare([1, 1], [1, 1]);
+  assert.equal(tiny.df, 0);
+  assert.ok(Number.isNaN(tiny.p));
 });

@@ -118,12 +118,12 @@ function axisTitles(g, xLabel, yLabel) {
   const parts = [];
   if (yLabel) {
     parts.push(
-      `<text class="chart__axis-title" transform="translate(14 ${round(g.top + g.plotH / 2)}) rotate(-90)" text-anchor="middle">${escapeXml(yLabel)}</text>`,
+      `<text class="chart__axis-title" transform="translate(14 ${round(g.top + g.plotH / 2)}) rotate(-90)" text-anchor="middle">${richText(yLabel)}</text>`,
     );
   }
   if (xLabel) {
     parts.push(
-      `<text class="chart__axis-title" x="${round(g.left + g.plotW / 2)}" y="${round(g.bottom + 40)}" text-anchor="middle">${escapeXml(xLabel)}</text>`,
+      `<text class="chart__axis-title" x="${round(g.left + g.plotW / 2)}" y="${round(g.bottom + 40)}" text-anchor="middle">${richText(xLabel)}</text>`,
     );
   }
   return parts.join('');
@@ -134,12 +134,198 @@ function powerLabel(base, k) {
   return `${base}<tspan class="chart__sup" dy="-0.5em" font-size="75%">${k}</tspan>`;
 }
 
+/* ------------------------------------------------------------ label text */
+
+/* How far an exponent rises above the baseline of an 11px label, in CSS pixels. */
+const SUP_RISE = 4;
+
+/**
+ * The SVG content of a label, escaped, in which "^{…}" marks an exponent:
+ * "2^{255}" prints 255 as a superscript, so that no caret is ever printed.
+ * The exponent is a smaller tspan raised by a fixed dy and the text after it
+ * is lowered back by the same amount (baseline-shift would be simpler, but
+ * Firefox ignores it).
+ * @param {string} label
+ */
+export function richText(label) {
+  const parts = String(label).split(/\^\{([^}]*)\}/);
+  let out = '';
+  let raised = false;
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      out += `<tspan class="chart__sup" dy="${-SUP_RISE}" font-size="75%">${escapeXml(part)}</tspan>`;
+      raised = true;
+    } else if (part) {
+      out += raised ? `<tspan dy="${SUP_RISE}">${escapeXml(part)}</tspan>` : escapeXml(part);
+      raised = false;
+    }
+  });
+  return out;
+}
+
+/* Average advance of a character of an 11px Libre Franklin label (weights 500–600), a little generous. */
+const CHAR_WIDTH = 6.3;
+
+/** Estimated width in CSS pixels of an 11px chart label written for richText. */
+export function textWidth(label) {
+  return String(label)
+    .split(/\^\{([^}]*)\}/)
+    .reduce((w, part, i) => w + [...part].reduce((s, c) => s + (c === ' ' ? 0.55 : 1), 0) * CHAR_WIDTH * (i % 2 === 1 ? 0.75 : 1), 0);
+}
+
+/**
+ * The box of a label drawn at (x, y) (its baseline) with a text-anchor:
+ * { x0, x1, y0, y1 } in CSS pixels, taller when the label has an exponent.
+ */
+export function labelBox({ x, y, anchor }, label) {
+  const w = textWidth(label);
+  const x0 = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+  return { x0, x1: x0 + w, y0: y - (/\^\{/.test(label) ? 9 + SUP_RISE : 9), y1: y + 3 };
+}
+
+const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const grow = (b, d) => ({ x0: b.x0 - d, x1: b.x1 + d, y0: b.y0 - d, y1: b.y1 + d });
+
+/* Whether the segment from (x1, y1) to (x2, y2) crosses the box (Liang–Barsky clipping). */
+function segmentHitsBox([x1, y1, x2, y2], b) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [p, q] of [
+    [-dx, x1 - b.x0],
+    [dx, b.x1 - x1],
+    [-dy, y1 - b.y0],
+    [dy, b.y1 - y1],
+  ]) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+
+/* Candidate positions of a label around an anchor point at distance d: baseline and text-anchor. */
+const DIRECTIONS = {
+  e: (ax, ay, d) => ({ x: ax + d, y: ay + 4, anchor: 'start' }),
+  w: (ax, ay, d) => ({ x: ax - d, y: ay + 4, anchor: 'end' }),
+  n: (ax, ay, d) => ({ x: ax, y: ay - d, anchor: 'middle' }),
+  s: (ax, ay, d) => ({ x: ax, y: ay + d + 6, anchor: 'middle' }),
+  ne: (ax, ay, d) => ({ x: ax + 0.7 * d, y: ay - 0.7 * d, anchor: 'start' }),
+  nw: (ax, ay, d) => ({ x: ax - 0.7 * d, y: ay - 0.7 * d, anchor: 'end' }),
+  se: (ax, ay, d) => ({ x: ax + 0.7 * d, y: ay + 0.7 * d + 6, anchor: 'start' }),
+  sw: (ax, ay, d) => ({ x: ax - 0.7 * d, y: ay + 0.7 * d + 6, anchor: 'end' }),
+};
+const ALL_DIRECTIONS = Object.keys(DIRECTIONS);
+/* Preferred directions, tried first at every distance, then the others: options for board.place. */
+const prefer = (first) => ({ directions: [...first, ...ALL_DIRECTIONS.filter((d) => !first.includes(d))], preferred: first.length });
+
+/**
+ * A board on which labels are placed without collisions: marks, lines and
+ * labels already drawn are obstacles, and each new label takes the first
+ * candidate position, nearest distance first and then in the given order of
+ * directions and anchors, whose box lies inside `bounds` (the plot area) and
+ * touches no obstacle. If every candidate collides, it takes the one inside
+ * the bounds with the fewest collisions, so a label never leaves the plot.
+ * @param {{ x0: number, x1: number, y0: number, y1: number }} bounds
+ */
+export function labelBoard(bounds) {
+  const boxes = [];
+  const segments = [];
+  const inside = (b) => b.x0 >= bounds.x0 && b.x1 <= bounds.x1 && b.y0 >= bounds.y0 && b.y1 <= bounds.y1;
+  const collisions = (b) => {
+    const padded = grow(b, 1.5);
+    return boxes.filter((o) => overlaps(o, padded)).length + segments.filter((s) => segmentHitsBox(s, padded)).length;
+  };
+  return {
+    circle(cx, cy, r) {
+      boxes.push({ x0: cx - r, x1: cx + r, y0: cy - r, y1: cy + r });
+    },
+    box(b) {
+      boxes.push(b);
+    },
+    segment(x1, y1, x2, y2) {
+      segments.push([x1, y1, x2, y2]);
+    },
+    /** Polyline through the given points ([x, y] pairs), as segments. */
+    polyline(points) {
+      for (let i = 1; i < points.length; i += 1) segments.push([...points[i - 1], ...points[i]]);
+    },
+    /**
+     * The first `preferred` directions are tried at every distance before the others, so that a
+     * label keeps to its preferred side when there is room there at any distance.
+     * @param {string} label
+     * @param {{ anchors: [number, number][], directions: string[], preferred?: number, distances?: number[] }} options
+     * @returns {{ x: number, y: number, anchor: 'start'|'middle'|'end' }}
+     */
+    place(label, { anchors, directions, preferred = 0, distances = [6, 9, 13, 18, 26, 36] }) {
+      let best = null;
+      const tiers = preferred > 0 ? [directions.slice(0, preferred), directions.slice(preferred)] : [directions];
+      for (const tier of tiers) {
+        for (const d of distances) {
+          for (const dir of tier) {
+            for (const [ax, ay] of anchors) {
+              const at = DIRECTIONS[dir](ax, ay, d);
+              const b = labelBox(at, label);
+              if (!inside(b)) continue;
+              const hits = collisions(b);
+              if (hits === 0) {
+                boxes.push(b);
+                return at;
+              }
+              if (!best || hits < best.hits) best = { at, b, hits };
+            }
+          }
+        }
+      }
+      if (!best) {
+        // Nothing fits inside: clamp the first candidate into the bounds.
+        const [ax, ay] = anchors[0];
+        const at = DIRECTIONS[directions[0]](ax, ay, distances[0]);
+        const b = labelBox(at, label);
+        const shiftX = Math.max(0, bounds.x0 - b.x0) - Math.max(0, b.x1 - bounds.x1);
+        const shiftY = Math.max(0, bounds.y0 - b.y0) - Math.max(0, b.y1 - bounds.y1);
+        best = { at: { ...at, x: at.x + shiftX, y: at.y + shiftY }, b: { x0: b.x0 + shiftX, x1: b.x1 + shiftX, y0: b.y0 + shiftY, y1: b.y1 + shiftY } };
+      }
+      boxes.push(best.b);
+      return best.at;
+    },
+  };
+}
+
+/* The anchors of a series label: its points from the given fraction of the series outward. */
+function seriesAnchors(points, from = 0.5) {
+  const order = [];
+  const start = Math.round((points.length - 1) * from);
+  for (let k = 0; order.length < points.length; k += 1) {
+    if (start + k < points.length) order.push(points[start + k]);
+    if (k > 0 && start - k >= 0) order.push(points[start - k]);
+  }
+  return order;
+}
+
+/* A label drawn at a position chosen by a label board. */
+const placedText = (cls, at, label) =>
+  `<text class="${cls}" x="${round(at.x)}" y="${round(at.y)}" text-anchor="${at.anchor}">${richText(label)}</text>`;
+
+/* The plot area of a layout, less a small inset, as the bounds of a label board. */
+const plotBounds = (g, inset = 2) => ({ x0: g.left + inset, x1: g.right - inset, y0: g.top + inset, y1: g.bottom - inset });
+
 /* ----------------------------------------------------------- histogram */
 
 /**
  * Bars for observed counts with an optional stepped line of expected counts.
+ * Bins are labelled at their centres (every `labelEvery`-th), or, when
+ * `edgeTicks` is given, at bin boundaries instead: { at, label } puts the
+ * label on the left edge of bin `at` (at = bins.length is the right edge).
  * @param {{ id: string, title: string, desc: string, bins: { label: string, observed: number, expected?: number }[],
- *   width?: number, height?: number, xLabel?: string, yLabel?: string, labelEvery?: number, yMax?: number }} options
+ *   width?: number, height?: number, xLabel?: string, yLabel?: string, labelEvery?: number, yMax?: number,
+ *   edgeTicks?: { at: number, label: string }[] }} options
  */
 export function renderHistogram({
   id,
@@ -152,6 +338,7 @@ export function renderHistogram({
   yLabel = 'Count',
   labelEvery = 1,
   yMax,
+  edgeTicks,
 }) {
   const g = layout({ width, height });
   const hasExpected = bins.some((b) => typeof b.expected === 'number');
@@ -189,9 +376,9 @@ export function renderHistogram({
 
   out.push('<g class="chart__labels" aria-hidden="true">');
   out.push(yLabels(g, yTicks.values.map((value) => ({ label: formatNumber(value, yTicks.decimals), y: y(value) }))));
-  const labelled = bins
-    .map((b, i) => ({ label: escapeXml(b.label), x: x(i) + bandW / 2, i }))
-    .filter(({ i }) => i % labelEvery === 0);
+  const labelled = edgeTicks
+    ? edgeTicks.map((t) => ({ label: escapeXml(t.label), x: x(t.at) }))
+    : bins.map((b, i) => ({ label: escapeXml(b.label), x: x(i) + bandW / 2, i })).filter(({ i }) => i % labelEvery === 0);
   out.push(xLabels(g, labelled));
   out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
@@ -249,68 +436,6 @@ export function renderZStrip({ id, title, desc, z, width = 960, height = 320, xL
   return out.join('');
 }
 
-/* ------------------------------------------------------ collision curve */
-
-/**
- * Probability of at least one collision against the sample size: the exact
- * birthday curve as a line, the empirical frequencies as points with 95%
- * binomial error bars. The bars are the binomial standard error of the subset
- * proportion for the fixed pool the subsets are drawn from; they do not
- * measure the uncertainty of the birthday law, since the subsets overlap.
- */
-export function renderCollisionCurve({
-  id,
-  title,
-  desc,
-  points,
-  theory,
-  subsets,
-  halfPoint,
-  width = 960,
-  height = 400,
-  xLabel = 'Sample size m',
-  yLabel = 'P(at least one collision)',
-}) {
-  const g = layout({ width, height });
-  const mMax = Math.max(...points.map((p) => p.m), ...theory.map((t) => t.m));
-  const xTicks = niceTicks(0, mMax, g.narrow ? 4 : 8);
-  const x = linear(0, mMax, g.left, g.right);
-  const y = linear(0, 1, g.bottom, g.top);
-  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--collision' })];
-
-  out.push('<g class="chart__rulings" aria-hidden="true">');
-  out.push(hRulings(g, [0.25, 0.5, 0.75].map((value) => ({ value, y: y(value) })), { major: (v) => v === 0.5 }));
-  out.push(vRulings(g, xTicks.values.filter((v) => v > 0 && v < mMax).map((value) => ({ value, x: x(value) })), { major: () => false }));
-  if (halfPoint) {
-    out.push(
-      `<line class="chart__half" x1="${round(x(halfPoint))}" x2="${round(x(halfPoint))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
-      `<text class="chart__annotation" x="${round(x(halfPoint) + 6)}" y="${round(g.top + 14)}">P = ½ at m = ${halfPoint}</text>`,
-    );
-  }
-  out.push(frame(g), '</g>');
-
-  const d = theory.map((t, i) => `${i === 0 ? 'M' : 'L'}${round(x(t.m))},${round(y(t.p))}`).join('');
-  out.push(`<path class="chart__theory" d="${d}" aria-hidden="true"/>`);
-
-  out.push('<g class="chart__data" aria-hidden="true">');
-  for (const p of points) {
-    const se = Math.sqrt((p.empirical * (1 - p.empirical)) / subsets);
-    const lo = Math.max(0, p.empirical - 1.96 * se);
-    const hi = Math.min(1, p.empirical + 1.96 * se);
-    out.push(
-      `<line class="chart__errorbar" x1="${round(x(p.m))}" x2="${round(x(p.m))}" y1="${round(y(lo))}" y2="${round(y(hi))}"/>`,
-      `<circle class="chart__point" cx="${round(x(p.m))}" cy="${round(y(p.empirical))}" r="${g.narrow ? 3 : 3.75}"/>`,
-    );
-  }
-  out.push('</g>');
-
-  out.push('<g class="chart__labels" aria-hidden="true">');
-  out.push(yLabels(g, [0, 0.25, 0.5, 0.75, 1].map((value) => ({ label: formatNumber(value, 2), y: y(value) }))));
-  out.push(xLabels(g, xTicks.values.map((value) => ({ label: formatNumber(value, xTicks.decimals), x: x(value) }))));
-  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
-  return out.join('');
-}
-
 /* ------------------------------------------------------------- log–log */
 
 function log2Ticks(min, max, target) {
@@ -353,46 +478,65 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
   out.push(vRulings(g, xt.map((k) => ({ value: k, x: x(k) })), { major: () => false }));
   out.push(frame(g), '</g>');
 
-  out.push('<g class="chart__references" aria-hidden="true">');
-  for (const ref of references) {
-    const f = Math.log2(ref.factor ?? 1);
-    // The reference line log2 y = f + exponent · log2 x is cut to the panel so that a steep
-    // law (n/2 in the measured panel) does not run past the frame into the caption.
-    const segment = clipLineToRange(ref.exponent, f, xRange, yRange);
-    if (!segment) continue;
+  // Every label is placed inside the plot area, clear of the points, the lines and the other labels.
+  const board = labelBoard(plotBounds(g));
+  // The panel title (10.5px with 0.04em tracking in the formula figures, about 6.2px a character).
+  if (label) board.box({ x0: g.left + 6, x1: g.left + 6 + [...label].length * 6.2, y0: g.top + 4, y1: g.top + 19 });
+  const radius = dense ? 3 : 3.75;
+  const points = series.map((s) => s.points.map((p) => [x(lx(p.x)), y(lx(p.y))]));
+  points.flat().forEach(([cx, cy]) => board.circle(cx, cy, radius));
+  const markAt = marks.map((m) => [x(lx(m.x)), y(lx(m.y))]);
+  markAt.forEach(([mx, my]) => board.circle(mx, my, 5));
+  // The reference line log2 y = f + exponent · log2 x is cut to the panel so that a steep
+  // law (n/2 in the measured panel) does not run past the frame into the caption.
+  const segments = references.map((ref) => {
+    const segment = clipLineToRange(ref.exponent, Math.log2(ref.factor ?? 1), xRange, yRange);
+    if (!segment) return null;
     const [xa, ya, xb, yb] = segment;
-    out.push(
-      `<line class="chart__reference" x1="${round(x(xa))}" y1="${round(y(ya))}" x2="${round(x(xb))}" y2="${round(y(yb))}"/>`,
-    );
-    out.push(
-      `<text class="chart__annotation" x="${round(x(xb) - 4)}" y="${round(y(yb) - 5)}" text-anchor="end">${escapeXml(ref.label)}</text>`,
-    );
+    const s = [x(xa), y(ya), x(xb), y(yb)];
+    board.segment(...s);
+    return s;
+  });
+
+  const labels = [];
+  // Marks first (their labels belong next to them), with `dy` (CSS pixels) as a hint for a lower or higher label.
+  marks.forEach((m, i) => {
+    const [mx, my] = markAt[i];
+    const at = board.place(m.label, { anchors: [[mx, my + (m.dy ?? 0)]], ...prefer(m.prefer ?? ['w', 'nw', 'sw']) });
+    labels.push(placedText('chart__annotation', at, m.label));
+  });
+  // Series labels: the highest series above-left of its points, the others below-right.
+  if (showSeriesLabels) {
+    const meanY = points.map((list) => list.reduce((s, [, py]) => s + py, 0) / Math.max(1, list.length));
+    const top = meanY.indexOf(Math.min(...meanY));
+    series.forEach((s, i) => {
+      if (!points[i].length) return;
+      const directions = i === top ? ['nw', 'n', 'w', 'ne', 'se', 's', 'e', 'sw'] : ['se', 's', 'e', 'sw', 'nw', 'n', 'w', 'ne'];
+      const at = board.place(s.label, { anchors: seriesAnchors(points[i]), directions });
+      labels.push(placedText('chart__series-label', at, s.label));
+    });
+  }
+  // Reference labels last: they may sit anywhere along their line, preferably near its upper end.
+  references.forEach((ref, i) => {
+    const s = segments[i];
+    if (!s) return;
+    const anchors = [0.92, 0.82, 0.72, 0.62, 0.52, 0.42, 0.32].map((t) => [s[0] + t * (s[2] - s[0]), s[1] + t * (s[3] - s[1])]);
+    const at = board.place(ref.label, { anchors, directions: ['nw', 'se', 'w', 'e', 'n', 's'] });
+    labels.push(placedText('chart__annotation', at, ref.label));
+  });
+
+  out.push('<g class="chart__references" aria-hidden="true">');
+  for (const s of segments) {
+    if (s) out.push(`<line class="chart__reference" x1="${round(s[0])}" y1="${round(s[1])}" x2="${round(s[2])}" y2="${round(s[3])}"/>`);
   }
   out.push('</g>');
 
   out.push('<g class="chart__data" aria-hidden="true">');
-  for (const s of series) {
-    for (const p of s.points) {
-      out.push(
-        `<circle class="chart__point chart__point--${s.key}" cx="${round(x(lx(p.x)))}" cy="${round(y(lx(p.y)))}" r="${dense ? 3 : 3.75}"/>`,
-      );
-    }
-    if (showSeriesLabels && s.points.length) {
-      const last = s.points[s.points.length - 1];
-      out.push(
-        `<text class="chart__series-label" x="${round(x(lx(last.x)) + 8)}" y="${round(y(lx(last.y)) + 4)}">${escapeXml(s.label)}</text>`,
-      );
-    }
-  }
-  for (const m of marks) {
-    const mx = x(lx(m.x));
-    const my = y(lx(m.y));
-    // `dy` shifts a label vertically (CSS pixels) so that marks close on the axis keep separate labels.
-    out.push(
-      `<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="5"/>`,
-      `<text class="chart__annotation" x="${round(mx - 9)}" y="${round(my + 4 + (m.dy ?? 0))}" text-anchor="end">${escapeXml(m.label)}</text>`,
-    );
-  }
+  series.forEach((s, i) => {
+    for (const [cx, cy] of points[i]) out.push(`<circle class="chart__point chart__point--${s.key}" cx="${round(cx)}" cy="${round(cy)}" r="${radius}"/>`);
+  });
+  for (const [mx, my] of markAt) out.push(`<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="5"/>`);
+  out.push(...labels);
   out.push('</g>');
 
   out.push('<g class="chart__labels" aria-hidden="true">');
@@ -410,7 +554,8 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
  * of the measured curves and the full range up to secp256k1.
  * @param {{ series: { key: string, label: string, points: { x: number, y: number }[] }[],
  *   references?: { label: string, exponent: number, factor?: number }[],
- *   marks?: { x: number, y: number, label: string, dy?: number }[] }} options
+ *   marks?: { x: number, y: number, label: string, dy?: number, prefer?: string[] }[] }} options
+ *   Labels are placed by a label board inside each plot area; '^{…}' in a label marks an exponent.
  */
 export function renderLogLog({
   id,
@@ -432,7 +577,7 @@ export function renderLogLog({
   const zoomX = [Math.floor(Math.min(...allX)) - 1, Math.ceil(Math.max(...allX)) + 1];
   const zoomY = [Math.max(0, Math.floor(Math.min(...allY)) - 1), Math.ceil(Math.max(...allY)) + 1];
   const fullX = [0, Math.ceil(Math.max(...allX, ...marks.map((m) => Math.log2(m.x))) / 32) * 32 + 8];
-  const fullY = [0, Math.ceil(Math.max(...allY, ...marks.map((m) => Math.log2(m.y))) / 16) * 16 + 8];
+  const fullY = [0, Math.ceil(Math.max(...allY, ...marks.map((m) => Math.log2(m.y))) / 16) * 16 + 24];
 
   const panels = stacked
     ? [
@@ -460,10 +605,15 @@ export function renderLogLog({
 
 /* ------------------------------------------------------ curve scatter */
 
-/** All affine points of y² = x³ + 7 over F_p, as a square scatter (the SVG is cut to the square). */
-export function renderCurveScatter({ id, title, desc, p, points, width = 960, height }) {
+/**
+ * All affine points of y² = x³ + 7 over F_p, as a square scatter (the SVG is
+ * cut to the square). `radius` overrides the point radius, which otherwise
+ * scales with the plot (small for dense clouds); `margin` overrides the
+ * default margins (tighter for small multiples).
+ */
+export function renderCurveScatter({ id, title, desc, p, points, width = 960, height, radius, margin = {} }) {
   const h = height ?? Math.min(width, 640);
-  const g0 = layout({ width, height: h, margin: { right: 28 } });
+  const g0 = layout({ width, height: h, margin: { right: 28, ...margin } });
   const side = Math.min(g0.plotW, g0.plotH);
   const g = { ...g0, plotW: side, plotH: side, right: g0.left + side, bottom: g0.top + side };
   const svgWidth = g.left + side + g.margin.right;
@@ -480,7 +630,7 @@ export function renderCurveScatter({ id, title, desc, p, points, width = 960, he
     `<text class="chart__annotation" x="${round(g.right - 4)}" y="${round(y(p / 2) - 5)}" text-anchor="end">y = p / 2</text>`,
   );
   out.push(frame(g), '</g>');
-  const r = Math.max(1.6, side / 230);
+  const r = radius ?? Math.max(1.6, side / 230);
   out.push('<g class="chart__data" aria-hidden="true">');
   for (const pt of points) out.push(`<circle class="chart__point" cx="${round(x(pt.x))}" cy="${round(y(pt.y))}" r="${round(r)}"/>`);
   out.push('</g>');
@@ -488,72 +638,6 @@ export function renderCurveScatter({ id, title, desc, p, points, width = 960, he
   out.push(yLabels(g, ticks.map((value) => ({ label: String(value), y: y(value) }))));
   out.push(xLabels(g, ticks.map((value) => ({ label: String(value), x: x(value) }))));
   out.push(axisTitles(g, 'x', 'y'), '</g></svg>');
-  return out.join('');
-}
-
-/* ------------------------------------------------------------ Nakamoto */
-
-const DASHES = ['', '7 4', '2 3', '9 3 2 3'];
-
-/**
- * Nakamoto's catch-up probability against the number of confirmations, one
- * curve per attacker share q, on a logarithmic probability axis.
- */
-export function renderNakamoto({
-  id,
-  title,
-  desc,
-  curves,
-  markZ,
-  floor = 1e-7,
-  width = 960,
-  height = 420,
-  xLabel = 'Confirmations z',
-  yLabel = 'P(attacker catches up)',
-}) {
-  const g = layout({ width, height, margin: { right: 74 } });
-  const zMax = Math.max(...curves.flatMap((c) => c.values.map((v) => v.z)));
-  const x = linear(0, zMax, g.left, g.right);
-  const yExp = linear(Math.log10(floor), 0, g.bottom, g.top);
-  const y = (p) => yExp(Math.log10(Math.max(p, floor)));
-  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--nakamoto' })];
-  const decades = [];
-  for (let k = 0; k >= Math.log10(floor); k -= 1) decades.push(k);
-  const xTicks = niceTicks(0, zMax, g.narrow ? 5 : 10).values;
-
-  out.push('<g class="chart__rulings" aria-hidden="true">');
-  out.push(hRulings(g, decades.filter((k) => k !== 0 && k > Math.log10(floor)).map((k) => ({ value: k, y: yExp(k) })), { major: () => false }));
-  out.push(vRulings(g, xTicks.filter((v) => v > 0 && v < zMax).map((value) => ({ value, x: x(value) })), { major: () => false }));
-  if (markZ !== undefined) {
-    out.push(
-      `<line class="chart__half" x1="${round(x(markZ))}" x2="${round(x(markZ))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
-      `<text class="chart__annotation" x="${round(x(markZ) + 6)}" y="${round(g.top + 14)}">z = ${markZ}</text>`,
-    );
-  }
-  out.push(frame(g), '</g>');
-
-  out.push('<g class="chart__data" aria-hidden="true">');
-  curves.forEach((c, i) => {
-    const visible = [];
-    for (const v of c.values) {
-      visible.push(v);
-      if (v.p < floor) break;
-    }
-    const d = visible.map((v, k) => `${k === 0 ? 'M' : 'L'}${round(x(v.z))},${round(y(v.p))}`).join('');
-    out.push(`<path class="chart__curve chart__curve--${i}" d="${d}"${DASHES[i % DASHES.length] ? ` stroke-dasharray="${DASHES[i % DASHES.length]}"` : ''}/>`);
-    // Curves that leave the sheet through the floor are labelled where they exit, inside the frame.
-    const last = visible[visible.length - 1];
-    const atFloor = last.p < floor;
-    out.push(
-      `<text class="chart__series-label" x="${round(atFloor ? x(last.z) + 6 : g.right + 6)}" y="${round(atFloor ? g.bottom - 8 - 14 * (i % 2) : y(last.p) + 4)}" text-anchor="start">${escapeXml(c.label)}</text>`,
-    );
-  });
-  out.push('</g>');
-
-  out.push('<g class="chart__labels" aria-hidden="true">');
-  out.push(yLabels(g, decades.map((k) => ({ label: k === 0 ? '1' : powerLabel(10, k), y: yExp(k) }))));
-  out.push(xLabels(g, xTicks.map((value) => ({ label: String(value), x: x(value) }))));
-  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
 }
 
@@ -814,5 +898,287 @@ export function renderCapacityBars({
   out.push('<g class="chart__labels" aria-hidden="true">');
   out.push(xLabels(g, ticks.values.map((value) => ({ label: formatNumber(value, ticks.decimals), x: x(value) }))));
   out.push(axisTitles(g, xLabel, ''), '</g></svg>');
+  return out.join('');
+}
+
+/* ------------------------------------------------------------- scatter */
+
+/** Tick values of niceTicks restricted to [min, max]. */
+function ticksWithin(min, max, target) {
+  const t = niceTicks(min, max, target);
+  return { ...t, values: t.values.filter((v) => v >= min - 1e-9 && v <= max + 1e-9) };
+}
+
+/**
+ * A scatter plot on linear axes. Each series is a list of points { x, y };
+ * a missing value (y null, undefined or not finite) draws no point and breaks
+ * the connecting line. Points are plot red, or open ink rings with
+ * mark: 'ring'; connect: true joins consecutive points with an ink line.
+ * Points of one series that land on the same position (to 0.1 px) are drawn
+ * once, so a dense cloud does not repeat identical marks.
+ * Options: identity draws the dashed line y = x; vMarks draws dashed vertical
+ * rulings labelled above the frame (for instance the multiples of an order);
+ * legend prints the labelled series above the frame; square makes the plot
+ * area square (the SVG is cut to it).
+ * @param {{ id: string, title: string, desc: string,
+ *   series: { key: string, label?: string, points: { x: number, y: number|null }[], connect?: boolean, mark?: 'point'|'ring' }[],
+ *   xDomain?: [number, number], yDomain?: [number, number], identity?: boolean, vMarks?: { x: number, label: string }[],
+ *   legend?: boolean, square?: boolean, width?: number, height?: number, xLabel?: string, yLabel?: string, radius?: number }} options
+ */
+export function renderScatter({
+  id,
+  title,
+  desc,
+  series,
+  xDomain,
+  yDomain,
+  identity = false,
+  vMarks = [],
+  legend = false,
+  square = false,
+  width = 960,
+  height,
+  xLabel = '',
+  yLabel = '',
+  radius,
+}) {
+  const h = height ?? Math.round(width * 0.6);
+  const top = legend || vMarks.length ? 34 : 16;
+  let g = layout({ width, height: h, margin: { top } });
+  if (square) {
+    const side = Math.min(g.plotW, g.plotH);
+    g = { ...g, plotW: side, plotH: side, right: g.left + side, bottom: g.top + side };
+  }
+  const svgW = square ? Math.round(g.right + g.margin.right) : width;
+  const svgH = square ? Math.round(g.bottom + g.margin.bottom) : h;
+  const finite = series.flatMap((s) => s.points).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const xd = xDomain ?? [Math.min(...finite.map((p) => p.x)), Math.max(...finite.map((p) => p.x))];
+  const yd = yDomain ?? [Math.min(...finite.map((p) => p.y)), Math.max(...finite.map((p) => p.y))];
+  const x = linear(xd[0], xd[1], g.left, g.right);
+  const y = linear(yd[0], yd[1], g.bottom, g.top);
+  const xt = ticksWithin(xd[0], xd[1], g.narrow ? 4 : 6);
+  const yt = ticksWithin(yd[0], yd[1], g.narrow ? 4 : 5);
+  const r = radius ?? (g.narrow ? 2.2 : 2.8);
+  const out = [svgOpen({ id, width: svgW, height: svgH, title, desc, className: 'chart--scatter' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yt.values.filter((v) => v > yd[0] && v < yd[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(vRulings(g, xt.values.filter((v) => v > xd[0] && v < xd[1]).map((value) => ({ value, x: x(value) })), { major: () => false }));
+  for (const m of vMarks) {
+    out.push(
+      `<line class="chart__half" x1="${round(x(m.x))}" x2="${round(x(m.x))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
+      `<text class="chart__annotation" x="${round(x(m.x))}" y="${round(g.top - 5)}" text-anchor="middle">${escapeXml(m.label)}</text>`,
+    );
+  }
+  out.push(frame(g), '</g>');
+
+  if (identity) {
+    const a = Math.max(xd[0], yd[0]);
+    const b = Math.min(xd[1], yd[1]);
+    if (a < b) {
+      out.push(`<line class="chart__reference" x1="${round(x(a))}" y1="${round(y(a))}" x2="${round(x(b))}" y2="${round(y(b))}" aria-hidden="true"/>`);
+    }
+  }
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  for (const s of series) {
+    if (s.connect) {
+      let d = '';
+      let pen = 'M';
+      for (const p of s.points) {
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          pen = 'M';
+          continue;
+        }
+        d += `${pen}${round(x(p.x))},${round(y(p.y))}`;
+        pen = 'L';
+      }
+      if (d) out.push(`<path class="chart__trace" d="${d}"/>`);
+    }
+    const cls = s.mark === 'ring' ? 'chart__point chart__point--ring' : 'chart__point';
+    const seen = new Set();
+    for (const p of s.points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+      const cx = round(x(p.x));
+      const cy = round(y(p.y));
+      const key = `${cx},${cy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(`<circle class="${cls}" cx="${cx}" cy="${cy}" r="${r}"/>`);
+    }
+  }
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  if (legend) {
+    let lx = g.left;
+    for (const s of series.filter((t) => t.label)) {
+      const cls = s.mark === 'ring' ? 'chart__point chart__point--ring' : 'chart__point';
+      out.push(
+        `<circle class="chart__swatch ${cls}" cx="${round(lx + 5)}" cy="13" r="3.5"/>`,
+        `<text class="chart__legend-label" x="${round(lx + 13)}" y="17">${escapeXml(s.label)}</text>`,
+      );
+      lx += 26 + s.label.length * 6.2;
+    }
+  }
+  out.push(yLabels(g, yt.values.map((value) => ({ label: formatNumber(value, yt.decimals), y: y(value) }))));
+  out.push(xLabels(g, xt.values.map((value) => ({ label: formatNumber(value, xt.decimals), x: x(value) }))));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
+  return out.join('');
+}
+
+/* ----------------------------------------------------------- line chart */
+
+const DASHES = ['', '7 4', '2 3', '9 3 2 3'];
+
+/**
+ * Lines on linear axes, one per series (missing values break the line), with
+ * optional marked points. With yFormat 'pow2' the y values are base-2
+ * logarithms and the ticks print as powers of two.
+ * @param {{ id: string, title: string, desc: string, series: { key: string, label?: string, points: { x: number, y: number|null }[] }[],
+ *   marks?: { x: number, y: number, label: string, dy?: number, anchor?: 'start'|'end', prefer?: string[] }[],
+ *   xDomain: [number, number], yDomain: [number, number], yFormat?: 'number'|'pow2',
+ *   width?: number, height?: number, xLabel?: string, yLabel?: string }} options
+ */
+export function renderLineChart({
+  id,
+  title,
+  desc,
+  series,
+  marks = [],
+  xDomain,
+  yDomain,
+  yFormat = 'number',
+  width = 960,
+  height = 360,
+  xLabel = '',
+  yLabel = '',
+}) {
+  const g = layout({ width, height });
+  const x = linear(xDomain[0], xDomain[1], g.left, g.right);
+  const y = linear(yDomain[0], yDomain[1], g.bottom, g.top);
+  const xt = ticksWithin(xDomain[0], xDomain[1], g.narrow ? 4 : 6);
+  const pow2 = yFormat === 'pow2';
+  const yValues = pow2 ? log2Ticks(yDomain[0], yDomain[1], g.narrow ? 4 : 5) : ticksWithin(yDomain[0], yDomain[1], 5).values;
+  const yDecimals = pow2 ? 0 : niceTicks(yDomain[0], yDomain[1], 5).decimals;
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--line' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yValues.filter((v) => v > yDomain[0] && v < yDomain[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(vRulings(g, xt.values.filter((v) => v > xDomain[0] && v < xDomain[1]).map((value) => ({ value, x: x(value) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+
+  // Labels are placed inside the plot area, clear of the lines, the marks and each other.
+  const board = labelBoard(plotBounds(g));
+  const runs = series.map((s) => {
+    // Missing values break a line into runs of drawable points (pixel coordinates).
+    const parts = [[]];
+    for (const p of s.points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+        if (parts.at(-1).length) parts.push([]);
+        continue;
+      }
+      parts.at(-1).push([x(p.x), y(p.y)]);
+    }
+    return parts.filter((part) => part.length);
+  });
+  runs.flat().forEach((run) => board.polyline(run));
+  const markAt = marks.map((m) => [x(m.x), y(m.y)]);
+  markAt.forEach(([mx, my]) => board.circle(mx, my, 4.5));
+
+  const labels = [];
+  // Mark labels first, next to their marks: `prefer` lists the directions to try first (compass
+  // points such as 'nw' or 'se'), `anchor: 'end'` prefers the left side, `dy` shifts the anchor.
+  marks.forEach((m, i) => {
+    const [mx, my] = markAt[i];
+    const order = prefer(m.prefer ?? (m.anchor === 'end' ? ['w', 'nw', 'sw'] : ['e', 'ne', 'se']));
+    const at = board.place(m.label, { anchors: [[mx, my + (m.dy ?? 0)]], ...order });
+    labels.push(placedText('chart__annotation', at, m.label));
+  });
+  // Series labels along their own line, preferably in its upper part: the highest line above-left.
+  const meanY = runs.map((parts) => {
+    const all = parts.flat();
+    return all.reduce((s, [, py]) => s + py, 0) / Math.max(1, all.length);
+  });
+  const top = meanY.indexOf(Math.min(...meanY));
+  series.forEach((s, i) => {
+    const all = runs[i].flat();
+    if (!s.label || !all.length) return;
+    const directions = i === top ? ['nw', 'n', 'w', 'se', 's', 'e'] : ['n', 'nw', 'ne', 'se', 's', 'sw'];
+    const at = board.place(s.label, { anchors: seriesAnchors(all, 0.7), directions });
+    labels.push(placedText('chart__series-label', at, s.label));
+  });
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  series.forEach((s, i) => {
+    const d = runs[i].map((run) => run.map(([px, py], k) => `${k === 0 ? 'M' : 'L'}${round(px)},${round(py)}`).join('')).join('');
+    const dash = DASHES[i % DASHES.length];
+    out.push(`<path class="chart__curve chart__curve--${i}"${dash ? ` stroke-dasharray="${dash}"` : ''} d="${d}"/>`);
+  });
+  for (const [mx, my] of markAt) out.push(`<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="4.5"/>`);
+  out.push(...labels);
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(yLabels(g, yValues.map((value) => ({ label: pow2 ? powerLabel(2, value) : formatNumber(value, yDecimals), y: y(value) }))));
+  out.push(xLabels(g, xt.values.map((value) => ({ label: formatNumber(value, xt.decimals), x: x(value) }))));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
+  return out.join('');
+}
+
+/* ---------------------------------------------------------- bit profile */
+
+/**
+ * The proportion of ones at each bit position: the observed proportion as a
+ * point, its exact expectation as an ink tick, a reference range (for
+ * instance the 95% range of a uniform random sample of the same size) as a
+ * vertical line, and the level one half as a dashed reference.
+ * @param {{ id: string, title: string, desc: string, bits: { observed: number, expected: number, low: number, high: number }[],
+ *   reference?: number, yDomain?: [number, number], width?: number, height?: number, xLabel?: string, yLabel?: string }} options
+ */
+export function renderBitProfile({
+  id,
+  title,
+  desc,
+  bits,
+  reference = 0.5,
+  yDomain = [0, 1],
+  width = 960,
+  height = 300,
+  xLabel = 'Bit position j (0 = least significant)',
+  yLabel = 'Proportion of ones',
+}) {
+  const g = layout({ width, height });
+  const y = linear(yDomain[0], yDomain[1], g.bottom, g.top);
+  const band = g.plotW / bits.length;
+  const cx = (j) => g.left + (j + 0.5) * band;
+  const yt = ticksWithin(yDomain[0], yDomain[1], 4);
+  const tickHalf = Math.min(10, band * 0.32);
+  const every = band >= 18 ? 1 : band >= 9 ? 2 : 4;
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--bits' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yt.values.filter((v) => v > yDomain[0] && v < yDomain[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+  out.push(
+    `<line class="chart__reference" x1="${g.left}" x2="${round(g.right)}" y1="${round(y(reference))}" y2="${round(y(reference))}" aria-hidden="true"/>`,
+  );
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  bits.forEach((b, j) => {
+    const x = round(cx(j));
+    out.push(
+      `<line class="chart__range" x1="${x}" x2="${x}" y1="${round(y(b.low))}" y2="${round(y(b.high))}"/>`,
+      `<line class="chart__tick-expected" x1="${round(cx(j) - tickHalf)}" x2="${round(cx(j) + tickHalf)}" y1="${round(y(b.expected))}" y2="${round(y(b.expected))}"/>`,
+      `<circle class="chart__point" cx="${x}" cy="${round(y(b.observed))}" r="${g.narrow ? 3 : 3.75}"/>`,
+    );
+  });
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(`<text class="chart__annotation" x="${round(g.right - 4)}" y="${round(y(reference) - 5)}" text-anchor="end">½</text>`);
+  out.push(yLabels(g, yt.values.map((value) => ({ label: formatNumber(value, yt.decimals), y: y(value) }))));
+  out.push(xLabels(g, bits.map((_, j) => ({ label: String(j), x: cx(j), j })).filter((t) => t.j % every === 0)));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
 }

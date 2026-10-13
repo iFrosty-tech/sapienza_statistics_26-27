@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toy ECC: private key to public key</title>
+  <style>
+    :root {
+      color-scheme: light;
+      /* The colours of the site's sheet (DESIGN.md): paper, inks, rulings, and plot red for focus. */
+      --paper: #f7faf8; --paper-deep: #edf3ef; --ink: #1b2420; --ink-soft: #46524c; --ink-faint: #5d6a63;
+      --ruling: #9cc3ae; --ruling-ink: #3a6b54; --plot: #d0462f; --error: #a8201a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--paper); color: var(--ink);
+      font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    main { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 3rem; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; line-height: 1.25; }
+    p { margin: 0 0 1.5rem; color: var(--ink-soft); }
+    form {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem;
+      align-items: end; padding: 1rem 0; border-block: 1px solid var(--ruling);
+    }
+    label { display: grid; gap: 0.25rem; font-size: 0.875rem; font-weight: 600; color: var(--ruling-ink); }
+    input, select, button {
+      min-height: 2.75rem; padding: 0.5rem 0.625rem; border: 1px solid var(--ink-faint); border-radius: 0;
+      background: var(--paper); color: var(--ink); font: inherit; font-weight: 400;
+    }
+    button { border-color: var(--ink); font-weight: 600; cursor: pointer; transition: background-color 120ms, color 120ms; }
+    button:hover { background: var(--ink); color: var(--paper); }
+    :focus-visible { outline: 2px solid var(--plot); outline-offset: 2px; }
+    ::selection { background: var(--ruling); color: var(--ink); }
+    pre {
+      margin: 1.5rem 0 0; padding: 1rem; overflow-x: auto; background: var(--paper-deep); border: 1px solid var(--ruling);
+      font: 0.9375rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    /* Dark red, 10:1 on the listing: the error reads as such without borrowing the plot red of data. */
+    pre.error { color: var(--error); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Toy ECC: from a private key to a public key</h1>
+    <p>This program computes the public key Q = kG on the toy curve y² = x³ + 7 over F<sub>17</sub>,
+      by repeated point addition or by double-and-add. Toy parameters, for teaching only.</p>
+    <form id="program">
+      <label>Private key k
+        <input name="k" type="text" inputmode="numeric" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Base point G
+        <select name="base"></select>
+      </label>
+      <label>Method
+        <select name="method">
+          <option value="repeated-addition">Repeated addition</option>
+          <option value="double-and-add">Double-and-add</option>
+        </select>
+      </label>
+      <button type="submit">Compute</button>
+    </form>
+    <pre id="output" aria-live="polite"></pre>
+    <noscript><p>This program runs in the browser and needs JavaScript.</p></noscript>
+  </main>
+  <script>
+'use strict';
+
+// Define the toy curve and the base point G.
+// The curve is y^2 = x^3 + a*x + b over F_p; points are { x, y } and null is O.
+const p = 17n;
+const a = 0n;
+const b = 7n;
+const G = { x: 1n, y: 5n };
+
+// Define the private key k.
+const k = 6n;
+
+// Repeated addition costs k - 1 group operations, so it is capped.
+const REPEATED_ADDITION_LIMIT = 10000n;
+
+function mod(v) {
+  return ((v % p) + p) % p;
+}
+
+// Inverse modulo p by the extended Euclidean algorithm.
+function inverse(v) {
+  let [r0, r1, s0, s1] = [mod(v), p, 1n, 0n];
+  if (r0 === 0n) throw new RangeError('0 has no inverse modulo p');
+  while (r1 !== 0n) {
+    const q = r0 / r1;
+    [r0, r1, s0, s1] = [r1, r0 - q * r1, s1, s0 - q * s1];
+  }
+  return mod(s0);
+}
+
+function isOnCurve(P) {
+  return P === null || mod(P.y * P.y) === mod(P.x ** 3n + a * P.x + b);
+}
+
+// P + Q by the chord-and-tangent rule; P = Q uses the tangent.
+function pointAdd(P, Q) {
+  if (P === null) return Q;
+  if (Q === null) return P;
+  if (P.x === Q.x && mod(P.y + Q.y) === 0n) return null; // vertical line: P + (-P) = O
+  const lambda = P.x === Q.x
+    ? mod((3n * P.x * P.x + a) * inverse(2n * P.y))
+    : mod((Q.y - P.y) * inverse(Q.x - P.x));
+  const x3 = mod(lambda * lambda - P.x - Q.x);
+  return { x: x3, y: mod(lambda * (P.x - x3) - P.y) };
+}
+
+// The list [P, 2P, ..., kP], one addition per entry.
+function scalarMultiplyNaive(k, P) {
+  const multiples = [P];
+  for (let i = 2n; i <= k; i += 1n) multiples.push(pointAdd(multiples[multiples.length - 1], P));
+  return multiples;
+}
+
+// kP reading the bits of k from the most significant one: the leading 1
+// loads P, then every bit doubles R and every 1 bit also adds P.
+function scalarMultiplyDoubleAndAdd(k, P) {
+  const bits = k.toString(2);
+  const trace = [];
+  let R = P;
+  let index = 1n;
+  for (const bit of bits.slice(1)) {
+    R = pointAdd(R, R);
+    index *= 2n;
+    trace.push({ bit, op: 'double', index, point: R });
+    if (bit === '1') {
+      R = pointAdd(R, P);
+      index += 1n;
+      trace.push({ bit, op: 'add', index, point: R });
+    }
+  }
+  return { result: R, bits, trace };
+}
+
+function formatPoint(P) {
+  return P === null ? 'O' : `(${P.x}, ${P.y})`;
+}
+
+function curvePoints() {
+  const found = [];
+  for (let x = 0n; x < p; x += 1n) {
+    for (let y = 0n; y < p; y += 1n) if (isOnCurve({ x, y })) found.push({ x, y });
+  }
+  return found;
+}
+
+function orderOf(P) {
+  let n = 1;
+  for (let R = P; R !== null; R = pointAdd(R, P)) n += 1;
+  return n;
+}
+
+function parseScalar(text, method) {
+  if (!/^\s*\d+\s*$/.test(text)) throw new Error('k must be a positive integer, for example 6.');
+  const value = BigInt(text.trim());
+  if (value < 1n) throw new Error('k must be at least 1.');
+  if (method === 'repeated-addition' && value > REPEATED_ADDITION_LIMIT) {
+    throw new Error(`Repeated addition is limited to k <= ${REPEATED_ADDITION_LIMIT}; choose double-and-add for larger k.`);
+  }
+  return value;
+}
+
+// The text printed by the program for the private key k and the base point P.
+function report(k, P, method) {
+  const name = (i) => (i === 1n ? 'G' : `${i}G`);
+  const show = (R) => (R === null ? 'O (point at infinity)' : formatPoint(R));
+  const lines = [];
+  let Q;
+  if (method === 'double-and-add') {
+    const { result, bits, trace } = scalarMultiplyDoubleAndAdd(k, P);
+    lines.push(`k = ${k} = ${bits} in binary`, `bit 1: ${'start'.padEnd(6)}  R = G = ${show(P)}`);
+    for (const { bit, op, index, point } of trace) {
+      lines.push(`bit ${bit}: ${(op === 'add' ? 'add G' : op).padEnd(6)}  R = ${name(index)} = ${show(point)}`);
+    }
+    lines.push(`Group operations: ${trace.length} (repeated addition: ${k - 1n})`);
+    Q = result;
+  } else {
+    const multiples = scalarMultiplyNaive(k, P);
+    multiples.forEach((R, i) => lines.push(`${name(BigInt(i + 1))} = ${show(R)}`));
+    Q = multiples[multiples.length - 1];
+  }
+  lines.push('', Q === null
+    ? `${name(k)} = O (point at infinity) is not a valid public key: k is a multiple of the order of G.`
+    : `TOY PUBLIC KEY: Q = ${name(k)} = ${formatPoint(Q)}`);
+  return lines.join('\n');
+}
+
+if (typeof document !== 'undefined') {
+  const form = document.getElementById('program');
+  const output = document.getElementById('output');
+  const fields = form.elements;
+  fields.k.value = String(k);
+  for (const P of curvePoints()) {
+    const option = new Option(`${formatPoint(P)}, order ${orderOf(P)}`, `${P.x},${P.y}`);
+    option.selected = P.x === G.x && P.y === G.y;
+    fields.base.add(option);
+  }
+  const compute = () => {
+    const [x, y] = fields.base.value.split(',').map(BigInt);
+    try {
+      output.textContent = report(parseScalar(fields.k.value, fields.method.value), { x, y }, fields.method.value);
+      output.classList.remove('error');
+    } catch (error) {
+      output.textContent = error.message;
+      output.classList.add('error');
+    }
+  };
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    compute();
+  });
+  compute();
+}
+  </script>
+</body>
+</html>

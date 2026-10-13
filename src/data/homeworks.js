@@ -19,10 +19,10 @@
 export default [
   {
     number: 1,
-    title: 'A toy hash function on secp256k1 and its statistical properties',
+    title: 'From private key to public key: scalar multiplication on a toy elliptic curve',
     abstract:
-      'A hash function is built from scalar and point arithmetic on the Bitcoin curve secp256k1 and put on trial: its digests are tested for uniformity, independence and avalanche against the binomial and chi-square laws an ideal hash would obey, and the structural flaws that statistics cannot see are exposed. A survey of cryptography and statistics in the major blockchains closes the work.',
-    topics: ['Elliptic-curve cryptography', 'Hash functions', 'Randomness testing', 'Blockchains'],
+      'A private key k is turned into a public key Q = kG on the toy curve y² = x³ + 7 over the field of 17 elements, first by repeated point addition and then by double-and-add, and the algorithm is replayed slowly on the finite lattice of the curve. The resulting points are then explored statistically on a ladder of curves up to secp256k1, the curve of Ethereum, with Keccak-256 as the hash baseline, to separate the properties a one-way function needs from those expected of a hash.',
+    topics: ['Elliptic-curve cryptography', 'One-way functions', 'Randomness testing', 'Ethereum'],
     published: '2026-10-08',
     status: 'published',
   },

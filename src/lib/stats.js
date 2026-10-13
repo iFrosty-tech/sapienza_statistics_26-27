@@ -285,35 +285,6 @@ export function binnedBinomialChiSquare(counts, n, p, { minExpected = 5 } = {}) 
 }
 
 /* ------------------------------------------------------------------------ */
-/* Proof-of-work race                                                        */
-/* ------------------------------------------------------------------------ */
-
-/**
- * Nakamoto's estimate of the probability that an attacker holding a fraction
- * q of the hash rate eventually overtakes the honest chain, given that the
- * honest chain is z blocks ahead (Bitcoin whitepaper, section 11). The
- * attacker's progress while the honest miners find z blocks is Poisson with
- * mean λ = z·q/p, and from a deficit of d blocks the catch-up probability is
- * (q/p)^d, so
- *   P = 1 − Σ_{k=0}^{z} (λ^k e^{−λ} / k!) · (1 − (q/p)^{z−k}).
- * With q ≥ 1/2 the attacker always catches up.
- */
-export function attackerSuccessProbability(q, z) {
-  if (!(q >= 0 && q < 1)) throw new Error('q must be a probability below 1');
-  const p = 1 - q;
-  if (q >= p) return 1;
-  const lambda = (z * q) / p;
-  const ratio = q / p;
-  let sum = 0;
-  let poisson = Math.exp(-lambda); // λ^0 e^{−λ} / 0!
-  for (let k = 0; k <= z; k += 1) {
-    if (k > 0) poisson *= lambda / k;
-    sum += poisson * (1 - ratio ** (z - k));
-  }
-  return Math.max(0, 1 - sum);
-}
-
-/* ------------------------------------------------------------------------ */
 /* Birthday bound                                                            */
 /* ------------------------------------------------------------------------ */
 
@@ -395,4 +366,156 @@ export function geometricPmf(t, p) {
 export function geometricCdf(t, p) {
   if (t < 1) return 0;
   return -Math.expm1(Math.floor(t) * Math.log1p(-p));
+}
+
+/* ------------------------------------------------------------------------ */
+/* The Poisson law                                                           */
+/* ------------------------------------------------------------------------ */
+
+/** P(M = m) for M ~ Poisson(λ), computed in log space: e^−λ λ^m / m!. */
+export function poissonPmf(m, lambda) {
+  if (!Number.isInteger(m) || m < 0) return 0;
+  if (lambda === 0) return m === 0 ? 1 : 0;
+  return Math.exp(m * Math.log(lambda) - lambda - lnGamma(m + 1));
+}
+
+/* ------------------------------------------------------------------------ */
+/* Monte Carlo tests                                                         */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Summary of a Monte Carlo null distribution for an observed statistic: the
+ * number of replicates R, their mean, their 95th percentile (type 7 of
+ * Hyndman and Fan, linear interpolation) and the upper-tail p-value
+ * (1 + #{T_r ≥ T}) / (R + 1), which counts the observed statistic as one more
+ * draw from the null and is therefore never 0 (the Monte Carlo test of
+ * Davison and Hinkley, Bootstrap Methods and their Application, 1997, ch. 4).
+ * A replicate within a relative 1e-9 of the observed value counts as a
+ * tie, so that equal statistics summed in different orders compare equal.
+ * @param {number} observed
+ * @param {ArrayLike<number>} replicates
+ * @returns {{ replicates: number, mean: number, q95: number, pValue: number }}
+ */
+export function monteCarloSummary(observed, replicates) {
+  const R = replicates.length;
+  if (R === 0) throw new Error('monteCarloSummary needs at least one replicate');
+  const sorted = Float64Array.from(replicates).sort();
+  let total = 0;
+  let atLeast = 0;
+  const threshold = observed - 1e-9 * Math.max(1, Math.abs(observed));
+  for (const t of sorted) {
+    total += t;
+    if (t >= threshold) atLeast += 1;
+  }
+  const h = (R - 1) * 0.95;
+  const lo = Math.floor(h);
+  const q95 = lo + 1 < R ? sorted[lo] + (h - lo) * (sorted[lo + 1] - sorted[lo]) : sorted[lo];
+  return { replicates: R, mean: total / R, q95, pValue: (1 + atLeast) / (R + 1) };
+}
+
+/**
+ * Pearson's chi-square test after pooling adjacent categories: categories are
+ * merged from the left until each pooled bin has an expected count of at
+ * least `minExpected`, and a remainder on the right is merged into the last
+ * bin (the rule of binnedBinomialChiSquare, for any reference law).
+ * @param {number[]} observed
+ * @param {number[]} expected
+ * @param {{ minExpected?: number, ddof?: number }} [options]
+ * @returns {{ statistic: number, df: number, p: number, bins: { from: number, to: number, observed: number, expected: number }[] }}
+ */
+export function pooledChiSquare(observed, expected, { minExpected = 5, ddof = 0 } = {}) {
+  if (observed.length !== expected.length) throw new Error('observed and expected need the same length');
+  const bins = [];
+  let from = 0;
+  let o = 0;
+  let e = 0;
+  for (let i = 0; i < observed.length; i += 1) {
+    o += observed[i];
+    e += expected[i];
+    if (e >= minExpected) {
+      bins.push({ from, to: i, observed: o, expected: e });
+      from = i + 1;
+      o = 0;
+      e = 0;
+    }
+  }
+  if (from < observed.length) {
+    const last = bins.pop() ?? { from: 0, observed: 0, expected: 0 };
+    bins.push({ from: last.from, to: observed.length - 1, observed: last.observed + o, expected: last.expected + e });
+  }
+  if (bins.length - 1 - ddof < 1) {
+    return { statistic: 0, df: 0, p: Number.NaN, bins, note: 'too few pooled categories for a chi-square test' };
+  }
+  const fit = chiSquareGoodnessOfFit(bins.map((b) => b.observed), bins.map((b) => b.expected), { ddof });
+  return { ...fit, bins };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Correlation                                                               */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Pearson's product-moment correlation coefficient of two paired samples,
+ * computed from centred values (two passes). NaN when a variable is constant.
+ * @param {ArrayLike<number>} xs
+ * @param {ArrayLike<number>} ys
+ */
+export function pearson(xs, ys) {
+  const n = xs.length;
+  if (n !== ys.length) throw new Error('pearson needs paired samples of equal length');
+  let mx = 0;
+  let my = 0;
+  for (let i = 0; i < n; i += 1) {
+    mx += xs[i];
+    my += ys[i];
+  }
+  mx /= n;
+  my /= n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i += 1) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    sxy += dx * dy;
+    sxx += dx * dx;
+    syy += dy * dy;
+  }
+  if (sxx === 0 || syy === 0) return Number.NaN;
+  return Math.max(-1, Math.min(1, sxy / Math.sqrt(sxx * syy)));
+}
+
+/** Ranks 1 … n of the values, ties receiving the average of the ranks they span. */
+export function averageRanks(values) {
+  const order = Array.from(values, (_, i) => i).sort((i, j) => values[i] - values[j]);
+  const ranks = new Array(values.length);
+  for (let start = 0; start < order.length; ) {
+    let end = start + 1;
+    while (end < order.length && values[order[end]] === values[order[start]]) end += 1;
+    const rank = (start + end + 1) / 2; // mean of the ranks start + 1 … end
+    for (let i = start; i < end; i += 1) ranks[order[i]] = rank;
+    start = end;
+  }
+  return ranks;
+}
+
+/** Spearman's rank correlation: Pearson's r of the average ranks. */
+export function spearman(xs, ys) {
+  return pearson(averageRanks(xs), averageRanks(ys));
+}
+
+/**
+ * Two-sided test of H0: ρ = 0 by Fisher's transformation. Under H0 and for a
+ * bivariate normal sample, z = atanh(r)·sqrt(n − 3) is approximately N(0, 1);
+ * this is a large-sample approximation, used here as a descriptive yardstick
+ * also for non-normal data and for Spearman's ρ.
+ * @param {number} r correlation coefficient
+ * @param {number} n number of pairs
+ * @returns {{ z: number, p: number }}
+ */
+export function fisherZTest(r, n) {
+  if (!(n > 3) || Number.isNaN(r)) return { z: Number.NaN, p: Number.NaN };
+  if (Math.abs(r) >= 1) return { z: Math.sign(r) * Infinity, p: 0 };
+  const z = Math.atanh(r) * Math.sqrt(n - 3);
+  return { z, p: Math.min(1, 2 * normCdf(-Math.abs(z))) };
 }
