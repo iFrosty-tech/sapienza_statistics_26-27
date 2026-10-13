@@ -39,24 +39,30 @@
  * Tokens ({{fig.<key>}}); every value is a display string. Series keys:
  * T17 (G = (1, 5)), T17g (G = (6, 6)), S1031, O1051, O16477 (enumerations),
  * secp256k1 and keccak (samples), keccak<orbit> (Keccak-256(k) mod p).
- *   params.{seed, seedAvalanche, seedEcdlp, sampleN, sacKeys, ecdlpTargets, resampleN, computeSeconds,
- *     computedAt, cacheKey, rejected, firstKey}
+ *   params.{seed, seedAvalanche, seedEcdlp, seedStructural, structuralReplicates, sampleN, sacKeys, ecdlpTargets,
+ *     resampleN, computeSeconds, computedAt, cacheKey, rejected, firstKey}
  *   curve.secp256k1.{pHex, nHex, gxHex, gyHex, pMod3}
  *   ladder.<orbit>.{label, p, pMod3, groupOrder, base, n, factors, cyclic}
  *   toy.{p, a, b, G, k, Q, points, order, orderG, generator, orderGenerator, repeatedOperations,
  *     dblAddOperations, dblAddDoublings, dblAddAdditions, bits},
  *     toy.multiple.<k> (k = 1 … 9, '(x, y)' or 'O'), toy.slope.<k> (λ of the step that gives kG, k = 2 … 6)
  *   groupLaw.{result, double}
- *   coordHist.<series>.{series, provenance, population, xName, n, bins, xStatistic, xDf, xP, yStatistic, yDf, yP, c1h…c4}
- *     (series: T17, T17g, S1031, O1051, O16477, secp256k1, keccak)
- *   occupancy.<series>.{…, p, n, lambda, xStatistic, xDf, xP, xMultiplicity, xHits<m>, yStatistic, yDf, yP,
- *     yMultiplicity, yHits<m>} (series: every orbit and keccak<orbit>)
+ *   coordHist.<series>.{series, provenance, population, xName, n, bins, xStatistic, xDf, xP, yStatistic, yDf, yP,
+ *     replicates, xStructuralMean, xStructuralQ95, xStructuralP, xVif, xDistinct, xMultiplicity (and y…), c1h…c4}
+ *     (series: T17, T17g, S1031, O1051, O16477, secp256k1, keccak). xP and yP are the χ²(B − 1) yardstick;
+ *     on the enumerations the …Structural… values come from a Monte Carlo null that keeps the multiplicities
+ *     and the mirror pairs of the orbit (a dash for the samples).
+ *   occupancy.<series>.{…, p, n, lambda (the Poisson mean, written θ on the page), xStatistic, xDf, xP,
+ *     xMultiplicity, xHits<m>, yStatistic, yDf, yP, yMultiplicity, yHits<m>} (series: every orbit and
+ *     keccak<orbit>); df counts one parameter estimated from the data
  *   bitFreq.<series>.{…, n, bits, maxAbsZExact, maxAbsZHalf, monobitP, topBit, topObserved, topExpected}
  *     (orbits) and {…, n, bits, statistic, df, p, maxAbsZ, beyondTwoSigma, expectedBeyondTwoSigma, monobitP}
  *     (secp256k1, keccak)
- *   avalanche.<series>.{…, trials, discarded, outputBits, mean, sd, expectedMean, statistic, df, p}
- *     (every orbit, secp256k1, keccak)
- *   pointCloud.<T17g|O1051|O16477>.{cells, cellsStatistic, cellsDf, cellsP, mirrored, total, drawn}
+ *   avalanche.<orbit>.{…, pairs, allPairs, discarded, outputBits, mean, sd, expectedMean, statistic, df, p}
+ *     (every unordered pair {k, k ⊕ 2^i} once, against the exact law of two distinct orbit points) and
+ *     avalanche.<secp256k1|keccak>.{…, trials, discarded, outputBits, mean, sd, expectedMean, statistic, df, p}
+ *   pointCloud.<T17g|O1051|O16477>.{cells, cellsPoints, cellsStatistic, cellsDf, cellsP, cellsMinExpected,
+ *     cellsIllustrative, mirrored, total, drawn} (the cell test runs on the half-grid y < p/2)
  *   sequence.T17.{period, kMax, kxR, lag1R}, sequence.O1051.{points, kxR, kyR, lag1R, mirrorR}
  *   correlation.<orbit>.{pairs, kxR, kxRho, kyR, kyRho, lag1R, lag1Rho, mirrorR, mirrorRho}
  *   correlation.secp256k1.{pairs, kxR, kxRho, kxP, kxRhoP, kyR, kyRho, kyP, kyRhoP}
@@ -65,15 +71,18 @@
  *     expectedBeyond, discarded}
  *   relatedOutputs.<secp256k1|keccak>.{hits, trials, proportion}, relatedOutputs.secp256k1.{xorHits, xorTrials}
  *   ecdlp.{curves, targets, seed, smallestP, largestP, largestN, largestBruteMean, largestBsgsMean, largestSqrtN,
+ *     bsgsReference ('1.5√n'), bruteReference ('n/2'), largestBsgsReference, largestBruteReference,
  *     bruteSlope, bsgsSlope, bruteR, bsgsR, bruteAt256, bsgsAt256, theoryBruteAt256, theoryBsgsAt256},
- *     ecdlp.smooth.<orbit>.{n, factors, largestPrime}
- *   dblAddCost.{k, bits, repeated, doublings, additions, total, result, meanRepeated256, log2Repeated256,
+ *     ecdlp.smooth.<orbit>.{n, factors, largestPrime}; the …At256 values are base-2 exponents
+ *   dblAddCost.{k, bits, repeated, doublings, additions, total, result, meanRepeated256 (plain text, 10⁷⁶),
+ *     meanRepeated256Mantissa, meanRepeated256Exponent (for 8.68 × 10<sup>76</sup>), log2Repeated256,
  *     meanDoubleAndAdd256}
  *   slowMo.{from, lambda, nu, third, result} (the printed step 5G + G: its line y = λx + ν, R′ and 6G)
  * Chart figures also expose c1h … c4 (the caption grid) and series, provenance, population per series.
- * Every p-value token <name> (xP, yP, p, monobitP, cellsP, kxP, …) also comes as <name>Eq, ready for a
- * sentence: "p = 0.252" or "p < 0.001". Occupancy also gives xPattern and yPattern in words
- * ("546 values twice, 505 never").
+ * Every p-value token <name> (xP, yP, xStructuralP, p, monobitP, cellsP, kxP, …) also comes as <name>Eq,
+ * ready for a sentence: "P = 0.252" or "P < 0.001" (a capital P: p is the prime of the field). Occupancy
+ * also gives xPattern and yPattern in words ("546 values twice, 505 never"). Tokens are inserted as text:
+ * a power shows as markup written in the page around its tokens, never as a caret.
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -121,6 +130,7 @@ export const PARAMS = Object.freeze({
   secpN: 4096, // private keys sampled on secp256k1 (E1, E3, E5, E6)
   sacKeys: 1024, // keys per strict-avalanche matrix (256 × 256 cells each)
   ecdlpTargets: 64, // random keys per curve in E7
+  structuralReplicates: 2000, // replicates of the structural Monte Carlo null of E1 on the enumerations
   buildWidth: 640, // pixel width of the printed charts; the page redraws them at their true width
 });
 
@@ -162,7 +172,13 @@ function loadOrCompute(root) {
   }
   if (!value) {
     const t0 = performance.now();
-    const study = runStudy({ seed: PARAMS.seed, secpN: PARAMS.secpN, sacKeys: PARAMS.sacKeys, ecdlpTargets: PARAMS.ecdlpTargets });
+    const study = runStudy({
+      seed: PARAMS.seed,
+      secpN: PARAMS.secpN,
+      sacKeys: PARAMS.sacKeys,
+      ecdlpTargets: PARAMS.ecdlpTargets,
+      structuralReplicates: PARAMS.structuralReplicates,
+    });
     const ms = performance.now() - t0;
     const text = JSON.stringify({ key, computedAt: new Date().toISOString(), ms, study });
     mkdirSync(dir, { recursive: true });
@@ -209,7 +225,8 @@ const factorText = (factors) =>
     : factors.map((f) => `${f.prime}${f.exponent > 1 ? String(f.exponent).replace(/\d/g, (d) => SUPER[d]) : ''}`).join('·');
 const hexGroups = (decimal) => BigInt(decimal).toString(16).toUpperCase().padStart(64, '0').replace(/(.{8})(?!$)/g, '$1 ');
 const name = (k) => (k === 1 ? 'G' : `${k}G`);
-const pEquation = (p) => (formatP(p).startsWith('<') ? `p ${formatP(p)}` : `p = ${formatP(p)}`);
+/* A p-value in a sentence: a capital P, since p is the prime of the field. */
+const pEquation = (p) => (formatP(p).startsWith('<') ? `P ${formatP(p)}` : `P = ${formatP(p)}`);
 const point = (P) => formatPoint(P);
 
 /* ---------------------------------------------------------- the toy curve */
@@ -448,6 +465,8 @@ export default async function provide({ root }) {
   token('params.seed', study.meta.seed);
   token('params.seedAvalanche', study.meta.seeds.avalanche);
   token('params.seedEcdlp', study.meta.seeds.ecdlp);
+  token('params.seedStructural', study.meta.seeds.structural);
+  token('params.structuralReplicates', int(study.meta.sizes.structuralReplicates));
   token('params.sampleN', int(study.meta.sizes.secpN));
   token('params.sacKeys', int(study.meta.sizes.sacKeys));
   token('params.ecdlpTargets', int(study.meta.sizes.ecdlpTargets));

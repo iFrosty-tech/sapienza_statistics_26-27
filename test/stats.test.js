@@ -195,23 +195,21 @@ test('Poisson pmf: known values, unit mass and the m = 0 term', async () => {
   near(s, 1, 1e-12);
 });
 
-test('Poisson-binomial pmf by dynamic programming', async () => {
-  const { poissonBinomialPmf } = await import('../src/lib/stats.js');
-  // Two trials with p = 0.5 and 0.2: P(0) = 0.4, P(1) = 0.5, P(2) = 0.1.
-  const two = poissonBinomialPmf([0.5, 0.2]);
-  assert.equal(two.length, 3);
-  [0.4, 0.5, 0.1].forEach((v, k) => near(two[k], v, 1e-15));
-  // Equal probabilities reduce it to the binomial law.
-  const equal = poissonBinomialPmf(new Array(30).fill(0.3));
-  const binomial = binomialPmfTable(30, 0.3);
-  equal.forEach((v, k) => near(v, binomial[k], 1e-13, `k = ${k}`));
-  // Unequal probabilities: unit mass and mean Σ p_j.
-  const probs = Array.from({ length: 40 }, (_, j) => (j + 1) / 50);
-  const pmf = poissonBinomialPmf(probs);
-  near(pmf.reduce((a, b) => a + b, 0), 1, 1e-12);
-  near(pmf.reduce((a, v, k) => a + k * v, 0), probs.reduce((a, b) => a + b, 0), 1e-10);
-  assert.deepEqual(poissonBinomialPmf([]), [1]);
-  assert.throws(() => poissonBinomialPmf([1.5]));
+test('Monte Carlo summary: replicate mean, 95th percentile and the +1-corrected p-value', async () => {
+  const { monteCarloSummary } = await import('../src/lib/stats.js');
+  const replicates = [10, 1, 9, 2, 8, 3, 7, 4, 6, 5];
+  const s = monteCarloSummary(5, replicates);
+  assert.equal(s.replicates, 10);
+  near(s.mean, 5.5, 1e-15);
+  // Type-7 quantile of 1 … 10 at 0.95: 9 + 0.55 · (10 − 9).
+  near(s.q95, 9.55, 1e-12);
+  // Six replicates are at least 5 (ties count): (1 + 6) / (10 + 1).
+  near(s.pValue, 7 / 11, 1e-15);
+  // An observed value beyond every replicate gets the smallest attainable p-value, never 0.
+  near(monteCarloSummary(11, replicates).pValue, 1 / 11, 1e-15);
+  // Round-off does not break a tie between equal statistics computed in different orders.
+  near(monteCarloSummary(0.1 + 0.2, [0.3, 0.3]).pValue, 1, 1e-15);
+  assert.throws(() => monteCarloSummary(1, []));
 });
 
 test('Pearson correlation: exact lines and Anscombe (1973), data set I', async () => {

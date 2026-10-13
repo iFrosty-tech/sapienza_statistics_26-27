@@ -26,7 +26,8 @@ import { coordinateDistribution, runStudy, secpSample } from '../src/lib/kg-stud
 import { P as SECP_P } from '../src/lib/secp256k1.js';
 
 const study = JSON.parse(JSON.stringify(runStudy({ secpN: 96, sacKeys: 8, ecdlpTargets: 4 })));
-const BAD = /NaN|undefined|Infinity|null|\[object/;
+// A leaked JavaScript value; "null" after a word ("a structural null") is the statistical term.
+const BAD = /NaN|undefined|Infinity|(?<![A-Za-z] )null|\[object/;
 const GRID = ['c1h', 'c1', 'c2h', 'c2', 'c3h', 'c3', 'c4h', 'c4'];
 
 test('every series of every figure has printable statistics and a chart', () => {
@@ -75,9 +76,66 @@ test('exact population values print as such: the exhaustive occupancy of F₁₀
   const stats = statsOf('occupancy', seriesFromStudy('occupancy', study, 'O1051'));
   assert.equal(stats.yHits0, '687');
   assert.equal(stats.yHits3, '364');
-  assert.equal(stats.yDf, '3');
+  // Four pooled categories, less one for the estimated mean θ and one for the total.
+  assert.equal(stats.yDf, '2');
   assert.equal(stats.yP, '< 0.001');
   assert.equal(stats.xMultiplicity, '0: 505; 2: 546');
+  assert.match(stats.population, /a mean of 1\.039 per value/);
+  assert.ok(!/λ/.test(stats.population), 'the Poisson mean is not called λ, the slope of the group law');
+});
+
+test('no figure prints a caret: powers are superscripts in charts and Unicode in plain text', () => {
+  // The visible text of an SVG or HTML string: its text nodes, without tags.
+  const visible = (html) => html.replace(/<title[^>]*>.*?<\/title>|<desc[^>]*>.*?<\/desc>/g, '').replace(/<[^>]+>/g, '');
+  for (const [kind, keys] of Object.entries(FIGURE_SERIES)) {
+    for (const key of keys) {
+      const data = seriesFromStudy(kind, study, key);
+      for (const [k, v] of Object.entries(statsOf(kind, data))) assert.ok(!v.includes('^'), `${kind}/${key}.${k} = "${v}"`);
+      for (const width of [640, 358]) {
+        const html = renderChart(kind, data, { id: `${kind}-${key}`, width });
+        assert.ok(!visible(html).includes('^'), `${kind}/${key} at ${width}px prints a caret`);
+        assert.ok(!/<(title|desc)[^>]*>[^<]*\^/.test(html), `${kind}/${key} at ${width}px: caret in an accessible text`);
+      }
+    }
+  }
+  const cost = statsOf('dblAddCost', seriesFromStudy('dblAddCost', study, 'all'));
+  assert.match(cost.meanRepeated256, /^\d\.\d\d × 10⁷⁶$/);
+  assert.equal(cost.meanRepeated256Exponent, '76');
+  assert.match(cost.meanRepeated256Mantissa, /^\d\.\d\d$/);
+});
+
+test('Figure 12: the dashed references are those of the marks and the tokens, n/2 and 1.5√n', () => {
+  const data = seriesFromStudy('ecdlp', study, 'all');
+  const stats = statsOf('ecdlp', data);
+  assert.equal(stats.bsgsReference, '1.5√n');
+  assert.equal(stats.bruteReference, 'n/2');
+  const svg = renderChart('ecdlp', data, { id: 'e', width: 640 });
+  assert.ok(svg.includes('>1.5√n<') && svg.includes('>n/2<'));
+  assert.ok(!svg.includes('>√n<'), 'no bare √n reference');
+  // The BSGS mark sits at log₂(1.5·√n) for n the order of secp256k1, as theoryBsgsAt256.
+  assert.equal(stats.theoryBsgsAt256, '128.6');
+  assert.ok(svg.includes(`font-size="75%">${stats.theoryBsgsAt256}</tspan>`));
+});
+
+test('enumerations report the structural Monte Carlo null and pairs counted once', () => {
+  const coord = statsOf('coordHist', seriesFromStudy('coordHist', study, 'O1051'));
+  assert.equal(coord.replicates, '2,000');
+  assert.match(coord.c2h, /structural null/);
+  assert.equal(coord.c2, coord.xStructuralP);
+  assert.equal(coord.c4, coord.yStructuralP);
+  assert.equal(coord.yVif, '1.96');
+  assert.match(coord.yStructuralPEq, /^P [=<] /);
+  const sample = statsOf('coordHist', seriesFromStudy('coordHist', study, 'secp256k1'));
+  assert.equal(sample.xStructuralP, '—');
+  assert.equal(sample.c2h, 'x: p-value');
+  const aval = statsOf('avalanche', seriesFromStudy('avalanche', study, 'O1051'));
+  assert.equal(aval.pairs, '5,380');
+  assert.equal(aval.trials, undefined);
+  assert.match(aval.population, /5,380 pairs/);
+  const cells = statsOf('pointCloud', seriesFromStudy('pointCloud', study, 'all'));
+  assert.equal(cells['T17g.cellsIllustrative'], 'illustrative only, expected counts below 5');
+  assert.match(cells.c1, /illustrative only$/);
+  assert.equal(cells['O16477.cellsPoints'], '8,346');
 });
 
 test('two coordinates sit side by side on a wide figure and stack on a narrow one', () => {

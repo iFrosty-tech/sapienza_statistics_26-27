@@ -118,12 +118,12 @@ function axisTitles(g, xLabel, yLabel) {
   const parts = [];
   if (yLabel) {
     parts.push(
-      `<text class="chart__axis-title" transform="translate(14 ${round(g.top + g.plotH / 2)}) rotate(-90)" text-anchor="middle">${escapeXml(yLabel)}</text>`,
+      `<text class="chart__axis-title" transform="translate(14 ${round(g.top + g.plotH / 2)}) rotate(-90)" text-anchor="middle">${richText(yLabel)}</text>`,
     );
   }
   if (xLabel) {
     parts.push(
-      `<text class="chart__axis-title" x="${round(g.left + g.plotW / 2)}" y="${round(g.bottom + 40)}" text-anchor="middle">${escapeXml(xLabel)}</text>`,
+      `<text class="chart__axis-title" x="${round(g.left + g.plotW / 2)}" y="${round(g.bottom + 40)}" text-anchor="middle">${richText(xLabel)}</text>`,
     );
   }
   return parts.join('');
@@ -133,6 +133,188 @@ function axisTitles(g, xLabel, yLabel) {
 function powerLabel(base, k) {
   return `${base}<tspan class="chart__sup" dy="-0.5em" font-size="75%">${k}</tspan>`;
 }
+
+/* ------------------------------------------------------------ label text */
+
+/* How far an exponent rises above the baseline of an 11px label, in CSS pixels. */
+const SUP_RISE = 4;
+
+/**
+ * The SVG content of a label, escaped, in which "^{…}" marks an exponent:
+ * "2^{255}" prints 255 as a superscript, so that no caret is ever printed.
+ * The exponent is a smaller tspan raised by a fixed dy and the text after it
+ * is lowered back by the same amount (baseline-shift would be simpler, but
+ * Firefox ignores it).
+ * @param {string} label
+ */
+export function richText(label) {
+  const parts = String(label).split(/\^\{([^}]*)\}/);
+  let out = '';
+  let raised = false;
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      out += `<tspan class="chart__sup" dy="${-SUP_RISE}" font-size="75%">${escapeXml(part)}</tspan>`;
+      raised = true;
+    } else if (part) {
+      out += raised ? `<tspan dy="${SUP_RISE}">${escapeXml(part)}</tspan>` : escapeXml(part);
+      raised = false;
+    }
+  });
+  return out;
+}
+
+/* Average advance of a character of an 11px Libre Franklin label (weights 500–600), a little generous. */
+const CHAR_WIDTH = 6.3;
+
+/** Estimated width in CSS pixels of an 11px chart label written for richText. */
+export function textWidth(label) {
+  return String(label)
+    .split(/\^\{([^}]*)\}/)
+    .reduce((w, part, i) => w + [...part].reduce((s, c) => s + (c === ' ' ? 0.55 : 1), 0) * CHAR_WIDTH * (i % 2 === 1 ? 0.75 : 1), 0);
+}
+
+/**
+ * The box of a label drawn at (x, y) (its baseline) with a text-anchor:
+ * { x0, x1, y0, y1 } in CSS pixels, taller when the label has an exponent.
+ */
+export function labelBox({ x, y, anchor }, label) {
+  const w = textWidth(label);
+  const x0 = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+  return { x0, x1: x0 + w, y0: y - (/\^\{/.test(label) ? 9 + SUP_RISE : 9), y1: y + 3 };
+}
+
+const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const grow = (b, d) => ({ x0: b.x0 - d, x1: b.x1 + d, y0: b.y0 - d, y1: b.y1 + d });
+
+/* Whether the segment from (x1, y1) to (x2, y2) crosses the box (Liang–Barsky clipping). */
+function segmentHitsBox([x1, y1, x2, y2], b) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [p, q] of [
+    [-dx, x1 - b.x0],
+    [dx, b.x1 - x1],
+    [-dy, y1 - b.y0],
+    [dy, b.y1 - y1],
+  ]) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+
+/* Candidate positions of a label around an anchor point at distance d: baseline and text-anchor. */
+const DIRECTIONS = {
+  e: (ax, ay, d) => ({ x: ax + d, y: ay + 4, anchor: 'start' }),
+  w: (ax, ay, d) => ({ x: ax - d, y: ay + 4, anchor: 'end' }),
+  n: (ax, ay, d) => ({ x: ax, y: ay - d, anchor: 'middle' }),
+  s: (ax, ay, d) => ({ x: ax, y: ay + d + 6, anchor: 'middle' }),
+  ne: (ax, ay, d) => ({ x: ax + 0.7 * d, y: ay - 0.7 * d, anchor: 'start' }),
+  nw: (ax, ay, d) => ({ x: ax - 0.7 * d, y: ay - 0.7 * d, anchor: 'end' }),
+  se: (ax, ay, d) => ({ x: ax + 0.7 * d, y: ay + 0.7 * d + 6, anchor: 'start' }),
+  sw: (ax, ay, d) => ({ x: ax - 0.7 * d, y: ay + 0.7 * d + 6, anchor: 'end' }),
+};
+const ALL_DIRECTIONS = Object.keys(DIRECTIONS);
+/* Preferred directions, tried first at every distance, then the others: options for board.place. */
+const prefer = (first) => ({ directions: [...first, ...ALL_DIRECTIONS.filter((d) => !first.includes(d))], preferred: first.length });
+
+/**
+ * A board on which labels are placed without collisions: marks, lines and
+ * labels already drawn are obstacles, and each new label takes the first
+ * candidate position, nearest distance first and then in the given order of
+ * directions and anchors, whose box lies inside `bounds` (the plot area) and
+ * touches no obstacle. If every candidate collides, it takes the one inside
+ * the bounds with the fewest collisions, so a label never leaves the plot.
+ * @param {{ x0: number, x1: number, y0: number, y1: number }} bounds
+ */
+export function labelBoard(bounds) {
+  const boxes = [];
+  const segments = [];
+  const inside = (b) => b.x0 >= bounds.x0 && b.x1 <= bounds.x1 && b.y0 >= bounds.y0 && b.y1 <= bounds.y1;
+  const collisions = (b) => {
+    const padded = grow(b, 1.5);
+    return boxes.filter((o) => overlaps(o, padded)).length + segments.filter((s) => segmentHitsBox(s, padded)).length;
+  };
+  return {
+    circle(cx, cy, r) {
+      boxes.push({ x0: cx - r, x1: cx + r, y0: cy - r, y1: cy + r });
+    },
+    box(b) {
+      boxes.push(b);
+    },
+    segment(x1, y1, x2, y2) {
+      segments.push([x1, y1, x2, y2]);
+    },
+    /** Polyline through the given points ([x, y] pairs), as segments. */
+    polyline(points) {
+      for (let i = 1; i < points.length; i += 1) segments.push([...points[i - 1], ...points[i]]);
+    },
+    /**
+     * The first `preferred` directions are tried at every distance before the others, so that a
+     * label keeps to its preferred side when there is room there at any distance.
+     * @param {string} label
+     * @param {{ anchors: [number, number][], directions: string[], preferred?: number, distances?: number[] }} options
+     * @returns {{ x: number, y: number, anchor: 'start'|'middle'|'end' }}
+     */
+    place(label, { anchors, directions, preferred = 0, distances = [6, 9, 13, 18, 26, 36] }) {
+      let best = null;
+      const tiers = preferred > 0 ? [directions.slice(0, preferred), directions.slice(preferred)] : [directions];
+      for (const tier of tiers) {
+        for (const d of distances) {
+          for (const dir of tier) {
+            for (const [ax, ay] of anchors) {
+              const at = DIRECTIONS[dir](ax, ay, d);
+              const b = labelBox(at, label);
+              if (!inside(b)) continue;
+              const hits = collisions(b);
+              if (hits === 0) {
+                boxes.push(b);
+                return at;
+              }
+              if (!best || hits < best.hits) best = { at, b, hits };
+            }
+          }
+        }
+      }
+      if (!best) {
+        // Nothing fits inside: clamp the first candidate into the bounds.
+        const [ax, ay] = anchors[0];
+        const at = DIRECTIONS[directions[0]](ax, ay, distances[0]);
+        const b = labelBox(at, label);
+        const shiftX = Math.max(0, bounds.x0 - b.x0) - Math.max(0, b.x1 - bounds.x1);
+        const shiftY = Math.max(0, bounds.y0 - b.y0) - Math.max(0, b.y1 - bounds.y1);
+        best = { at: { ...at, x: at.x + shiftX, y: at.y + shiftY }, b: { x0: b.x0 + shiftX, x1: b.x1 + shiftX, y0: b.y0 + shiftY, y1: b.y1 + shiftY } };
+      }
+      boxes.push(best.b);
+      return best.at;
+    },
+  };
+}
+
+/* The anchors of a series label: its points from the given fraction of the series outward. */
+function seriesAnchors(points, from = 0.5) {
+  const order = [];
+  const start = Math.round((points.length - 1) * from);
+  for (let k = 0; order.length < points.length; k += 1) {
+    if (start + k < points.length) order.push(points[start + k]);
+    if (k > 0 && start - k >= 0) order.push(points[start - k]);
+  }
+  return order;
+}
+
+/* A label drawn at a position chosen by a label board. */
+const placedText = (cls, at, label) =>
+  `<text class="${cls}" x="${round(at.x)}" y="${round(at.y)}" text-anchor="${at.anchor}">${richText(label)}</text>`;
+
+/* The plot area of a layout, less a small inset, as the bounds of a label board. */
+const plotBounds = (g, inset = 2) => ({ x0: g.left + inset, x1: g.right - inset, y0: g.top + inset, y1: g.bottom - inset });
 
 /* ----------------------------------------------------------- histogram */
 
@@ -296,46 +478,65 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
   out.push(vRulings(g, xt.map((k) => ({ value: k, x: x(k) })), { major: () => false }));
   out.push(frame(g), '</g>');
 
-  out.push('<g class="chart__references" aria-hidden="true">');
-  for (const ref of references) {
-    const f = Math.log2(ref.factor ?? 1);
-    // The reference line log2 y = f + exponent · log2 x is cut to the panel so that a steep
-    // law (n/2 in the measured panel) does not run past the frame into the caption.
-    const segment = clipLineToRange(ref.exponent, f, xRange, yRange);
-    if (!segment) continue;
+  // Every label is placed inside the plot area, clear of the points, the lines and the other labels.
+  const board = labelBoard(plotBounds(g));
+  // The panel title (10.5px with 0.04em tracking in the formula figures, about 6.2px a character).
+  if (label) board.box({ x0: g.left + 6, x1: g.left + 6 + [...label].length * 6.2, y0: g.top + 4, y1: g.top + 19 });
+  const radius = dense ? 3 : 3.75;
+  const points = series.map((s) => s.points.map((p) => [x(lx(p.x)), y(lx(p.y))]));
+  points.flat().forEach(([cx, cy]) => board.circle(cx, cy, radius));
+  const markAt = marks.map((m) => [x(lx(m.x)), y(lx(m.y))]);
+  markAt.forEach(([mx, my]) => board.circle(mx, my, 5));
+  // The reference line log2 y = f + exponent · log2 x is cut to the panel so that a steep
+  // law (n/2 in the measured panel) does not run past the frame into the caption.
+  const segments = references.map((ref) => {
+    const segment = clipLineToRange(ref.exponent, Math.log2(ref.factor ?? 1), xRange, yRange);
+    if (!segment) return null;
     const [xa, ya, xb, yb] = segment;
-    out.push(
-      `<line class="chart__reference" x1="${round(x(xa))}" y1="${round(y(ya))}" x2="${round(x(xb))}" y2="${round(y(yb))}"/>`,
-    );
-    out.push(
-      `<text class="chart__annotation" x="${round(x(xb) - 4)}" y="${round(y(yb) - 5)}" text-anchor="end">${escapeXml(ref.label)}</text>`,
-    );
+    const s = [x(xa), y(ya), x(xb), y(yb)];
+    board.segment(...s);
+    return s;
+  });
+
+  const labels = [];
+  // Marks first (their labels belong next to them), with `dy` (CSS pixels) as a hint for a lower or higher label.
+  marks.forEach((m, i) => {
+    const [mx, my] = markAt[i];
+    const at = board.place(m.label, { anchors: [[mx, my + (m.dy ?? 0)]], ...prefer(m.prefer ?? ['w', 'nw', 'sw']) });
+    labels.push(placedText('chart__annotation', at, m.label));
+  });
+  // Series labels: the highest series above-left of its points, the others below-right.
+  if (showSeriesLabels) {
+    const meanY = points.map((list) => list.reduce((s, [, py]) => s + py, 0) / Math.max(1, list.length));
+    const top = meanY.indexOf(Math.min(...meanY));
+    series.forEach((s, i) => {
+      if (!points[i].length) return;
+      const directions = i === top ? ['nw', 'n', 'w', 'ne', 'se', 's', 'e', 'sw'] : ['se', 's', 'e', 'sw', 'nw', 'n', 'w', 'ne'];
+      const at = board.place(s.label, { anchors: seriesAnchors(points[i]), directions });
+      labels.push(placedText('chart__series-label', at, s.label));
+    });
+  }
+  // Reference labels last: they may sit anywhere along their line, preferably near its upper end.
+  references.forEach((ref, i) => {
+    const s = segments[i];
+    if (!s) return;
+    const anchors = [0.92, 0.82, 0.72, 0.62, 0.52, 0.42, 0.32].map((t) => [s[0] + t * (s[2] - s[0]), s[1] + t * (s[3] - s[1])]);
+    const at = board.place(ref.label, { anchors, directions: ['nw', 'se', 'w', 'e', 'n', 's'] });
+    labels.push(placedText('chart__annotation', at, ref.label));
+  });
+
+  out.push('<g class="chart__references" aria-hidden="true">');
+  for (const s of segments) {
+    if (s) out.push(`<line class="chart__reference" x1="${round(s[0])}" y1="${round(s[1])}" x2="${round(s[2])}" y2="${round(s[3])}"/>`);
   }
   out.push('</g>');
 
   out.push('<g class="chart__data" aria-hidden="true">');
-  for (const s of series) {
-    for (const p of s.points) {
-      out.push(
-        `<circle class="chart__point chart__point--${s.key}" cx="${round(x(lx(p.x)))}" cy="${round(y(lx(p.y)))}" r="${dense ? 3 : 3.75}"/>`,
-      );
-    }
-    if (showSeriesLabels && s.points.length) {
-      const last = s.points[s.points.length - 1];
-      out.push(
-        `<text class="chart__series-label" x="${round(x(lx(last.x)) + 8)}" y="${round(y(lx(last.y)) + 4)}">${escapeXml(s.label)}</text>`,
-      );
-    }
-  }
-  for (const m of marks) {
-    const mx = x(lx(m.x));
-    const my = y(lx(m.y));
-    // `dy` shifts a label vertically (CSS pixels) so that marks close on the axis keep separate labels.
-    out.push(
-      `<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="5"/>`,
-      `<text class="chart__annotation" x="${round(mx - 9)}" y="${round(my + 4 + (m.dy ?? 0))}" text-anchor="end">${escapeXml(m.label)}</text>`,
-    );
-  }
+  series.forEach((s, i) => {
+    for (const [cx, cy] of points[i]) out.push(`<circle class="chart__point chart__point--${s.key}" cx="${round(cx)}" cy="${round(cy)}" r="${radius}"/>`);
+  });
+  for (const [mx, my] of markAt) out.push(`<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="5"/>`);
+  out.push(...labels);
   out.push('</g>');
 
   out.push('<g class="chart__labels" aria-hidden="true">');
@@ -353,7 +554,8 @@ function logPanel({ g, series, references, marks, xRange, yRange, label, showSer
  * of the measured curves and the full range up to secp256k1.
  * @param {{ series: { key: string, label: string, points: { x: number, y: number }[] }[],
  *   references?: { label: string, exponent: number, factor?: number }[],
- *   marks?: { x: number, y: number, label: string, dy?: number }[] }} options
+ *   marks?: { x: number, y: number, label: string, dy?: number, prefer?: string[] }[] }} options
+ *   Labels are placed by a label board inside each plot area; '^{…}' in a label marks an exponent.
  */
 export function renderLogLog({
   id,
@@ -375,7 +577,7 @@ export function renderLogLog({
   const zoomX = [Math.floor(Math.min(...allX)) - 1, Math.ceil(Math.max(...allX)) + 1];
   const zoomY = [Math.max(0, Math.floor(Math.min(...allY)) - 1), Math.ceil(Math.max(...allY)) + 1];
   const fullX = [0, Math.ceil(Math.max(...allX, ...marks.map((m) => Math.log2(m.x))) / 32) * 32 + 8];
-  const fullY = [0, Math.ceil(Math.max(...allY, ...marks.map((m) => Math.log2(m.y))) / 16) * 16 + 8];
+  const fullY = [0, Math.ceil(Math.max(...allY, ...marks.map((m) => Math.log2(m.y))) / 16) * 16 + 24];
 
   const panels = stacked
     ? [
@@ -834,7 +1036,7 @@ const DASHES = ['', '7 4', '2 3', '9 3 2 3'];
  * optional marked points. With yFormat 'pow2' the y values are base-2
  * logarithms and the ticks print as powers of two.
  * @param {{ id: string, title: string, desc: string, series: { key: string, label?: string, points: { x: number, y: number|null }[] }[],
- *   marks?: { x: number, y: number, label: string, dy?: number, anchor?: 'start'|'end' }[],
+ *   marks?: { x: number, y: number, label: string, dy?: number, anchor?: 'start'|'end', prefer?: string[] }[],
  *   xDomain: [number, number], yDomain: [number, number], yFormat?: 'number'|'pow2',
  *   width?: number, height?: number, xLabel?: string, yLabel?: string }} options
  */
@@ -866,37 +1068,55 @@ export function renderLineChart({
   out.push(vRulings(g, xt.values.filter((v) => v > xDomain[0] && v < xDomain[1]).map((value) => ({ value, x: x(value) })), { major: () => false }));
   out.push(frame(g), '</g>');
 
-  out.push('<g class="chart__data" aria-hidden="true">');
-  series.forEach((s, i) => {
-    let d = '';
-    let pen = 'M';
-    let last = null;
+  // Labels are placed inside the plot area, clear of the lines, the marks and each other.
+  const board = labelBoard(plotBounds(g));
+  const runs = series.map((s) => {
+    // Missing values break a line into runs of drawable points (pixel coordinates).
+    const parts = [[]];
     for (const p of s.points) {
       if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-        pen = 'M';
+        if (parts.at(-1).length) parts.push([]);
         continue;
       }
-      d += `${pen}${round(x(p.x))},${round(y(p.y))}`;
-      pen = 'L';
-      last = p;
+      parts.at(-1).push([x(p.x), y(p.y)]);
     }
+    return parts.filter((part) => part.length);
+  });
+  runs.flat().forEach((run) => board.polyline(run));
+  const markAt = marks.map((m) => [x(m.x), y(m.y)]);
+  markAt.forEach(([mx, my]) => board.circle(mx, my, 4.5));
+
+  const labels = [];
+  // Mark labels first, next to their marks: `prefer` lists the directions to try first (compass
+  // points such as 'nw' or 'se'), `anchor: 'end'` prefers the left side, `dy` shifts the anchor.
+  marks.forEach((m, i) => {
+    const [mx, my] = markAt[i];
+    const order = prefer(m.prefer ?? (m.anchor === 'end' ? ['w', 'nw', 'sw'] : ['e', 'ne', 'se']));
+    const at = board.place(m.label, { anchors: [[mx, my + (m.dy ?? 0)]], ...order });
+    labels.push(placedText('chart__annotation', at, m.label));
+  });
+  // Series labels along their own line, preferably in its upper part: the highest line above-left.
+  const meanY = runs.map((parts) => {
+    const all = parts.flat();
+    return all.reduce((s, [, py]) => s + py, 0) / Math.max(1, all.length);
+  });
+  const top = meanY.indexOf(Math.min(...meanY));
+  series.forEach((s, i) => {
+    const all = runs[i].flat();
+    if (!s.label || !all.length) return;
+    const directions = i === top ? ['nw', 'n', 'w', 'se', 's', 'e'] : ['n', 'nw', 'ne', 'se', 's', 'sw'];
+    const at = board.place(s.label, { anchors: seriesAnchors(all, 0.7), directions });
+    labels.push(placedText('chart__series-label', at, s.label));
+  });
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  series.forEach((s, i) => {
+    const d = runs[i].map((run) => run.map(([px, py], k) => `${k === 0 ? 'M' : 'L'}${round(px)},${round(py)}`).join('')).join('');
     const dash = DASHES[i % DASHES.length];
     out.push(`<path class="chart__curve chart__curve--${i}"${dash ? ` stroke-dasharray="${dash}"` : ''} d="${d}"/>`);
-    if (s.label && last) {
-      out.push(
-        `<text class="chart__series-label" x="${round(x(last.x) - 4)}" y="${round(y(last.y) - 7)}" text-anchor="end">${escapeXml(s.label)}</text>`,
-      );
-    }
   });
-  for (const m of marks) {
-    const mx = x(m.x);
-    const my = y(m.y);
-    const end = m.anchor === 'end';
-    out.push(
-      `<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="4.5"/>`,
-      `<text class="chart__annotation" x="${round(mx + (end ? -9 : 9))}" y="${round(my + 4 + (m.dy ?? 0))}" text-anchor="${end ? 'end' : 'start'}">${escapeXml(m.label)}</text>`,
-    );
-  }
+  for (const [mx, my] of markAt) out.push(`<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="4.5"/>`);
+  out.push(...labels);
   out.push('</g>');
 
   out.push('<g class="chart__labels" aria-hidden="true">');

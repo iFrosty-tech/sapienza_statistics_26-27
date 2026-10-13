@@ -27,6 +27,8 @@ import {
   correlationStudy,
   periodicSequence,
   avalancheSmall,
+  pairDistanceLaw,
+  structuralNull,
   secpSample,
   flipSample,
   flippedPoints,
@@ -120,6 +122,9 @@ test('E2 occupancy: exact multiplicities of x and y', () => {
   near(occ.lambda, 1092 / 1051, 1e-15);
   assert.equal(occ.reference.length, 4);
   assert.ok(occ.test.pValue < 1e-10, 'three-to-one ordinates are far from a random function');
+  // The Poisson mean θ is the observed mean number of occurrences per value: one degree of freedom is spent on it.
+  assert.equal(occ.test.df, occ.test.bins.length - 2);
+  assert.equal(occ.test.ddof, 1);
 });
 
 test('E2 Poisson reference and the Keccak-256 mod p baseline', () => {
@@ -150,6 +155,59 @@ test('E1 coordinate distribution with exact unequal bin widths', () => {
   const big = coordinateDistribution([0n, 2n ** 255n, 2n ** 256n - 1n], 2n ** 256n, 2);
   assert.deepEqual(big.counts, [1, 2]);
   near(big.expected[0], 1.5, 1e-12);
+});
+
+test('E1 ordinates of an orbit closed under negation fill mirror-image bins equally', () => {
+  // y ↦ p − y maps bin j onto bin B − 1 − j when p is a prime larger than B, and a subgroup
+  // contains −Q = (x, p − y) with every Q, so the y-bin counts are paired exactly.
+  for (const [id, B] of [['O1051', 16], ['O16477', 32]]) {
+    const o = orbit(byId[id]);
+    const d = coordinateDistribution(o.ys, o.p, B);
+    for (let j = 0; j < B; j += 1) assert.equal(d.counts[j], d.counts[B - 1 - j], `${id}: bins ${j} and ${B - 1 - j}`);
+  }
+});
+
+test('E1 structural Monte Carlo null of the binned chi-square on an enumeration', () => {
+  const o = orbit(byId.O1051);
+  // Ordinates: 364 distinct values, each three times, in pairs {y, p − y}.
+  const y = structuralNull(o.ys, 1051, 16, { closedUnderNegation: true, replicates: 2000, seed: 7, examples: 3 });
+  assert.equal(y.replicates, 2000);
+  assert.equal(y.seed, 7);
+  assert.equal(y.distinct, 364);
+  near(y.multiplicity, 3, 1e-12);
+  near(y.vif, 3 * (1 - 364 / 1051), 1e-12);
+  near(y.statistic, coordinateDistribution(o.ys, 1051, 16).statistic, 1e-9);
+  near(y.mean, 27.5, 2.5, 'structural mean ≈ m(1 − d)(B − 2)');
+  assert.ok(y.q95 > 45 && y.q95 < 66, `95th percentile ${y.q95}`);
+  assert.ok(y.pValue > 0.005 && y.pValue < 0.06, `Monte Carlo p-value ${y.pValue}`);
+  // Every replicate keeps the structure: the same total, multiples of three, mirror-image bins equal.
+  assert.equal(y.examples.length, 3);
+  for (const counts of y.examples) {
+    assert.equal(counts.reduce((a, b) => a + b, 0), 1092);
+    assert.ok(counts.every((c) => c % 3 === 0));
+    for (let j = 0; j < 16; j += 1) assert.equal(counts[j], counts[15 - j]);
+  }
+  // Abscissas: 546 distinct values, each twice, with no pairing; the inflation factor is about 1.
+  const x = structuralNull(o.xs, 1051, 16, { closedUnderNegation: false, replicates: 2000, seed: 8, examples: 1 });
+  assert.equal(x.distinct, 546);
+  near(x.vif, 2 * (1 - 546 / 1051), 1e-12);
+  near(x.mean, x.vif * 15, 1.5, 'structural mean ≈ m(1 − d)(B − 1)');
+  assert.ok(x.examples[0].every((c) => c % 2 === 0));
+  // The Monte Carlo p-value counts the replicates at least as large, with the +1 correction.
+  assert.ok(x.pValue >= 1 / 2001 && x.pValue <= 1);
+  // Reproducible from its seed.
+  assert.deepEqual(structuralNull(o.ys, 1051, 16, { closedUnderNegation: true, replicates: 50, seed: 7 }), structuralNull(o.ys, 1051, 16, { closedUnderNegation: true, replicates: 50, seed: 7 }));
+  // Exactly uniform ordinates (p ≡ 2 mod 3): every value once, nothing to permute, P = 1.
+  const s = orbit(byId.S1031);
+  const sy = structuralNull(s.ys, 1031, 16, { closedUnderNegation: true, replicates: 50, seed: 3 });
+  assert.equal(sy.vif, 0);
+  assert.equal(sy.mean, 0);
+  assert.equal(sy.pValue, 1);
+  // A mixture of multiplicities (one point of order 2 on the toy curve with the generator): m is Σm²/Σm.
+  const g = orbit(T17, { x: 6, y: 6 });
+  const gx = structuralNull(g.xs, 17, 17, { closedUnderNegation: false, replicates: 20, seed: 4 });
+  assert.equal(gx.distinct, 9);
+  near(gx.multiplicity, (8 * 4 + 1) / 17, 1e-12);
 });
 
 test('E3 exact bit expectation and bit frequencies', () => {
@@ -185,10 +243,22 @@ test('E4 point cloud, cell uniformity and mirror symmetry', () => {
   assert.ok(cloud.k.every((k, i) => i === 0 || k > cloud.k[i - 1]));
   assert.equal(cloud.xs[10], o.xs[cloud.k[10] - 1]);
   assert.deepEqual(pointCloud(orbit(T17)).k, [1, 2, 3, 4, 5, 6, 7, 8]);
+  // The cell test uses the half-grid y < p/2 only: the other half is its mirror image.
   const cells = cellUniformity(o.xs, o.ys, o.p, 16);
   assert.equal(cells.counts.length, 16);
-  assert.equal(cells.counts.flat().reduce((a, b) => a + b, 0), o.n - 1);
+  assert.equal(cells.half, true);
+  assert.equal(cells.total, (o.n - 1) / 2);
+  assert.equal(cells.counts.flat().reduce((a, b) => a + b, 0), (o.n - 1) / 2);
+  near(cells.expected.flat().reduce((a, b) => a + b, 0), (o.n - 1) / 2, 1e-9);
   assert.equal(cells.df, 255);
+  assert.equal(cells.illustrative, false);
+  // The toy curve with the generator: 9 points with y < 17/2 (the point of order 2 has y = 0) in 2 × 2 cells.
+  const g = orbit(T17, { x: 6, y: 6 });
+  const toy = cellUniformity(g.xs, g.ys, 17, 2);
+  assert.equal(toy.total, 9);
+  assert.equal(toy.df, 3);
+  assert.ok(toy.minExpected < 5);
+  assert.equal(toy.illustrative, true, 'expected counts below 5: illustrative only');
   for (const { orbit: orb, base } of ORBITS) assert.equal(mirrorSymmetry(orb).fraction, 1, base.key);
 });
 
@@ -218,15 +288,56 @@ test('E5 periodic sequence of x(kG) on T17: period 9, O at multiples of n', () =
   assert.deepEqual(s.xs.slice(9, 18), s.xs.slice(0, 9));
 });
 
-test('E6 exhaustive avalanche on a small curve', () => {
-  const a = avalancheSmall(byId.O1051);
-  assert.equal(a.trials + a.discarded, 1092 * 11);
-  assert.equal(a.counts.reduce((x, y) => x + y, 0), a.trials);
+test('E6 exhaustive avalanche counts each unordered pair {k, k ⊕ 2^i} once', () => {
+  const e = byId.O1051;
+  const o = orbit(e);
+  const a = avalancheSmall(e, { orbit: o });
+  // Ordered flips (k, i) with k ⊕ 2^i in [1, n − 1]: each unordered pair is reached from both ends.
+  let ordered = 0;
+  for (let k = 1; k < o.n; k += 1) {
+    for (let i = 0; i < a.inputBits; i += 1) {
+      const kp = k ^ (1 << i);
+      if (kp >= 1 && kp < o.n) ordered += 1;
+    }
+  }
+  assert.equal(a.pairs * 2, ordered);
+  assert.equal(2 * a.pairs + a.discarded, 1092 * 11);
+  assert.equal(a.counts.reduce((x, y) => x + y, 0), a.pairs);
   assert.equal(a.counts.length, 23);
-  near(a.reference.reduce((x, y) => x + y, 0), 1, 1e-12);
   assert.ok(a.mean > 8 && a.mean < 14, `mean ${a.mean}`);
   const t = avalancheSmall(T17);
-  assert.equal(t.trials + t.discarded, 8 * 4);
+  assert.equal(2 * t.pairs + t.discarded, 8 * 4);
+});
+
+test('E6 reference: the exact Hamming-distance law of two distinct points of the orbit', () => {
+  for (const key of ['T17g', 'O1051']) {
+    const { entry, base } = ORBITS.find((item) => item.base.key === key);
+    const o = orbit(entry, base);
+    const m = o.n - 1;
+    const bits = entry.bits;
+    const a = avalancheSmall(entry, { base, orbit: o });
+    const allPairs = (m * (m - 1)) / 2;
+    assert.equal(a.allPairs, allPairs);
+    assert.equal(a.reference.reduce((x, y) => x + y, 0), allPairs, `${key}: the law counts every pair a < b once`);
+    assert.deepEqual(a.reference, pairDistanceLaw(o.xs, o.ys, bits));
+    // Mean of the law: Σ 2q_j(1 − q_j) · m/(m − 1), q_j the population frequency of bit j of x‖y.
+    const q = [...bitFrequency(o.xs, bits).frequency, ...bitFrequency(o.ys, bits).frequency];
+    const closed = (q.reduce((s, qj) => s + 2 * qj * (1 - qj), 0) * m) / (m - 1);
+    near(a.expectedMean, closed, 1e-9, `${key}: closed-form mean`);
+    near(a.reference.reduce((s, c, d) => s + c * d, 0) / allPairs, closed, 1e-9, `${key}: mean of the law`);
+  }
+  // Brute force on the toy orbit of the assignment: 8 points, 28 pairs.
+  const o = orbit(T17);
+  const law = new Array(11).fill(0);
+  for (let a = 0; a < 8; a += 1) {
+    for (let b = a + 1; b < 8; b += 1) {
+      let d = 0;
+      for (let j = 0; j < 5; j += 1) d += ((o.xs[a] >> j) & 1) !== ((o.xs[b] >> j) & 1) ? 1 : 0;
+      for (let j = 0; j < 5; j += 1) d += ((o.ys[a] >> j) & 1) !== ((o.ys[b] >> j) & 1) ? 1 : 0;
+      law[d] += 1;
+    }
+  }
+  assert.deepEqual(pairDistanceLaw(o.xs, o.ys, 5), law);
 });
 
 test('secpSample: keys in [1, n − 1], deterministic, points and digests correct', () => {
@@ -318,6 +429,12 @@ test('runStudy returns JSON-serialisable output keyed by experiment and curve', 
   for (const key of ['meta', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8']) assert.ok(key in back, key);
   for (const key of ['T17', 'T17g', 'S1031', 'O1051', 'O16477']) assert.ok(key in back.E2, key);
   assert.ok(Array.isArray(back.E4.O1051.cloud.xs));
+  // Enumerations carry the structural null of E1; samples do not need one.
+  assert.equal(back.E1.O1051.y.structural.replicates, 2000);
+  assert.equal(typeof back.E1.O1051.y.structural.pValue, 'number');
+  assert.equal(back.E1.secp256k1.x.structural, undefined);
+  assert.equal(typeof back.meta.seeds.structural, 'number');
+  assert.equal(back.E6.O1051.pairs * 2 + back.E6.O1051.discarded, 1092 * 11);
   assert.equal(back.meta.seed, 20261013);
   assert.equal(back.meta.keys.first.length, 8);
   assert.match(back.meta.keys.first[0], /^[0-9a-f]{64}$/);

@@ -77,6 +77,11 @@
   letter-spacing: 0.03em;
 }
 
+/* Exponents (8.68 × 10⁷⁶, 2²⁵⁶) are real superscripts; they must not open the line spacing. */
+:is(.pplot__stats, .data-table) :is(sup, sub) {
+  line-height: 0;
+}
+
 .pplot__stats--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1539,12 +1544,45 @@
   white-space: nowrap;
 }
 
-/* Wide tables (the steps of Table 2, the curves of Table 4, the correlations of Table 5) take the
-   free margin to the right of the measure on the two-column layout; the caption keeps the measure. */
+/* Wide tables (the steps of Table 2, the curves of Table 4, the correlations of Table 5, the results
+   and the classification of Tables 7 and 8) take the free margin to the right of the measure on the
+   two-column layout; the caption keeps the measure. */
 @media (min-width: 62rem) {
-  .table-figure:has(.data-table--steps, .data-table--ladder, .data-table--correlation) > .data-table--scroll {
+  .table-figure:has(.data-table--steps, .data-table--ladder, .data-table--correlation, .data-table--results, .data-table--classification)
+    > .data-table--scroll {
     margin-right: calc(-1 * min(var(--hw01-free, 0px), 24rem));
   }
+}
+
+/* Tables 7 and 8: a floor on the width keeps every column readable; below it the table scrolls in its
+   frame. Cells start at the top of the row, and the property column keeps one width in both tables. */
+.data-table--results,
+.data-table--classification {
+  min-width: 44rem;
+}
+
+.data-table--classification {
+  min-width: 36rem;
+}
+
+:is(.data-table--results, .data-table--classification) :is(th, td) {
+  vertical-align: top;
+}
+
+:is(.data-table--results, .data-table--classification) tbody th {
+  width: 10rem;
+}
+
+/* The classification is argued, so it is set in the voice of the argument (the Two Voices Rule). */
+.data-table--classification td {
+  font-family: var(--font-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* Long inline values (an address, a key, a cache key) wrap anywhere rather than widen the page. */
+.prose :not(pre) > code {
+  overflow-wrap: anywhere;
 }
 
 /* Scroll affordance: while columns are hidden to the right (or left), the cut edge fades out. The

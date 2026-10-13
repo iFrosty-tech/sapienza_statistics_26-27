@@ -50,8 +50,8 @@ import {
   chiSquareSf,
   fisherZTest,
   monobitFromCounts,
+  monteCarloSummary,
   pearson,
-  poissonBinomialPmf,
   poissonPmf,
   pooledChiSquare,
   spearman,
@@ -432,6 +432,127 @@ export function coordinateDistribution(values, p, bins) {
   return { bins, total, edges, widths, counts, expected, minExpected: Math.min(...expected), statistic: fit.statistic, df: fit.df, pValue: fit.p };
 }
 
+/**
+ * Structural Monte Carlo null of the binned chi-square of
+ * coordinateDistribution, for one coordinate of an enumerated orbit. The
+ * reference χ²(B − 1) assumes independent draws, and the coordinates of an
+ * orbit are not: every value that occurs does so a fixed number of times (an
+ * abscissa twice, or once for a point of order 2; an ordinate three times
+ * when p ≡ 1 (mod 3)), and the ordinates of a subgroup are closed under
+ * y ↦ p − y, which makes the counts of bins j and B − 1 − j equal. Each
+ * replicate keeps that structure and randomises only where the values lie:
+ *   closedUnderNegation false (abscissas): a uniformly random set of D values
+ *     of F_p, D the number of distinct observed values, carrying the observed
+ *     multiplicities in random order;
+ *   closedUnderNegation true (ordinates): the value 0 if it is observed, and a
+ *     uniformly random set of as many pairs {y, p − y} as observed, both values
+ *     of a pair carrying the observed multiplicity of a pair.
+ * The variance-inflation factor m(1 − d), with m = Σ m_v² / Σ m_v the
+ * multiplicity of a value (weighted by its count) and d = D/p, is the ratio of
+ * variance to mean of a bin count under the null without pairing, where
+ * χ²(B − 1) assumes 1; the pairing of mirror bins comes on top of it.
+ * @param {ArrayLike<number>} values coordinates, integers in [0, p)
+ * @param {number} p an odd prime
+ * @param {number} bins
+ * @param {{ closedUnderNegation: boolean, replicates?: number, seed: number, examples?: number }} options
+ *   examples: the bin counts of the first replicates are returned too (for tests)
+ * @returns {{ replicates: number, seed: number, closedUnderNegation: boolean, distinct: number, multiplicity: number,
+ *   vif: number, statistic: number, mean: number, q95: number, pValue: number, examples?: number[][] }}
+ */
+export function structuralNull(values, p, bins, { closedUnderNegation, replicates = 2000, seed, examples = 0 }) {
+  if (!Number.isInteger(p) || p < 3 || p % 2 === 0) throw new RangeError('p must be an odd integer');
+  if (!Number.isInteger(bins) || bins < 1 || bins > p) throw new RangeError('bins must be an integer in [1, p]');
+  if (!Number.isInteger(seed)) throw new RangeError('a structural null needs its seed');
+  const hits = new Int32Array(p);
+  for (const v of values) {
+    if (!(v >= 0 && v < p)) throw new RangeError(`value ${v} is outside [0, ${p})`);
+    hits[v] += 1;
+  }
+  const total = values.length;
+  const binOf = new Int32Array(p);
+  for (let v = 0; v < p; v += 1) binOf[v] = Math.floor((v * bins) / p);
+  const expected = new Float64Array(bins);
+  for (let v = 0; v < p; v += 1) expected[binOf[v]] += total / p;
+  const counts = new Float64Array(bins);
+  const statisticOf = () => {
+    let s = 0;
+    for (let j = 0; j < bins; j += 1) {
+      const d = counts[j] - expected[j];
+      s += (d * d) / expected[j];
+    }
+    return s;
+  };
+
+  let distinct = 0;
+  let sumM = 0;
+  let sumM2 = 0;
+  for (let v = 0; v < p; v += 1) {
+    counts[binOf[v]] += hits[v];
+    if (hits[v] > 0) {
+      distinct += 1;
+      sumM += hits[v];
+      sumM2 += hits[v] * hits[v];
+    }
+  }
+  const statistic = statisticOf();
+
+  // Each replicate: a partial Fisher–Yates shuffle of the candidate values draws the set in a
+  // uniformly random order, so the fixed list of multiplicities lands on it in random order.
+  let pool;
+  let multiplicities;
+  let place;
+  if (closedUnderNegation) {
+    for (let v = 1; v < p; v += 1) {
+      if (hits[v] !== hits[p - v]) throw new RangeError('the values are not closed under v ↦ p − v');
+    }
+    const half = (p - 1) / 2;
+    pool = Int32Array.from({ length: half }, (_, i) => i + 1);
+    multiplicities = Int32Array.from(pool.filter((v) => hits[v] > 0), (v) => hits[v]);
+    place = (y, m) => {
+      counts[binOf[y]] += m;
+      counts[binOf[p - y]] += m;
+    };
+  } else {
+    pool = Int32Array.from({ length: p }, (_, v) => v);
+    multiplicities = Int32Array.from(pool.filter((v) => hits[v] > 0), (v) => hits[v]);
+    place = (v, m) => {
+      counts[binOf[v]] += m;
+    };
+  }
+  const zero = closedUnderNegation ? hits[0] : 0;
+  const rnd = createRandom(seed);
+  const stats = new Float64Array(replicates);
+  const kept = [];
+  for (let r = 0; r < replicates; r += 1) {
+    counts.fill(0);
+    if (zero > 0) counts[binOf[0]] += zero;
+    for (let t = 0; t < multiplicities.length; t += 1) {
+      const j = t + rnd.int(pool.length - t);
+      const v = pool[j];
+      pool[j] = pool[t];
+      pool[t] = v;
+      place(v, multiplicities[t]);
+    }
+    stats[r] = statisticOf();
+    if (r < examples) kept.push(Array.from(counts));
+  }
+  const multiplicity = sumM2 / sumM;
+  const { mean, q95, pValue } = monteCarloSummary(statistic, stats);
+  return {
+    replicates,
+    seed,
+    closedUnderNegation,
+    distinct,
+    multiplicity,
+    vif: multiplicity * (1 - distinct / p),
+    statistic,
+    mean,
+    q95,
+    pValue,
+    ...(examples > 0 ? { examples: kept } : {}),
+  };
+}
+
 /* ------------------------------------------------------------------------ */
 /* E2 value frequency (occupancy)                                            */
 /* ------------------------------------------------------------------------ */
@@ -445,20 +566,26 @@ export function poissonReference(lambda, p, mMax) {
   return Array.from({ length: mMax + 1 }, (_, m) => p * poissonPmf(m, lambda));
 }
 
-/* Chi-square of observed multiplicities against Poisson(λ), the last category being m ≥ max. */
-function poissonOccupancyTest(counts, lambda, p) {
-  const expected = counts.map((_, m) => p * poissonPmf(m, lambda));
+/*
+ * Chi-square of observed multiplicities against the Poisson law of mean θ, the last category being
+ * m ≥ max. θ is the observed mean number of occurrences per value, a parameter estimated from the
+ * data, so one degree of freedom is removed (ddof 1).
+ */
+function poissonOccupancyTest(counts, theta, p) {
+  const expected = counts.map((_, m) => p * poissonPmf(m, theta));
   const below = sum(expected.slice(0, -1));
   expected[expected.length - 1] = Math.max(0, p - below);
-  const fit = pooledChiSquare(counts, expected);
-  return { statistic: fit.statistic, df: fit.df, pValue: fit.p, bins: fit.bins };
+  const fit = pooledChiSquare(counts, expected, { ddof: 1 });
+  return { statistic: fit.statistic, df: fit.df, ddof: 1, pValue: fit.p, bins: fit.bins };
 }
 
 /**
  * Occupancy of F_p by a list of values in [0, p): how many field values are
- * hit exactly m times, against the Poisson(λ) law of a random function with
- * λ = number of values / p, and a chi-square test with pooling of expected
- * counts below 5. multiplicity lists only the m that occur; counts is dense.
+ * hit exactly m times, against the Poisson law of a random function whose
+ * mean θ is the number of values / p (returned as `lambda`; the page writes θ,
+ * since λ is the slope of the group law), and a chi-square test with pooling
+ * of expected counts below 5 and one degree of freedom spent on θ.
+ * multiplicity lists only the m that occur; counts is dense.
  * @returns {{ total: number, p: number, lambda: number, max: number, counts: number[],
  *   multiplicity: Object<number, number>, reference: number[], test: object }}
  */
@@ -592,31 +719,58 @@ export function pointCloud(o, maxPoints = 4000) {
 }
 
 /**
- * Two-dimensional chi-square on a cellsPerAxis × cellsPerAxis grid against
- * the uniform law on the p × p lattice F_p², each axis cut into bins of exact
- * integer widths as in coordinateDistribution. The support of the points is
- * only the curve (about p of the p² lattice points), so the test asks whether
- * the curve spreads evenly over the cells at this resolution, not whether it
- * fills the plane. counts[row][col]: row = cell of y, col = cell of x.
+ * Two-dimensional chi-square on the half-grid y < p/2, cut into
+ * cellsPerAxis × cellsPerAxis cells, against the uniform law on the half
+ * lattice F_p × {0, …, (p − 1)/2}. The points with y > p/2 are the mirror
+ * images (x, p − y) of the others, which a subgroup always contains, so a grid
+ * over the whole square would count every point twice and pair its cells
+ * exactly; the half-grid keeps one point of each pair (and the points with
+ * y = 0). Each axis is cut into bins of exact integer widths as in
+ * coordinateDistribution. The support of the points is only the curve, so the
+ * test asks whether it spreads evenly over the cells at this resolution, not
+ * whether it fills the plane. With expected counts below 5 (the toy curve)
+ * the result is flagged illustrative. counts[row][col]: row = cell of y,
+ * col = cell of x. edges are those of x, yEdges those of y.
+ * @param {ArrayLike<number>} xs
+ * @param {ArrayLike<number>} ys
+ * @param {number} p an odd prime
+ * @param {number} cellsPerAxis
  */
 export function cellUniformity(xs, ys, p, cellsPerAxis) {
   const c = cellsPerAxis;
+  const rows = (p + 1) / 2; // the ordinates 0, …, (p − 1)/2, that is y < p/2
+  if (!Number.isInteger(rows)) throw new RangeError('p must be odd');
+  if (!Number.isInteger(c) || c < 1 || c > rows) throw new RangeError('cellsPerAxis must be an integer in [1, (p + 1)/2]');
   const edges = Array.from({ length: c + 1 }, (_, j) => Math.ceil((j * p) / c));
+  const yEdges = Array.from({ length: c + 1 }, (_, j) => Math.ceil((j * rows) / c));
   const widths = edges.slice(1).map((e, j) => e - edges[j]);
+  const heights = yEdges.slice(1).map((e, j) => e - yEdges[j]);
   const counts = Array.from({ length: c }, () => new Array(c).fill(0));
-  for (let i = 0; i < xs.length; i += 1) counts[Math.floor((ys[i] * c) / p)][Math.floor((xs[i] * c) / p)] += 1;
-  const total = xs.length;
-  const expected = widths.map((wy) => widths.map((wx) => (total * wx * wy) / (p * p)));
+  let total = 0;
+  for (let i = 0; i < xs.length; i += 1) {
+    if (2 * ys[i] > p) continue;
+    counts[Math.floor((ys[i] * c) / rows)][Math.floor((xs[i] * c) / p)] += 1;
+    total += 1;
+  }
+  const expected = heights.map((wy) => widths.map((wx) => (total * wx * wy) / (p * rows)));
   const fit = chiSquareGoodnessOfFit(counts.flat(), expected.flat());
-  const note = ['Reference: uniform law on F_p × F_p; the points lie on the curve only, about p of the p² lattice points.'];
+  const minExpected = Math.min(...expected.flat());
+  const note = [
+    'Reference: uniform law on the half lattice F_p × {0, …, (p − 1)/2}; the points with y > p/2 are the mirror images (x, p − y) of these and are left out.',
+  ];
   if (p % 3 === 2) note.push('For p ≡ 2 (mod 3) every ordinate occurs exactly once, so the marginal law of y is exactly uniform.');
+  if (minExpected < 5) note.push('Expected counts below 5: the statistic is illustrative, not a test.');
   return {
+    half: true,
     cellsPerAxis: c,
+    rows,
     total,
     edges,
+    yEdges,
     counts,
     expected,
-    minExpected: Math.min(...expected.flat()),
+    minExpected,
+    illustrative: minExpected < 5,
     statistic: fit.statistic,
     df: fit.df,
     pValue: fit.p,
@@ -707,22 +861,50 @@ export function sampleCorrelation(sample) {
 /* ------------------------------------------------------------------------ */
 
 /**
- * Exhaustive avalanche on an orbit: for every k in [1, n − 1] and every bit
- * i < bitLength(n), k′ = k ⊕ 2^i; k′ = 0 or k′ ≥ n is discarded and counted,
- * otherwise the Hamming distance between x‖y of kG and of k′G (bits bits per
- * coordinate) is tallied.
+ * The exact law of the Hamming distance between x‖y of two distinct points of
+ * an orbit: counts[d] = #{a < b : popcount(W_a ⊕ W_b) = d}, W = x·2^bits + y,
+ * over all m(m − 1)/2 unordered pairs of the m points (O(m²): about
+ * 1.4 × 10^8 pairs for p = 16477, a couple of seconds).
+ * @param {ArrayLike<number>} xs
+ * @param {ArrayLike<number>} ys
+ * @param {number} bits width of one coordinate, at most 15
+ * @returns {number[]} counts for d = 0, …, 2·bits
+ */
+export function pairDistanceLaw(xs, ys, bits) {
+  if (!Number.isInteger(bits) || bits < 1 || bits > 15) throw new RangeError('x‖y must fit in 30 bits');
+  const m = xs.length;
+  const W = new Int32Array(m);
+  for (let i = 0; i < m; i += 1) W[i] = (xs[i] << bits) | ys[i];
+  const counts = new Float64Array(2 * bits + 1);
+  for (let a = 0; a < m - 1; a += 1) {
+    const wa = W[a];
+    for (let b = a + 1; b < m; b += 1) counts[popcount(wa ^ W[b])] += 1;
+  }
+  return Array.from(counts);
+}
+
+/**
+ * Exhaustive avalanche on an orbit: every unordered pair {k, k′} with
+ * k′ = k ⊕ 2^i, i < bitLength(n), both in [1, n − 1], counted once, by the
+ * Hamming distance between x‖y of kG and of k′G (bits bits per coordinate).
+ * A flip (k, i) whose k′ is 0 or ≥ n is discarded and counted; every other
+ * flip is one end of a pair, so 2·pairs + discarded = (n − 1)·inputBits.
  *
- * Reference law: if Q′ were an independent draw from the orbit's own
- * population, coordinate bit j would differ with probability 2q_j(1 − q_j),
- * q_j its population frequency over the orbit; treating the 2·bits positions
- * as independent gives a Poisson-binomial law for the distance.
+ * Reference law: the exact distribution of the distance between two distinct
+ * points of the orbit (pairDistanceLaw), what the pairs would show if k′G were
+ * any other point of the orbit. Its mean is Σ_j 2q_j(1 − q_j) · m/(m − 1),
+ * q_j the population frequency of bit j of x‖y and m = n − 1. The chi-square
+ * (expected counts below 5 pooled) compares the pairs with that law; the pairs
+ * are not independent draws, so its p-value is a yardstick.
+ * reference holds the counts of the law over all allPairs = m(m − 1)/2 pairs.
  */
 export function avalancheSmall(entry, { base = entry.base, orbit: o = orbit(entry, base) } = {}) {
   const { n, xs, ys } = o;
   const bits = entry.bits;
   const inputBits = bitLength(n);
+  const m = n - 1;
   const counts = new Array(2 * bits + 1).fill(0);
-  let trials = 0;
+  let pairs = 0;
   let discarded = 0;
   for (let k = 1; k < n; k += 1) {
     for (let i = 0; i < inputBits; i += 1) {
@@ -731,26 +913,29 @@ export function avalancheSmall(entry, { base = entry.base, orbit: o = orbit(entr
         discarded += 1;
         continue;
       }
+      if (kp < k) continue; // the pair {k′, k} was counted from k′
       counts[popcount(xs[k - 1] ^ xs[kp - 1]) + popcount(ys[k - 1] ^ ys[kp - 1])] += 1;
-      trials += 1;
+      pairs += 1;
     }
   }
-  const flip = [...bitFrequency(xs, bits).frequency, ...bitFrequency(ys, bits).frequency].map((q) => 2 * q * (1 - q));
-  const reference = poissonBinomialPmf(flip);
-  const fit = pooledChiSquare(counts, reference.map((r) => r * trials));
+  const allPairs = (m * (m - 1)) / 2;
+  const reference = pairDistanceLaw(xs, ys, bits);
+  const fit = pooledChiSquare(counts, reference.map((c) => (c * pairs) / allPairs));
+  const q = [...bitFrequency(xs, bits).frequency, ...bitFrequency(ys, bits).frequency];
   const { mean, sd } = momentsOfCounts(counts);
   return {
     key: o.key,
     n,
     bits,
     inputBits,
-    trials,
+    pairs,
     discarded,
     counts,
     mean,
     sd,
+    allPairs,
     reference,
-    expectedMean: sum(flip),
+    expectedMean: (sum(q.map((qj) => 2 * qj * (1 - qj))) * m) / (m - 1),
     test: { statistic: fit.statistic, df: fit.df, pValue: fit.p, bins: fit.bins },
   };
 }
@@ -1187,7 +1372,9 @@ function ecdlpOnCurve(p, targets, seed) {
     targets,
     bruteForce: describe(brute),
     bsgs: { m, ...describe(bsgs) },
-    reference: { bruteForceMean: (n - 2) / 2, sqrtN: Math.sqrt(n) },
+    // Exhaustive search costs k − 1 ≈ n/2 on average; this baby-step giant-step costs m − 1 table
+    // additions plus ⌊k/m⌋ giant steps, about 1.5·√n on average.
+    reference: { bruteForceMean: (n - 2) / 2, sqrtN: Math.sqrt(n), bsgsMean: 1.5 * Math.sqrt(n) },
   };
 }
 
@@ -1281,9 +1468,12 @@ const cellsFor = (points) => Math.min(16, Math.max(2, 2 ** Math.floor(Math.log2(
  * experiment, each keyed by orbit (T17, T17g, S1031, O1051, O16477) and by
  * secp256k1 / keccak. meta records the seed and the derived sub-seeds, the
  * sample sizes, the curve parameters, the time spent per experiment (ms) and
- * the first 8 private keys as hexadecimal.
+ * the first 8 private keys as hexadecimal. On the enumerated orbits each
+ * coordinate of E1 also carries its structural Monte Carlo null
+ * (`structural`, structuralReplicates replicates, seed
+ * deriveSeed(seeds.structural, '<orbit>.<x|y>')).
  */
-export function runStudy({ seed = 20261013, secpN = 4096, sacKeys = 1024, ecdlpTargets = 64, ecdlpPrimes } = {}) {
+export function runStudy({ seed = 20261013, secpN = 4096, sacKeys = 1024, ecdlpTargets = 64, ecdlpPrimes, structuralReplicates = 2000 } = {}) {
   const start = performance.now();
   const timing = {};
   const timed = (name, fn) => {
@@ -1292,7 +1482,12 @@ export function runStudy({ seed = 20261013, secpN = 4096, sacKeys = 1024, ecdlpT
     timing[name] = Math.round(performance.now() - t0);
     return value;
   };
-  const seeds = { keys: seed, avalanche: deriveSeed(seed, 'avalanche'), ecdlp: deriveSeed(seed, 'ecdlp') };
+  const seeds = {
+    keys: seed,
+    avalanche: deriveSeed(seed, 'avalanche'),
+    ecdlp: deriveSeed(seed, 'ecdlp'),
+    structural: deriveSeed(seed, 'structural'),
+  };
 
   const orbits = timed('orbits', () => LADDER.flatMap((entry) => entry.bases.map((base) => ({ entry, base, o: orbit(entry, base) }))));
   const perOrbit = (fn) => Object.fromEntries(orbits.map((item) => [item.base.key, fn(item)]));
@@ -1303,7 +1498,18 @@ export function runStudy({ seed = 20261013, secpN = 4096, sacKeys = 1024, ecdlpT
   const HASH_RANGE = 2n ** 256n;
 
   const E1 = timed('E1', () => ({
-    ...perOrbit(({ o }) => ({ x: coordinateDistribution(o.xs, o.p, binsFor(o.p)), y: coordinateDistribution(o.ys, o.p, binsFor(o.p)) })),
+    ...perOrbit(({ o }) => {
+      const bins = binsFor(o.p);
+      const coordinate = (values, axis) => ({
+        ...coordinateDistribution(values, o.p, bins),
+        structural: structuralNull(values, o.p, bins, {
+          closedUnderNegation: axis === 'y',
+          replicates: structuralReplicates,
+          seed: deriveSeed(seeds.structural, `${o.key}.${axis}`),
+        }),
+      });
+      return { x: coordinate(o.xs, 'x'), y: coordinate(o.ys, 'y') };
+    }),
     secp256k1: { x: coordinateDistribution(xs, SECP_P, 32), y: coordinateDistribution(ys, SECP_P, 32) },
     keccak: { digest: coordinateDistribution(sample.hashes, HASH_RANGE, 32) },
   }));
@@ -1346,7 +1552,7 @@ export function runStudy({ seed = 20261013, secpN = 4096, sacKeys = 1024, ecdlpT
     meta: {
       seed,
       seeds,
-      sizes: { secpN, sacKeys: Math.min(sacKeys, secpN), ecdlpTargets },
+      sizes: { secpN, sacKeys: Math.min(sacKeys, secpN), ecdlpTargets, structuralReplicates },
       curves: LADDER,
       secp256k1: { p: SECP_P.toString(), n: ORDER.toString(), G: { x: SECP_G.x.toString(), y: SECP_G.y.toString() } },
       keys: {

@@ -255,7 +255,8 @@ export function mountProgram(root) {
   slot.innerHTML =
     '<form class="program__form" novalidate aria-label="Inputs of the toy program">' +
     choice('program-curve', 'Curve', [
-      ['toy', 'Toy curve y² = x³ + 7 over F<sub>17</sub>', true],
+      // "(mod 17)" rather than a subscripted F: the form typeface has no subscript digits.
+      ['toy', 'Toy curve y² = x³ + 7 (mod 17)', true],
       ['secp256k1', 'secp256k1 (Ethereum)', false],
     ]) +
     '<div class="program__fields">' +

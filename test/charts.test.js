@@ -17,6 +17,10 @@ import {
   renderScatter,
   renderLineChart,
   renderBitProfile,
+  richText,
+  textWidth,
+  labelBox,
+  labelBoard,
 } from '../src/lib/charts.js';
 import { modelFromSample } from '../src/lib/normal.js';
 import { renderProbabilityPlotSVG, plotTitle, plotDescription } from '../src/lib/probability-plot.js';
@@ -60,13 +64,134 @@ test('histogram axis covers the tallest bar, so no bar rises above the frame', (
   assert.ok(svg.includes('>250<'), 'the axis gains a tick above the data maximum');
 });
 
-test('log-log marks accept a label offset', () => {
-  const series = [{ key: 's', label: 'S', points: [{ x: 128, y: 11 }, { x: 1024, y: 32 }] }];
-  const marks = [{ x: 2 ** 112, y: 2 ** 56, label: 'A', dy: 12 }, { x: 2 ** 114, y: 2 ** 57, label: 'B', dy: -8 }];
-  const svg = renderLogLog({ id: 'll', title: 'T', desc: 'D', series, marks });
-  const labels = [...svg.matchAll(/class="chart__annotation" x="[\d.-]+" y="([\d.-]+)" text-anchor="end">(A|B)</g)];
-  assert.equal(labels.length, 2);
-  assert.ok(Math.abs(Number(labels[0][1]) - Number(labels[1][1])) >= 18, 'the two labels are separated vertically');
+/* The text labels of an SVG fragment (series labels and annotations) with their estimated boxes. */
+function labelsOf(svg) {
+  return [...svg.matchAll(/<text class="(chart__series-label|chart__annotation)" x="([\d.-]+)" y="([\d.-]+)" text-anchor="(start|middle|end)">(.*?)<\/text>/g)].map(
+    ([, cls, x, y, anchor, body]) => {
+      // Back from the SVG markup to the label written for richText: an exponent tspan is ^{…}.
+      const label = body.replace(/<tspan class="chart__sup"[^>]*>([^<]*)<\/tspan>/g, '^{$1}').replace(/<\/?tspan[^>]*>/g, '');
+      return { cls, label, box: labelBox({ x: Number(x), y: Number(y), anchor }, label) };
+    },
+  );
+}
+
+const overlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+test('exponents print as superscripts, never as a caret', () => {
+  const html = richText('BSGS ≈ 2^{128.6} ops');
+  assert.ok(!html.includes('^'));
+  assert.match(html, /^BSGS ≈ 2<tspan class="chart__sup" dy="-4" font-size="75%">128\.6<\/tspan><tspan dy="4"> ops<\/tspan>$/);
+  assert.equal(richText('a < b'), 'a &lt; b');
+  assert.ok(textWidth('2^{255}') < textWidth('2255'), 'an exponent is set smaller');
+});
+
+test('a label board places labels inside its bounds, clear of marks, lines and each other', () => {
+  // A mark in the middle of a 300 × 100 area, on a line that crosses the whole area.
+  const board = labelBoard({ x0: 0, x1: 300, y0: 0, y1: 100 });
+  board.circle(150, 50, 5);
+  board.segment(0, 100, 300, 0);
+  const placed = ['Exhaustive search', 'Exhaustive search', 'n/2'].map((label) => {
+    const at = board.place(label, { anchors: [[150, 50]], directions: ['w', 'nw', 'sw', 'e', 'se'] });
+    return labelBox(at, label);
+  });
+  for (const box of placed) {
+    assert.ok(box.x0 >= 0 && box.x1 <= 300 && box.y0 >= 0 && box.y1 <= 100, `inside: ${JSON.stringify(box)}`);
+    assert.ok(!overlap(box, { x0: 145, x1: 155, y0: 45, y1: 55 }), 'a label leaves its mark visible');
+    // The line y = 100 − x/3 does not pass through any label.
+    for (let x = box.x0; x <= box.x1; x += 1) assert.ok(100 - x / 3 < box.y0 || 100 - x / 3 > box.y1, `the line crosses ${JSON.stringify(box)}`);
+  }
+  for (let i = 0; i < placed.length; i += 1) {
+    for (let j = i + 1; j < placed.length; j += 1) assert.ok(!overlap(placed[i], placed[j]), `labels ${i} and ${j} never overlap`);
+  }
+});
+
+test('log-log labels stay inside the plot of their panel, with exponents as superscripts', () => {
+  const rows = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((b) => ({ n: 2 ** b + 3, brute: 2 ** (b - 1), bsgs: 1.5 * 2 ** (b / 2) }));
+  const series = [
+    { key: 'bsgs', label: 'Baby-step giant-step', points: rows.map((r) => ({ x: r.n, y: r.bsgs })) },
+    { key: 'brute', label: 'Exhaustive search', points: rows.map((r) => ({ x: r.n, y: r.brute })) },
+  ];
+  const references = [
+    { label: '1.5√n', exponent: 0.5, factor: 1.5 },
+    { label: 'n/2', exponent: 1, factor: 0.5 },
+  ];
+  const marks = [
+    { x: 2 ** 256, y: 2 ** 255, label: 'Exhaustive ≈ 2^{255}' },
+    { x: 2 ** 256, y: 2 ** 128.6, label: 'BSGS ≈ 2^{128.6}' },
+  ];
+  for (const width of [340, 358, 640, 960]) {
+    const svg = renderLogLog({ id: 'e', title: 'T', desc: 'D', series, references, marks, width });
+    assert.ok(!/>[^<]*\^/.test(svg), `${width}px: no caret in visible text`);
+    const panels = svg.split('<g transform="translate(').slice(1);
+    assert.equal(panels.length, 2);
+    for (const panel of panels) {
+      const frame = panel.match(/class="chart__frame" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/).slice(1).map(Number);
+      const labels = labelsOf(panel);
+      const circles = [...panel.matchAll(/<circle class="chart__(?:point[^"]*|mark)" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.]+)"/g)].map(([, cx, cy, r]) => ({
+        x0: Number(cx) - Number(r),
+        x1: Number(cx) + Number(r),
+        y0: Number(cy) - Number(r),
+        y1: Number(cy) + Number(r),
+      }));
+      for (const { label, box } of labels) {
+        assert.ok(box.x0 >= frame[0] && box.x1 <= frame[0] + frame[2] && box.y0 >= frame[1] && box.y1 <= frame[1] + frame[3], `${width}px: "${label}" inside the plot`);
+        for (const c of circles) assert.ok(!overlap(box, c), `${width}px: "${label}" clear of every point`);
+      }
+      for (let i = 0; i < labels.length; i += 1) {
+        for (let j = i + 1; j < labels.length; j += 1) assert.ok(!overlap(labels[i].box, labels[j].box), `${width}px: "${labels[i].label}" and "${labels[j].label}"`);
+      }
+    }
+    // The series labels are in the measured panel, the marks in the extrapolation panel.
+    assert.equal(labelsOf(panels[0]).filter((l) => l.cls === 'chart__series-label').length, 2);
+    assert.ok(panels[1].includes('2<tspan class="chart__sup" dy="-4" font-size="75%">255</tspan>'));
+  }
+});
+
+test('line chart labels stay inside the plot and clear of the marks and of each other', () => {
+  const L = Array.from({ length: 16 }, (_, i) => i + 1);
+  const series = [
+    { key: 'repeated', label: 'Repeated addition', points: L.map((b) => ({ x: b, y: b === 1 ? null : Math.log2((3 * 2 ** (b - 1) - 3) / 2) })) },
+    { key: 'binary', label: 'Double-and-add', points: L.map((b) => ({ x: b, y: b === 1 ? null : Math.log2(1.5 * (b - 1)) })) },
+  ];
+  // The marks of Figure 3: the exact counts for k = 6, one above the other at L = 3.
+  const marks = [
+    { x: 3, y: Math.log2(5), label: 'k = 6: 5', prefer: ['nw', 'n', 'w'] },
+    { x: 3, y: Math.log2(3), label: 'k = 6: 3', prefer: ['se', 'e', 's'] },
+  ];
+  for (const width of [312, 358, 480]) {
+    const svg = renderLineChart({ id: 'c', title: 'T', desc: 'D', series, marks, xDomain: [0, 16], yDomain: [0, 16], yFormat: 'pow2', width, height: 260 });
+    const frame = svg.match(/class="chart__frame" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/).slice(1).map(Number);
+    const labels = labelsOf(svg);
+    assert.equal(labels.length, 4);
+    const circles = [...svg.matchAll(/<circle class="chart__mark" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.]+)"/g)].map(([, cx, cy, r]) => ({
+      x0: Number(cx) - Number(r),
+      x1: Number(cx) + Number(r),
+      y0: Number(cy) - Number(r),
+      y1: Number(cy) + Number(r),
+    }));
+    assert.equal(circles.length, 2);
+    // Points every half pixel along both curves: none may fall inside a label.
+    const trace = [];
+    for (const [, d] of svg.matchAll(/class="chart__curve[^"]*"[^>]*d="([^"]+)"/g)) {
+      let prev = null;
+      for (const [, op, x, y] of d.matchAll(/([ML])([\d.-]+),([\d.-]+)/g)) {
+        const pt = [Number(x), Number(y)];
+        if (op === 'L' && prev) {
+          const steps = Math.ceil(Math.hypot(pt[0] - prev[0], pt[1] - prev[1]) * 2);
+          for (let s = 0; s <= steps; s += 1) trace.push([prev[0] + ((pt[0] - prev[0]) * s) / steps, prev[1] + ((pt[1] - prev[1]) * s) / steps]);
+        }
+        prev = pt;
+      }
+    }
+    for (const { label, box } of labels) {
+      assert.ok(box.x0 >= frame[0] && box.x1 <= frame[0] + frame[2] && box.y0 >= frame[1] && box.y1 <= frame[1] + frame[3], `${width}px: "${label}" inside the plot`);
+      for (const c of circles) assert.ok(!overlap(box, c), `${width}px: "${label}" leaves the marks visible`);
+      assert.ok(!trace.some(([x, y]) => x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1), `${width}px: a curve crosses "${label}"`);
+    }
+    for (let i = 0; i < labels.length; i += 1) {
+      for (let j = i + 1; j < labels.length; j += 1) assert.ok(!overlap(labels[i].box, labels[j].box), `${width}px: "${labels[i].label}" and "${labels[j].label}"`);
+    }
+  }
 });
 
 test('histogram without expectations draws no step line and honours labelEvery', () => {

@@ -116,14 +116,27 @@ export function int(v) {
 /** A chi-square statistic: two decimals, one from 100 upwards. */
 const chi = (v) => (finite(v) ? fmt(v, Math.abs(v) >= 100 ? 1 : 2) : DASH);
 
+const SUPERSCRIPT = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '−': '⁻', '-': '⁻' };
 
-/** A large number as "8.68 × 10^76" (Libre Franklin has no superscript digits beyond ³). */
-export function formatSci(v, digits = 2) {
-  if (!finite(v)) return DASH;
+/** An integer exponent in Unicode superscript digits, for plain text only (titles, descriptions, JSON). */
+export const superscript = (s) => String(s).replace(/[0-9−-]/g, (c) => SUPERSCRIPT[c]);
+
+/**
+ * A large number in scientific notation, as its parts: { mantissa: '8.68', exponent: '76' }
+ * (exponent null below 10^6, where the mantissa is the number itself). The page sets the
+ * exponent as a real superscript, 8.68 × 10<sup>76</sup>; a display string never carries a caret.
+ */
+export function sciParts(v, digits = 2) {
+  if (!finite(v)) return { mantissa: DASH, exponent: null };
   const e = Math.floor(Math.log10(Math.abs(v)));
-  if (e < 6) return fmt(v, 1);
-  const m = v / 10 ** e;
-  return `${m.toFixed(digits)} × 10^${e}`;
+  if (e < 6) return { mantissa: fmt(v, 1), exponent: null };
+  return { mantissa: (v / 10 ** e).toFixed(digits), exponent: String(e) };
+}
+
+/** A large number as plain text, "8.68 × 10⁷⁶" (Unicode superscripts; markup uses sciParts). */
+export function formatSci(v, digits = 2) {
+  const { mantissa, exponent } = sciParts(v, digits);
+  return exponent === null ? mantissa : `${mantissa} × 10${superscript(exponent)}`;
 }
 
 /* The four caption cells c1 … c4 and their headings. */
@@ -189,8 +202,31 @@ function provenanceOf(study, key) {
 
 /* ------------------------------------------------- data of one series */
 
+/* The structural Monte Carlo null of an enumerated coordinate (kg-study.js, structuralNull). */
+const pickStructural = (s) =>
+  s && {
+    replicates: s.replicates,
+    seed: s.seed,
+    distinct: s.distinct,
+    multiplicity: s.multiplicity,
+    vif: s.vif,
+    mean: s.mean,
+    q95: s.q95,
+    pValue: s.pValue,
+    closedUnderNegation: s.closedUnderNegation,
+  };
+
 const pickCoord = (d) =>
-  d && { counts: d.counts, expected: d.expected.map(r4), total: d.total, bins: d.bins, statistic: d.statistic, df: d.df, pValue: d.pValue };
+  d && {
+    counts: d.counts,
+    expected: d.expected.map(r4),
+    total: d.total,
+    bins: d.bins,
+    statistic: d.statistic,
+    df: d.df,
+    pValue: d.pValue,
+    ...(d.structural ? { structural: pickStructural(d.structural) } : {}),
+  };
 
 const pickOccupancy = (o) =>
   o && { p: o.p, total: o.total, lambda: o.lambda, counts: o.counts, statistic: o.test.statistic, df: o.test.df, pValue: o.test.pValue };
@@ -279,8 +315,10 @@ export function seriesFromStudy(kind, study, key) {
       return {
         ...meta,
         counts: a.counts,
-        reference: a.reference.map((v) => Math.round(v * 1e9) / 1e9),
-        trials: a.trials,
+        // The exact law of two distinct points of the orbit, as probabilities.
+        reference: a.reference.map((c) => Math.round((c / a.allPairs) * 1e9) / 1e9),
+        pairs: a.pairs,
+        allPairs: a.allPairs,
         discarded: a.discarded,
         inputBits: a.inputBits,
         outputBits: 2 * a.bits,
@@ -309,7 +347,15 @@ export function seriesFromStudy(kind, study, key) {
             n: c.n,
             xs: c.xs.filter(keep),
             ys: c.ys.filter(keep),
-            cells: { per: e.cells.cellsPerAxis, statistic: e.cells.statistic, df: e.cells.df, pValue: e.cells.pValue },
+            cells: {
+              per: e.cells.cellsPerAxis,
+              total: e.cells.total,
+              statistic: e.cells.statistic,
+              df: e.cells.df,
+              pValue: e.cells.pValue,
+              minExpected: e.cells.minExpected,
+              illustrative: e.cells.illustrative,
+            },
             mirrored: e.mirror.mirrored,
             total: e.mirror.total,
           };
@@ -345,6 +391,8 @@ export function seriesFromStudy(kind, study, key) {
         seed: e.seed,
         targets: e.targets,
         rows: e.curves.map((c) => ({ p: c.p, n: c.n, bsgs: c.bsgs.mean, brute: c.bruteForce.mean })),
+        // The dashed references: n/2 for exhaustive search, 1.5·√n for this baby-step giant-step.
+        references: { bruteFactor: 0.5, bsgsFactor: 1.5 },
         fit: {
           bruteSlope: e.fit.bruteForce.slope,
           bsgsSlope: e.fit.bsgs.slope,
@@ -421,12 +469,17 @@ function panels(parts, width, { columns = 2, maxStacked = Infinity } = {}) {
 }
 
 const histHeight = (w) => Math.round(Math.min(340, Math.max(220, w * 0.62)));
+/* Fig. 3 is a little taller, so that the labels of its marks fit between the lines and the frame. */
+const costHeight = (w) => Math.round(Math.min(340, Math.max(260, w * 0.72)));
 
 /* Margins of the small multiples of Fig. 8, and a point radius that covers about a quarter of the square. */
 const CLOUD_MARGIN = Object.freeze({ top: 8, right: 8, bottom: 46, left: 44 });
 const cloudRadius = (side, count) => Math.round(Math.min(3.5, Math.max(0.9, side * Math.sqrt(0.25 / (Math.PI * count)))) * 10) / 10;
 
 /* ------------------------------------------------------------ charts */
+
+/* A label written with ^{…} exponents (the chart markup of charts.js) as plain text, with Unicode superscripts. */
+const plain = (s) => String(s).replace(/\^\{([^}]*)\}/g, (_, e) => superscript(e));
 
 function coordPanel(d, data, coord, id) {
   const hash = coord === 'H(k)';
@@ -440,13 +493,17 @@ function coordPanel(d, data, coord, id) {
       [1, '1'],
     ];
     const edgeTicks = data.perValue ? undefined : fractions.map(([f, label]) => ({ at: f * d.bins, label }));
-    const scale = hash ? 'H(k) / 2^256' : data.perValue ? coord : `${coord} / p`;
+    const scale = hash ? 'H(k) / 2^{256}' : data.perValue ? coord : `${coord} / p`;
+    const s = d.structural;
+    const structural = s
+      ? ` A structural Monte Carlo null that keeps the multiplicities${s.closedUnderNegation ? ' and the mirror pairs' : ''} of the orbit (${int(s.replicates)} replicates) gives a mean of ${chi(s.mean)} and P = ${formatP(s.pValue)}.`
+      : '';
     return {
       title: hash ? 'Digest H(k)' : coord === 'x' ? 'Abscissa x' : 'Ordinate y',
       html: renderHistogram({
         id: `${id}-${hash ? 'h' : coord}`,
-        title: `Distribution of ${scale} for ${data.label}, in ${d.bins} bins`,
-        desc: `Bars are the observed counts of the ${int(d.total)} values in each bin; the step line is the exact expected count under the uniform law on the integers of the range, χ² = ${chi(d.statistic)} with ${d.df} degrees of freedom.`,
+        title: `Distribution of ${plain(scale)} for ${data.label}, in ${d.bins} bins`,
+        desc: `Bars are the observed counts of the ${int(d.total)} values in each bin; the step line is the exact expected count under the uniform law on the integers of the range, χ² = ${chi(d.statistic)} with ${d.df} degrees of freedom.${structural}`,
         bins,
         width: w,
         height: histHeight(w),
@@ -472,7 +529,7 @@ function occupancyPanel(o, data, coord, id) {
       html: renderHistogram({
         id: `${id}-${coord === 'x' || coord === 'y' ? coord : 'h'}`,
         title: `How many of the ${int(o.p)} field values occur m times, ${coord} for ${data.label}`,
-        desc: `Bars count the field values hit exactly m times by the ${int(o.total)} values; the step line is the Poisson expectation p·e^(−λ)·λ^m/m! of a random function, λ = ${fmt(o.lambda, 3)}.`,
+        desc: `Bars count the field values hit exactly m times by the ${int(o.total)} values; the step line is p times the Poisson probability of m for a random function with mean θ = ${fmt(o.lambda, 3)} occurrences per value.`,
         bins,
         width: w,
         height: histHeight(w),
@@ -485,7 +542,7 @@ function occupancyPanel(o, data, coord, id) {
 
 function avalancheBins(data) {
   if (data.reference) {
-    return data.counts.map((observed, m) => ({ label: String(m), observed, expected: data.trials * data.reference[m] }));
+    return data.counts.map((observed, m) => ({ label: String(m), observed, expected: data.pairs * data.reference[m] }));
   }
   const pmf = binomialPmfTable(256, 0.5);
   const bins = [];
@@ -544,13 +601,13 @@ export function renderChart(kind, data, { id, width = 640, rasterize } = {}) {
         id,
         title: `Hamming distance between the outputs for k and for k with one bit flipped, ${data.label}`,
         desc: data.reference
-          ? `Bars count the ${int(data.trials)} valid flips by the number of the ${data.outputBits} coordinate bits of x‖y that change; the step line is the Poisson-binomial law of independent bits with the population flip probabilities 2q_j(1 − q_j).`
+          ? `Bars count the ${int(data.pairs)} pairs of keys that differ in one bit, each pair once, by the number of the ${data.outputBits} coordinate bits of x‖y that change; the step line is the exact law of the distance between two distinct points of the orbit, over all ${int(data.allPairs)} pairs, scaled to the same number of pairs.`
           : `Bars count the ${int(data.trials)} flips by the number of the 256 output bits that change, from 88 to 168; the step line is the binomial law Bin(256, ½), mean 128 and standard deviation 8.`,
         bins,
         width,
         height: histHeight(width),
         xLabel: 'Output bits changed',
-        yLabel: 'Flips',
+        yLabel: data.reference ? 'Pairs' : 'Flips',
         labelEvery: data.reference ? (width < 420 ? 4 : 2) : 8,
       });
     }
@@ -639,21 +696,23 @@ export function renderChart(kind, data, { id, width = 640, rasterize } = {}) {
     }
     case 'ecdlp': {
       const f = data.fit;
+      const { bruteFactor, bsgsFactor } = data.references;
+      // Line, label, extrapolated mark and tokens all use the same references: n/2 and 1.5·√n.
       return renderLogLog({
         id,
         title: 'Group operations needed to recover k from Q = kG against the order n of G, on log₂ axes',
-        desc: `Filled points are the mean cost of baby-step giant-step and open points the mean cost of exhaustive search over ${data.targets} random keys on each of ${data.rows.length} curves y² = x³ + 7 of prime order; the dashed references are √n and n/2, and the right panel extends them to n ≈ 2^256, the order of secp256k1. Fitted slopes: ${fmt(f.bruteSlope, 3)} (exhaustive) and ${fmt(f.bsgsSlope, 3)} (BSGS).`,
+        desc: `Filled points are the mean cost of baby-step giant-step and open points the mean cost of exhaustive search over ${data.targets} random keys on each of ${data.rows.length} curves y² = x³ + 7 of prime order; the dashed references are ${bsgsFactor}·√n and n/2, the expected costs of the two methods, and the right panel extends them to n ≈ 2²⁵⁶, the order of secp256k1, where the marks give about 2 to the power ${fmt(f.theoryBsgs, 1)} and 2 to the power ${fmt(f.theoryBrute, 0)} operations. Fitted slopes: ${fmt(f.bruteSlope, 3)} (exhaustive) and ${fmt(f.bsgsSlope, 3)} (BSGS).`,
         series: [
           { key: 'bsgs', label: 'Baby-step giant-step', points: data.rows.map((r) => ({ x: r.n, y: r.bsgs })) },
           { key: 'brute', label: 'Exhaustive search', points: data.rows.map((r) => ({ x: r.n, y: r.brute })) },
         ],
         references: [
-          { label: '√n', exponent: 0.5 },
-          { label: 'n / 2', exponent: 1, factor: 0.5 },
+          { label: `${bsgsFactor}√n`, exponent: 0.5, factor: bsgsFactor },
+          { label: 'n/2', exponent: 1, factor: bruteFactor },
         ],
         marks: [
-          { x: 2 ** 256, y: 2 ** f.theoryBrute, label: `exhaustive ≈ 2^${fmt(f.theoryBrute, 0)}`, dy: 14 },
-          { x: 2 ** 256, y: 2 ** f.theoryBsgs, label: `BSGS ≈ 2^${fmt(f.theoryBsgs, 1)}` },
+          { x: 2 ** 256, y: 2 ** f.theoryBrute, label: `Exhaustive ≈ 2^{${fmt(f.theoryBrute, 0)}}` },
+          { x: 2 ** 256, y: 2 ** f.theoryBsgs, label: `BSGS ≈ 2^{${fmt(f.theoryBsgs, 1)}}` },
         ],
         width,
         xLabel: 'Order n of G',
@@ -676,15 +735,16 @@ export function renderChart(kind, data, { id, width = 640, rasterize } = {}) {
               title: 'Mean number of group operations to compute kG for an L-bit k, L = 1 … 16, on a log₂ scale',
               desc: `Repeated addition needs k − 1 additions, double-and-add L − 1 doublings and on average (L − 1)/2 additions; the marks are the exact counts for the assignment's k = ${a.k} = ${a.bits}₂: ${a.repeatedAddition} additions against ${a.doubleAndAdd.total} operations.`,
               series: line(16),
+              // The two marks sit one above the other at L = 3: the upper label goes above, the lower below.
               marks: [
-                { x: 3, y: Math.log2(a.repeatedAddition), label: `k = ${a.k}: ${a.repeatedAddition}`, dy: -6 },
-                { x: 3, y: Math.log2(a.doubleAndAdd.total), label: `k = ${a.k}: ${a.doubleAndAdd.total}`, dy: 8 },
+                { x: 3, y: Math.log2(a.repeatedAddition), label: `k = ${a.k}: ${a.repeatedAddition}`, prefer: ['nw', 'n', 'w'] },
+                { x: 3, y: Math.log2(a.doubleAndAdd.total), label: `k = ${a.k}: ${a.doubleAndAdd.total}`, prefer: ['se', 'e', 's'] },
               ],
-              xDomain: [1, 16],
+              xDomain: [0, 16],
               yDomain: [0, 16],
               yFormat: 'pow2',
               width: w,
-              height: histHeight(w),
+              height: costHeight(w),
               xLabel: 'Bit length L of k',
               yLabel: 'Group operations',
             }),
@@ -697,14 +757,15 @@ export function renderChart(kind, data, { id, width = 640, rasterize } = {}) {
               desc: `At L = 256, the size of a secp256k1 key, repeated addition needs about ${formatSci(data.meanRepeated)} additions and double-and-add ${fmt(data.meanDoubleAndAdd, 1)} operations on average.`,
               series: line(256),
               marks: [
-                { x: 256, y: data.repeated.at(-1), label: 'secp256k1', anchor: 'end', dy: 14 },
-                { x: 256, y: data.doubleAndAdd.at(-1), label: 'secp256k1', anchor: 'end', dy: -10 },
+                { x: 256, y: data.repeated.at(-1), label: 'secp256k1', prefer: ['w', 'sw', 'nw'] },
+                { x: 256, y: data.doubleAndAdd.at(-1), label: 'secp256k1', prefer: ['nw', 'n', 'w'] },
               ],
               xDomain: [1, 256],
-              yDomain: [0, 256],
+              // Headroom above 2^256 keeps the label of the top mark inside the frame.
+              yDomain: [0, 288],
               yFormat: 'pow2',
               width: w,
-              height: histHeight(w),
+              height: costHeight(w),
               xLabel: 'Bit length L of k',
               yLabel: 'Group operations',
             }),
@@ -750,8 +811,11 @@ const multiplicity = (counts) =>
     .map(([m, c]) => `${m}: ${int(c)}`)
     .join('; ');
 
-/* A p-value as printed in a sentence: "p = 0.252", "p < 0.001", or why there is none. */
-const pEq = (s) => (s === DASH ? DASH : s === 'n/a' ? 'no p-value (no degrees of freedom left)' : s.startsWith('<') ? `p ${s}` : `p = ${s}`);
+/*
+ * A p-value as printed in a sentence: "P = 0.252", "P < 0.001", or why there is none. A capital P,
+ * because p is the prime of the field everywhere on the page.
+ */
+export const pEq = (s) => (s === DASH ? DASH : s === 'n/a' ? 'no p-value (no degrees of freedom left)' : s.startsWith('<') ? `P ${s}` : `P = ${s}`);
 
 const TIMES = ['never', 'once', 'twice', 'three times', 'four times', 'five times', 'six times'];
 
@@ -769,7 +833,9 @@ function pattern(counts) {
  * The statistics a figure caption prints, as display strings: named values
  * (cited in the text as {{fig.<figure>.<series>.<name>}}) and the four grid
  * cells c1 … c4 with their headings c1h … c4h. Every p-value <name> also
- * comes as <name>Eq, ready for a sentence ("p = 0.252", "p < 0.001").
+ * comes as <name>Eq, ready for a sentence ("P = 0.252", "P < 0.001"). Display
+ * strings are plain text (the page inserts them as text): a power is written
+ * with Unicode superscripts here, and as markup by the page where it shows.
  */
 export function statsOf(kind, data) {
   const stats = statsOfKind(kind, data);
@@ -784,6 +850,18 @@ function statsOfKind(kind, data) {
   switch (kind) {
     case 'coordHist': {
       const { x, y } = data;
+      // Enumerations: the chi-square against the structural Monte Carlo null; χ²(B − 1) is only a yardstick.
+      const structural = (d, prefix) => {
+        const n = d?.structural;
+        return {
+          [`${prefix}StructuralMean`]: n ? chi(n.mean) : DASH,
+          [`${prefix}StructuralQ95`]: n ? chi(n.q95) : DASH,
+          [`${prefix}StructuralP`]: n ? formatP(n.pValue) : DASH,
+          [`${prefix}Vif`]: n ? fmt(n.vif, 2) : DASH,
+          [`${prefix}Distinct`]: n ? int(n.distinct) : DASH,
+          [`${prefix}Multiplicity`]: n ? fmt(n.multiplicity, 2) : DASH,
+        };
+      };
       const s = {
         ...base,
         xName: data.xName,
@@ -792,19 +870,26 @@ function statsOfKind(kind, data) {
         xStatistic: chi(x.statistic),
         xDf: int(x.df),
         xP: formatP(x.pValue),
+        ...structural(x, 'x'),
         yStatistic: y ? chi(y.statistic) : DASH,
         yDf: y ? int(y.df) : DASH,
         yP: y ? formatP(y.pValue) : DASH,
+        ...structural(y, 'y'),
+        replicates: x.structural ? int(x.structural.replicates) : DASH,
       };
       const binning = data.perValue ? 'one bin per field value' : `${x.bins} bins of equal width`;
-      s.population = `${base.population}; ${binning}${y ? '' : '; a digest has no second coordinate'}`;
+      const nullNote = x.structural
+        ? `; P from a structural Monte Carlo null of ${s.replicates} replicates that keep the multiplicity of every value and, for y, the mirror pairs {y, p − y} (seeds ${x.structural.seed} and ${y.structural.seed}); χ²(${s.xDf}) is a yardstick only`
+        : '';
+      s.population = `${base.population}; ${binning}${y ? '' : '; a digest has no second coordinate'}${nullNote}`;
+      const enumerated = Boolean(x.structural);
       return {
         ...s,
         ...grid([
           [`${s.xName}: χ²(${s.xDf})`, s.xStatistic],
-          [`${s.xName}: p-value`, s.xP],
+          enumerated ? [`${s.xName}: P, structural null`, s.xStructuralP] : [`${s.xName}: p-value`, s.xP],
           [y ? `y: χ²(${s.yDf})` : 'y: χ²', s.yStatistic],
-          ['y: p-value', s.yP],
+          enumerated ? ['y: P, structural null', s.yStructuralP] : ['y: p-value', s.yP],
         ]),
       };
     }
@@ -829,7 +914,7 @@ function statsOfKind(kind, data) {
         yPattern: y ? pattern(y.counts) : DASH,
         ...(y ? hits('yHits', y.counts) : {}),
       };
-      s.population = `${base.population}; ${s.n} values on ${s.p} cells, λ = ${s.lambda}; reference: the Poisson(λ) occupancy of a random function`;
+      s.population = `${base.population}; ${s.n} values on ${s.p} cells, a mean of ${s.lambda} per value; reference: the Poisson occupancy of a random function with that mean, which is estimated from the data (one degree of freedom less)`;
       return {
         ...s,
         ...grid([
@@ -891,7 +976,7 @@ function statsOfKind(kind, data) {
     case 'avalanche': {
       const s = {
         ...base,
-        trials: int(data.trials),
+        ...(data.sampled ? { trials: int(data.trials) } : { pairs: int(data.pairs), allPairs: int(data.allPairs) }),
         discarded: int(data.discarded),
         outputBits: int(data.outputBits),
         mean: fmt(data.mean, 2),
@@ -903,12 +988,12 @@ function statsOfKind(kind, data) {
       };
       s.population = data.sampled
         ? `${base.population}; one random bit of each key flipped (flip seed ${data.flipSeed}), ${s.discarded} discarded; reference Bin(256, ½)`
-        : `${base.population}; each of the ${data.inputBits} bits of k flipped: ${s.trials} valid flips, ${s.discarded} discarded because k XOR 2^i left [1, n − 1]; reference: Poisson-binomial law of the ${data.outputBits} bits of x and y`;
+        : `${base.population}; each of the ${data.inputBits} bits of every k flipped, every pair {k, k′} counted once: ${s.pairs} pairs, and ${s.discarded} flips discarded because k′ left [1, n − 1]; reference: the exact law of the distance between two distinct points of the orbit, over all ${s.allPairs} pairs`;
       return {
         ...s,
         ...grid([
           ['Mean distance', s.mean],
-          ['Expected mean', s.expectedMean],
+          [data.sampled ? 'Expected mean' : 'Mean, two distinct points', s.expectedMean],
           [`χ²(${s.df})`, s.statistic],
           ['p-value', s.p],
         ]),
@@ -917,21 +1002,29 @@ function statsOfKind(kind, data) {
     case 'pointCloud': {
       const s = { ...base };
       for (const c of data.panels) {
+        // The cell test runs on the half-grid y < p/2 (the other half is its mirror image).
         s[`${c.key}.cells`] = `${c.cells.per} × ${c.cells.per}`;
+        s[`${c.key}.cellsPoints`] = int(c.cells.total);
         s[`${c.key}.cellsStatistic`] = chi(c.cells.statistic);
         s[`${c.key}.cellsDf`] = int(c.cells.df);
         s[`${c.key}.cellsP`] = formatP(c.cells.pValue);
+        s[`${c.key}.cellsMinExpected`] = fmt(c.cells.minExpected, 2);
+        s[`${c.key}.cellsIllustrative`] = c.cells.illustrative ? 'illustrative only, expected counts below 5' : 'a test';
         s[`${c.key}.mirrored`] = int(c.mirrored);
         s[`${c.key}.total`] = int(c.total);
         s[`${c.key}.drawn`] = int(c.xs.length);
       }
+      const cell = (k) =>
+        data.panels.find((panel) => panel.key === k).cells.illustrative
+          ? `${s[`${k}.cellsStatistic`]}, illustrative only`
+          : `${s[`${k}.cellsStatistic`]}, ${pEq(s[`${k}.cellsP`])}`;
       const [a, b, c] = data.panels.map((panel) => panel.key);
       return {
         ...s,
         ...grid([
-          [`${field(17)}: cells χ²(${s[`${a}.cellsDf`]})`, `${s[`${a}.cellsStatistic`]}, ${pEq(s[`${a}.cellsP`])}`],
-          [`${field(1051)}: cells χ²(${s[`${b}.cellsDf`]})`, `${s[`${b}.cellsStatistic`]}, ${pEq(s[`${b}.cellsP`])}`],
-          [`${field(16477)}: cells χ²(${s[`${c}.cellsDf`]})`, `${s[`${c}.cellsStatistic`]}, ${pEq(s[`${c}.cellsP`])}`],
+          [`${field(17)}: half-grid χ²(${s[`${a}.cellsDf`]})`, cell(a)],
+          [`${field(1051)}: half-grid χ²(${s[`${b}.cellsDf`]})`, cell(b)],
+          [`${field(16477)}: half-grid χ²(${s[`${c}.cellsDf`]})`, cell(c)],
           [
             'Points whose mirror (x, p − y) is present',
             data.panels.every((panel) => panel.mirrored === panel.total)
@@ -979,6 +1072,11 @@ function statsOfKind(kind, data) {
         largestBruteMean: int(last.brute),
         largestBsgsMean: int(last.bsgs),
         largestSqrtN: int(Math.sqrt(last.n)),
+        // The references drawn as dashed lines, at the largest curve: n/2 and 1.5·√n.
+        bsgsReference: `${data.references.bsgsFactor}√n`,
+        bruteReference: 'n/2',
+        largestBsgsReference: int(data.references.bsgsFactor * Math.sqrt(last.n)),
+        largestBruteReference: int(data.references.bruteFactor * last.n),
         bruteSlope: fmt(f.bruteSlope, 3),
         bsgsSlope: fmt(f.bsgsSlope, 3),
         bruteR: fmt(f.bruteR, 4),
@@ -993,8 +1091,8 @@ function statsOfKind(kind, data) {
         ...grid([
           ['Slope, exhaustive search', s.bruteSlope],
           ['Slope, baby-step giant-step', s.bsgsSlope],
-          ['Fit at n = 2^256, exhaustive (log2)', s.bruteAt256],
-          ['Fit at n = 2^256, BSGS (log2)', s.bsgsAt256],
+          ['Fit at n ≈ 2²⁵⁶, exhaustive (log₂)', s.bruteAt256],
+          ['Fit at n ≈ 2²⁵⁶, baby-step giant-step (log₂)', s.bsgsAt256],
         ]),
       };
     }
@@ -1010,6 +1108,9 @@ function statsOfKind(kind, data) {
         total: int(a.doubleAndAdd.total),
         result: a.result,
         meanRepeated256: formatSci(data.meanRepeated),
+        // The same number for markup: {{…Mantissa}} × 10<sup>{{…Exponent}}</sup>.
+        meanRepeated256Mantissa: sciParts(data.meanRepeated).mantissa,
+        meanRepeated256Exponent: sciParts(data.meanRepeated).exponent ?? '0',
         log2Repeated256: fmt(data.repeated.at(-1), 1),
         meanDoubleAndAdd256: fmt(data.meanDoubleAndAdd, 1),
       };

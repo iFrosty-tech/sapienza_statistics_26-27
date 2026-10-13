@@ -369,7 +369,7 @@ export function geometricCdf(t, p) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Poisson and Poisson-binomial laws                                         */
+/* The Poisson law                                                           */
 /* ------------------------------------------------------------------------ */
 
 /** P(M = m) for M ~ Poisson(λ), computed in log space: e^−λ λ^m / m!. */
@@ -379,23 +379,38 @@ export function poissonPmf(m, lambda) {
   return Math.exp(m * Math.log(lambda) - lambda - lnGamma(m + 1));
 }
 
+/* ------------------------------------------------------------------------ */
+/* Monte Carlo tests                                                         */
+/* ------------------------------------------------------------------------ */
+
 /**
- * The pmf of a Poisson-binomial variable, the number of successes in
- * independent Bernoulli trials with unequal probabilities p_1, …, p_m, as an
- * array of length m + 1. Dynamic programming over the trials: after trial j,
- * P(S = s) = P(S′ = s)(1 − p_j) + P(S′ = s − 1) p_j, which costs O(m²) and
- * involves no cancellation.
- * @param {number[]} probs success probabilities in [0, 1]
+ * Summary of a Monte Carlo null distribution for an observed statistic: the
+ * number of replicates R, their mean, their 95th percentile (type 7 of
+ * Hyndman and Fan, linear interpolation) and the upper-tail p-value
+ * (1 + #{T_r ≥ T}) / (R + 1), which counts the observed statistic as one more
+ * draw from the null and is therefore never 0 (the Monte Carlo test of
+ * Davison and Hinkley, Bootstrap Methods and their Application, 1997, ch. 4).
+ * A replicate within a relative 1e-9 of the observed value counts as a
+ * tie, so that equal statistics summed in different orders compare equal.
+ * @param {number} observed
+ * @param {ArrayLike<number>} replicates
+ * @returns {{ replicates: number, mean: number, q95: number, pValue: number }}
  */
-export function poissonBinomialPmf(probs) {
-  const pmf = new Array(probs.length + 1).fill(0);
-  pmf[0] = 1;
-  probs.forEach((p, j) => {
-    if (!(p >= 0 && p <= 1)) throw new Error(`probability ${j} is not in [0, 1]`);
-    for (let s = j + 1; s >= 1; s -= 1) pmf[s] = pmf[s] * (1 - p) + pmf[s - 1] * p;
-    pmf[0] *= 1 - p;
-  });
-  return pmf;
+export function monteCarloSummary(observed, replicates) {
+  const R = replicates.length;
+  if (R === 0) throw new Error('monteCarloSummary needs at least one replicate');
+  const sorted = Float64Array.from(replicates).sort();
+  let total = 0;
+  let atLeast = 0;
+  const threshold = observed - 1e-9 * Math.max(1, Math.abs(observed));
+  for (const t of sorted) {
+    total += t;
+    if (t >= threshold) atLeast += 1;
+  }
+  const h = (R - 1) * 0.95;
+  const lo = Math.floor(h);
+  const q95 = lo + 1 < R ? sorted[lo] + (h - lo) * (sorted[lo + 1] - sorted[lo]) : sorted[lo];
+  return { replicates: R, mean: total / R, q95, pValue: (1 + atLeast) / (R + 1) };
 }
 
 /**

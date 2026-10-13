@@ -44,6 +44,18 @@ test('the program is one self-contained file', () => {
   assert.match(html, /<html lang="en">/);
 });
 
+test('the program is printed on the colours of the site (DESIGN.md) and stays a short listing', () => {
+  const style = html.match(/<style>([\s\S]*?)<\/style>/)[1].toLowerCase();
+  // paper, ink, soft ink, ruling and printed green ink of the sheet; plot red for the focus outline.
+  for (const colour of ['#f7faf8', '#1b2420', '#46524c', '#9cc3ae', '#3a6b54', '#d0462f']) assert.ok(style.includes(colour), colour);
+  assert.match(style, /--plot:\s*#d0462f/);
+  assert.match(style, /:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--plot\)/);
+  // Colours of the earlier stand-alone palette are gone.
+  for (const colour of ['#fbfaf7', '#1f1f1c', '#55544e', '#d8d5cb', '#8c897f', '#3b3a35']) assert.ok(!style.includes(colour), colour);
+  const lines = html.trimEnd().split('\n').length;
+  assert.ok(lines >= 150 && lines <= 230, `${lines} lines`);
+});
+
 test('the constants mirror the assignment: p = 17, a = 0, b = 7, G = (1, 5), k = 6', () => {
   const program = loadProgram();
   assert.deepEqual([...vm.runInContext('[p, a, b, G.x, G.y, k]', program)], [17n, 0n, 7n, 1n, 5n, 6n]);
