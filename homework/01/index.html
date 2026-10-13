@@ -248,7 +248,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               The path from a private key to an address therefore passes through two one-way maps in series, of
               different kinds. The first, <span data-tex>k \mapsto kG</span>, is algebraic: it is a homomorphism, and it
               is hard to invert only because the ECDLP is hard. The second, Keccak-256, is a hash: it compresses its
-              input and is designed to have no algebraic structure at all. <a href="{{base}}homework/02/">Homework 2</a>
+              input and is designed so that no exploitable algebraic relation between its inputs and outputs is known.
+              <a href="{{base}}homework/02/">Homework 2</a>
               follows the whole wallet pipeline, from a mnemonic sentence to the address; this page studies the first
               map, with the second as the baseline against which its statistics are compared.
             </p>
@@ -593,7 +594,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               coordinates it is the uniform law on the integers of <span data-tex>[0, p)</span>. For the frequencies of
               values, the bits and the avalanche it is a random function, which gives every input an independent,
               uniformly distributed output: the random oracle through which Bellare and Rogaway idealise a hash function
-              in the design of protocols [<a href="#ref-1">1</a>, §1.1].
+              in the design of protocols [<a href="#ref-1">1</a>, §1.1]. Where the size of the field or the structure
+              of an orbit makes these references inexact, the text replaces them with exact or simulated ones (§5.2,
+              §5.4 and §5.7).
             </p>
 
             <figure class="table-figure" aria-labelledby="table4-caption">
@@ -612,31 +615,57 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               If the public key were a uniformly random point of the plane, its abscissa and its ordinate would each be
               uniform on the integers of <span data-tex>[0, p)</span>. Figure 5 sorts <span data-tex>x/p</span> and
-              <span data-tex>y/p</span> into equal bins and compares the counts with their exact expectation under that
-              law by a chi-square statistic. At this resolution the larger curves look uniform: on
-              <span data-tex>\mathbb{F}_{1051}</span> the abscissas give <span data-tex>\chi^2</span> =
-              {{fig.coordHist.O1051.xStatistic}} on {{fig.coordHist.O1051.xDf}} degrees of freedom
-              ({{fig.coordHist.O1051.xPEq}}), and on <span data-tex>\mathbb{F}_{16477}</span> both coordinates stay within
-              the range of the reference ({{fig.coordHist.O16477.xPEq}} and {{fig.coordHist.O16477.yPEq}}). The sample of
-              secp256k1 passes genuine tests, with {{fig.coordHist.secp256k1.xPEq}} for <span data-tex>x</span> and
-              {{fig.coordHist.secp256k1.yPEq}} for <span data-tex>y</span>, and so do the Keccak-256 digests of the same
-              keys ({{fig.coordHist.keccak.xPEq}}).
+              <span data-tex>y/p</span> into <span data-tex>B</span> equal bins and compares the counts with their exact
+              expectation under that law by a chi-square statistic. For a sample the statistic is referred to
+              <span data-tex>\chi^2(B - 1)</span> and the test is genuine: the sample of secp256k1 passes it, with
+              {{fig.coordHist.secp256k1.xPEq}} for <span data-tex>x</span> and {{fig.coordHist.secp256k1.yPEq}} for
+              <span data-tex>y</span>, and so do the Keccak-256 digests of the same keys ({{fig.coordHist.keccak.xPEq}}).
+              For an enumeration the <span data-tex>\chi^2(B - 1)</span> p-value is a yardstick only (§5.1), and for these
+              coordinates an inexact one, for the reasons given below. The figure therefore also refers each statistic to
+              a structural Monte Carlo null: {{fig.params.structuralReplicates}} random configurations that keep the
+              multiplicity of every value and, for the ordinates, the mirror pairs <span data-tex>\{y, p - y\}</span>, and
+              change only where the values lie. At this resolution the abscissas of
+              <span data-tex>\mathbb{F}_{1051}</span> look uniform against either reference, with
+              <span data-tex>\chi^2</span> = {{fig.coordHist.O1051.xStatistic}} on {{fig.coordHist.O1051.xDf}} degrees of
+              freedom (yardstick {{fig.coordHist.O1051.xPEq}}; structural null {{fig.coordHist.O1051.xStructuralPEq}}), and
+              both coordinates of <span data-tex>\mathbb{F}_{16477}</span> are compatible with the structural null
+              ({{fig.coordHist.O16477.xStructuralPEq}} for <span data-tex>x</span> and
+              {{fig.coordHist.O16477.yStructuralPEq}} for <span data-tex>y</span>).
             </p>
             <p>
-              The ordinates of <span data-tex>\mathbb{F}_{1051}</span> are the exception, with
-              <span data-tex>\chi^2</span> = {{fig.coordHist.O1051.yStatistic}} ({{fig.coordHist.O1051.yPEq}}). They show
-              no preference for particular values, but a multiplicity: when <span data-tex>p \equiv 1 \pmod 3</span>
-              every ordinate that occurs belongs to exactly three points (§5.3), so the bin counts move in steps of three
-              and tend to be more dispersed than counts of independent draws, for which the reference is built; on
-              <span data-tex>\mathbb{F}_{16477}</span> the same effect stays within the range of the reference. Behind the bins, the
-              support is structured on every curve. Only about half the abscissas occur,
+              The ordinates of <span data-tex>\mathbb{F}_{1051}</span> are the exception. Their statistic,
+              <span data-tex>\chi^2</span> = {{fig.coordHist.O1051.yStatistic}}, lies far in the tail of
+              <span data-tex>\chi^2</span>({{fig.coordHist.O1051.yDf}}) ({{fig.coordHist.O1051.yPEq}} as a yardstick), yet
+              they show no preference for particular values. What <span data-tex>\chi^2(B - 1)</span> ignores is their
+              multiplicity: when <span data-tex>p \equiv 1 \pmod 3</span> every ordinate that occurs belongs to exactly
+              three points (§5.3). For a coordinate whose <span data-tex>D</span> distinct values are each shared by
+              <span data-tex>m</span> points, the variance of a bin count is about <span data-tex>m(1 - d)</span> times
+              that of independent draws, with <span data-tex>d = D/p</span> the fraction of the field that occurs, whereas
+              <span data-tex>\chi^2(B - 1)</span> assumes the factor 1. For the ordinates of
+              <span data-tex>\mathbb{F}_{1051}</span>, shared by three points and taking
+              <span data-tex>D</span> = {{fig.coordHist.O1051.yDistinct}} values, the factor is
+              {{fig.coordHist.O1051.yVif}}; for the abscissas, which come in pairs (<span data-tex>D</span> =
+              {{fig.coordHist.O1051.xDistinct}}), it is {{fig.coordHist.O1051.xVif}}, close to 1. Moreover the set of
+              ordinates of a subgroup is closed under <span data-tex>y \mapsto p - y</span>, so bins
+              <span data-tex>j</span> and <span data-tex>B - 1 - j</span> hold identical counts, which leaves the mean of
+              the statistic unchanged but about doubles its variance. A null that keeps both structures is the honest
+              yardstick, and <span data-tex>\chi^2(B - 1)</span> is not. Under it the statistic of the ordinates has mean
+              {{fig.coordHist.O1051.yStructuralMean}} and 95th percentile {{fig.coordHist.O1051.yStructuralQ95}}, and the
+              observed {{fig.coordHist.O1051.yStatistic}} lies in its upper tail ({{fig.coordHist.O1051.yStructuralPEq}}):
+              a mild departure, not the decisive rejection that <span data-tex>\chi^2</span>({{fig.coordHist.O1051.yDf}})
+              suggests. The ordinates of <span data-tex>\mathbb{F}_{16477}</span> share both structures (factor
+              {{fig.coordHist.O16477.yVif}}) and give <span data-tex>\chi^2</span> = {{fig.coordHist.O16477.yStatistic}},
+              below the structural mean of {{fig.coordHist.O16477.yStructuralMean}}.
+            </p>
+            <p>
+              Behind the bins, the support is structured on every curve. Only about half the abscissas occur,
               {{fig.occupancy.O1051.xHits2}} of the {{fig.ladder.O1051.p}} values of <span data-tex>\mathbb{F}_{1051}</span>,
               because <span data-tex>x^3 + 7</span> must be a square. When <span data-tex>p \equiv 2 \pmod 3</span>, on
               the other hand, the ordinates are exactly uniform, each value of the field occurring once (§3.1): their
               statistic is {{fig.coordHist.S1031.yStatistic}} on <span data-tex>\mathbb{F}_{1031}</span>
-              ({{fig.coordHist.S1031.yPEq}}) and {{fig.coordHist.T17g.yStatistic}} on the toy curve with the generator. The
-              statistic of a random sample would scatter around its {{fig.coordHist.S1031.yDf}} degrees of freedom; a fit
-              this good is itself a sign of structure.
+              ({{fig.coordHist.S1031.yPEq}} as a yardstick) and {{fig.coordHist.T17g.yStatistic}} on the toy curve with the
+              generator. The statistic of a random sample would scatter around its {{fig.coordHist.S1031.yDf}} degrees of
+              freedom; a fit this good is itself a sign of structure.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="coordHist" data-fig-kind="coordHist" aria-labelledby="fig5-title">
@@ -725,17 +754,20 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               A random function that sends <span data-tex>n - 1</span> inputs into the <span data-tex>p</span> values of
               <span data-tex>\mathbb{F}_p</span> hits each value a number of times that follows, approximately, the
-              Poisson law of mean <span data-tex>\lambda = (n - 1)/p</span>: for <span data-tex>\lambda</span> near 1,
+              Poisson law of mean <span data-tex>\theta = (n - 1)/p</span>: for <span data-tex>\theta</span> near 1,
               values hit once are about as common as values never hit, and a few are hit three times or more. Figure 6
               counts how many values of the field occur <span data-tex>m</span> times as a coordinate of
               <span data-tex>kG</span>, and the curves look nothing like a random function. On
               <span data-tex>\mathbb{F}_{1051}</span> the abscissas take {{fig.occupancy.O1051.xPattern}}, and the
-              ordinates {{fig.occupancy.O1051.yPattern}}; against the Poisson law the chi-square statistics are
-              {{fig.occupancy.O1051.xStatistic}} for the abscissas ({{fig.occupancy.O1051.xPEq}}) and
-              {{fig.occupancy.O1051.yStatistic}} for the ordinates ({{fig.occupancy.O1051.yPEq}}). Keccak-256 reduced
-              modulo the same <span data-tex>p</span> and applied to the same keys follows the Poisson law, with
-              {{fig.occupancy.keccakO1051.xPattern}} (<span data-tex>\chi^2</span> =
-              {{fig.occupancy.keccakO1051.xStatistic}}, {{fig.occupancy.keccakO1051.xPEq}}).
+              ordinates {{fig.occupancy.O1051.yPattern}}. Against the Poisson law, whose mean
+              <span data-tex>\theta</span> is set to the observed mean and so costs one degree of freedom, the
+              chi-square statistics are {{fig.occupancy.O1051.xStatistic}} for the abscissas and
+              {{fig.occupancy.O1051.yStatistic}} for the ordinates, on {{fig.occupancy.O1051.xDf}} and
+              {{fig.occupancy.O1051.yDf}} degrees of freedom ({{fig.occupancy.O1051.xPEq}} and
+              {{fig.occupancy.O1051.yPEq}}, as yardsticks). Keccak-256 reduced modulo the same <span data-tex>p</span>
+              and applied to the same keys follows the Poisson law, with {{fig.occupancy.keccakO1051.xPattern}}
+              (<span data-tex>\chi^2</span> = {{fig.occupancy.keccakO1051.xStatistic}} on
+              {{fig.occupancy.keccakO1051.xDf}} degrees of freedom, yardstick {{fig.occupancy.keccakO1051.xPEq}}).
             </p>
             <p>
               Both patterns are exact consequences of the equation. An abscissa is shared by the points
@@ -926,19 +958,27 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <h3 id="s5-5">5.5 Apparent uniformity</h3>
             <p>
               Drawn as clouds of points (Figure 8), the multiples <span data-tex>kG</span> look like noise: no line,
-              cluster or gap stands out. The cell test agrees, with <span data-tex>\chi^2</span> =
-              {{fig.pointCloud.O1051.cellsStatistic}} on {{fig.pointCloud.O1051.cells}} cells for
-              <span data-tex>\mathbb{F}_{1051}</span> ({{fig.pointCloud.O1051.cellsPEq}}) and
-              {{fig.pointCloud.O16477.cellsStatistic}} on {{fig.pointCloud.O16477.cells}} cells for
-              <span data-tex>\mathbb{F}_{16477}</span> ({{fig.pointCloud.O16477.cellsPEq}}); even the 17 points of the toy
-              curve spread evenly over {{fig.pointCloud.T17g.cells}} cells ({{fig.pointCloud.T17g.cellsPEq}}). Yet the
-              mirror image <span data-tex>(x, p - y)</span> of every point is present, {{fig.pointCloud.O1051.mirrored}}
-              of {{fig.pointCloud.O1051.total}} on <span data-tex>\mathbb{F}_{1051}</span> and
-              {{fig.pointCloud.O16477.mirrored}} of {{fig.pointCloud.O16477.total}} on
-              <span data-tex>\mathbb{F}_{16477}</span>: an exact symmetry, which a uniform scatter of the same size would
-              show with vanishing probability, and which a comparison of cell counts with their expectation is not
-              designed to see. "Looks uniform" is a statement about one test at one resolution; "is random"
-              is a statement about every test, and the clouds pass the first while failing the second by construction.
+              cluster or gap stands out. Yet the mirror image <span data-tex>(x, p - y)</span> of every point is present,
+              {{fig.pointCloud.O1051.mirrored}} of {{fig.pointCloud.O1051.total}} on
+              <span data-tex>\mathbb{F}_{1051}</span> and {{fig.pointCloud.O16477.mirrored}} of
+              {{fig.pointCloud.O16477.total}} on <span data-tex>\mathbb{F}_{16477}</span>: an exact symmetry, which a
+              uniform scatter of the same size would show with vanishing probability. The symmetry also shapes the cell
+              test. Over the whole plane every cell would have a mirror cell holding exactly the same count, which would
+              double the variance of the statistic; the test therefore divides only the lower half
+              <span data-tex>y &lt; p/2</span> into equal cells and compares their counts with the uniform law on the half
+              lattice. There the clouds look uniform: <span data-tex>\chi^2</span> =
+              {{fig.pointCloud.O1051.cellsStatistic}} for the {{fig.pointCloud.O1051.cellsPoints}} points of the lower
+              half of <span data-tex>\mathbb{F}_{1051}</span> on {{fig.pointCloud.O1051.cells}} cells
+              ({{fig.pointCloud.O1051.cellsDf}} degrees of freedom, yardstick {{fig.pointCloud.O1051.cellsPEq}}), and
+              {{fig.pointCloud.O16477.cellsStatistic}} for the {{fig.pointCloud.O16477.cellsPoints}} points of the lower
+              half of <span data-tex>\mathbb{F}_{16477}</span> on {{fig.pointCloud.O16477.cells}} cells
+              ({{fig.pointCloud.O16477.cellsDf}} degrees of freedom, yardstick {{fig.pointCloud.O16477.cellsPEq}}). On the
+              toy curve the {{fig.pointCloud.T17g.cellsPoints}} points of the lower half fall into
+              {{fig.pointCloud.T17g.cells}} cells whose expected counts are as low as
+              {{fig.pointCloud.T17g.cellsMinExpected}}, below the usual minimum of 5, so its statistic,
+              {{fig.pointCloud.T17g.cellsStatistic}}, is illustrative only and supports no inference. "Looks uniform" is a
+              statement about one test at one resolution; "is random" is a statement about every test, and the clouds
+              pass the first while failing the second by construction.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="pointCloud" data-fig-kind="pointCloud" aria-labelledby="fig8-title">
@@ -1033,7 +1073,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 <span data-tex>\rho</span> between input and output: <span data-tex>k</span> with
                 <span data-tex>x(kG)</span> and with <span data-tex>y(kG)</span>, consecutive abscissas (lag one) and
                 mirror pairs. For the enumerated curves the coefficients are exact values over the whole orbit, so no
-                p-value applies; for secp256k1 and Keccak-256 they are estimates from the sample, between
+                inferential p-value applies; for secp256k1 and Keccak-256 they are estimates from the sample, between
                 <span data-tex>k/n</span> and <span data-tex>x/p</span>, <span data-tex>y/p</span> or
                 <span data-tex>H(k)/2^{256}</span>, with p-values from Fisher's <span data-tex>z</span>.
               </figcaption>
@@ -1058,15 +1098,28 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               {{fig.sac.keccak.beyond}}, where chance alone would give {{fig.sac.secp256k1.expectedBeyond}}.
             </p>
             <p>
-              On the enumerated curves the reference is the Poisson-binomial law built from the bit frequencies of each
-              orbit. The mean distances agree with it closely, {{fig.avalanche.O1051.mean}} against
-              {{fig.avalanche.O1051.expectedMean}} on <span data-tex>\mathbb{F}_{1051}</span> and
-              {{fig.avalanche.O16477.mean}} against {{fig.avalanche.O16477.expectedMean}} on
-              <span data-tex>\mathbb{F}_{16477}</span>, but the shapes do not ({{fig.avalanche.O1051.pEq}} and
-              {{fig.avalanche.O16477.pEq}}). This is a limit of the reference rather than a finding: an enumeration
-              counts every pair <span data-tex>\{k, k \oplus 2^i\}</span> twice, once from each end, and the bits of
-              <span data-tex>x</span> and <span data-tex>y</span> are not independent, as the reference assumes. The
-              {{fig.avalanche.T17.pairs}} admissible flips of the toy orbit are too few to say anything.
+              On the enumerated curves every bit <span data-tex>i</span> of every key is flipped, and each unordered pair
+              <span data-tex>\{k, k \oplus 2^i\}</span> with both keys in <span data-tex>[1, n - 1]</span> is counted
+              once: {{fig.avalanche.O1051.pairs}} pairs on <span data-tex>\mathbb{F}_{1051}</span> and
+              {{fig.avalanche.O16477.pairs}} on <span data-tex>\mathbb{F}_{16477}</span>, after
+              {{fig.avalanche.O1051.discarded}} and {{fig.avalanche.O16477.discarded}} flips that left the range were
+              discarded. The output is <span data-tex>x</span> and <span data-tex>y</span> written in binary,
+              {{fig.avalanche.O1051.outputBits}} and {{fig.avalanche.O16477.outputBits}} bits. Its bits are neither fair
+              (§5.4) nor independent of one another, since <span data-tex>y</span> is tied to <span data-tex>x</span> by
+              the equation, so the reference is not a binomial law but the exact law of the Hamming distance between two
+              distinct points of the orbit, computed over all {{fig.avalanche.O1051.allPairs}} and
+              {{fig.avalanche.O16477.allPairs}} pairs of points: the distance that a flip would produce if it sent
+              <span data-tex>kG</span> to an unrelated point of the orbit. The means agree,
+              {{fig.avalanche.O1051.mean}} against {{fig.avalanche.O1051.expectedMean}} on
+              <span data-tex>\mathbb{F}_{1051}</span> and {{fig.avalanche.O16477.mean}} against
+              {{fig.avalanche.O16477.expectedMean}} on <span data-tex>\mathbb{F}_{16477}</span>. The shapes agree on
+              <span data-tex>\mathbb{F}_{16477}</span> (<span data-tex>\chi^2</span> =
+              {{fig.avalanche.O16477.statistic}} on {{fig.avalanche.O16477.df}} degrees of freedom, yardstick
+              {{fig.avalanche.O16477.pEq}}) and depart mildly on <span data-tex>\mathbb{F}_{1051}</span>
+              (<span data-tex>\chi^2</span> = {{fig.avalanche.O1051.statistic}} on {{fig.avalanche.O1051.df}} degrees of
+              freedom, yardstick
+              {{fig.avalanche.O1051.pEq}}), a value of the kind expected now and then among the many statistics of this
+              section. The toy orbit offers only {{fig.avalanche.T17.pairs}} pairs, too few to say anything.
             </p>
 
             <figure class="chart-figure chart-figure--formulas" data-fig="avalanche" data-fig-kind="avalanche" aria-labelledby="fig10-title">
@@ -1269,16 +1322,19 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>p</span> grows: the frequencies of values, the mirror images, the related outputs after a
               bit flip. Some are artefacts of the field size or of smallness that vanish on secp256k1: the bias of the
               top bits and the correlations of the toy orbit. The rest agree with an ideal function on the larger curves
-              and on secp256k1: the binned coordinates, apart from the ordinates of
-              <span data-tex>\mathbb{F}_{1051}</span> explained in §5.2, the balance of the bits, the avalanche of the bits of
-              <span data-tex>x</span>. Only the last row measures what makes a function one-way, and it is the row in
+              and on secp256k1: the binned coordinates, with a mild departure of the ordinates of
+              <span data-tex>\mathbb{F}_{1051}</span> under the structural null of §5.2
+              ({{fig.coordHist.O1051.yStructuralPEq}}); the cells of the half plane; the balance of the bits; and the
+              avalanche of the output bits, with a mild departure in the shape of the distances on
+              <span data-tex>\mathbb{F}_{1051}</span> (§5.7). Only the last row, the cost of inversion, measures what makes a
+              function one-way, and it is the row in
               which the toy curve and secp256k1 differ most. Table 8 anticipates the discussion of §6.
             </p>
 
             <figure class="table-figure" aria-labelledby="table7-caption">
               <figcaption id="table7-caption">
                 <span class="table-figure__no">Table 7.</span>Observed results: the properties explored in §5.2 to §5.8
-                for each series. P is a p-value, a yardstick on the enumerations (§5.2); for the coordinates of the
+                for each series. P is a p-value, a yardstick on the enumerations (§5.1); for the coordinates of the
                 enumerated curves it comes from the structural Monte Carlo null.
               </figcaption>
               <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table7-caption">
@@ -1303,7 +1359,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                     <tr>
                       <th scope="row">Frequency of individual values (§5.3)</th>
                       <td>G = (6, 6): x, {{fig.occupancy.T17g.xPattern}}; y, {{fig.occupancy.T17g.yPattern}}</td>
-                      <td>p = 1051: x, {{fig.occupancy.O1051.xPattern}}; y, {{fig.occupancy.O1051.yPattern}}; χ² = {{fig.occupancy.O1051.xStatistic}} and {{fig.occupancy.O1051.yStatistic}}, {{fig.occupancy.O1051.yPEq}}</td>
+                      <td>p = 1051: x, {{fig.occupancy.O1051.xPattern}}; y, {{fig.occupancy.O1051.yPattern}}; χ² = {{fig.occupancy.O1051.xStatistic}} (x) and {{fig.occupancy.O1051.yStatistic}} (y), {{fig.occupancy.O1051.xPEq}} and {{fig.occupancy.O1051.yPEq}}</td>
                       <td>Not measurable: no value repeats among N = {{fig.params.sampleN}}</td>
                       <td>mod 1051: χ² = {{fig.occupancy.keccakO1051.xStatistic}}, {{fig.occupancy.keccakO1051.xPEq}}</td>
                     </tr>
@@ -1330,7 +1386,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                     </tr>
                     <tr>
                       <th scope="row">Avalanche-like behaviour (§5.7)</th>
-                      <td>G = (1, 5): mean {{fig.avalanche.T17.mean}} against {{fig.avalanche.T17.expectedMean}}</td>
+                      <td>G = (1, 5): mean {{fig.avalanche.T17.mean}} against {{fig.avalanche.T17.expectedMean}}, {{fig.avalanche.T17.pairs}} pairs only</td>
                       <td>Mean {{fig.avalanche.O1051.mean}} against {{fig.avalanche.O1051.expectedMean}}, {{fig.avalanche.O1051.pEq}}<br />{{fig.avalanche.O16477.mean}} against {{fig.avalanche.O16477.expectedMean}}, {{fig.avalanche.O16477.pEq}}</td>
                       <td>Mean {{fig.avalanche.secp256k1.mean}}, {{fig.avalanche.secp256k1.pEq}}<br />SAC max |f − ½|: {{fig.sac.secp256k1.maxAbsDeviation}}<br />Related outputs: {{fig.relatedOutputs.secp256k1.hits}} of {{fig.relatedOutputs.secp256k1.trials}}</td>
                       <td>Mean {{fig.avalanche.keccak.mean}}, {{fig.avalanche.keccak.pEq}}<br />SAC max |f − ½|: {{fig.sac.keccak.maxAbsDeviation}}<br />Related outputs: {{fig.relatedOutputs.keccak.hits}} of {{fig.relatedOutputs.keccak.trials}}</td>
@@ -1366,12 +1422,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                     <tr>
                       <th scope="row">Distribution of x and y (§5.2)</th>
                       <td>No. What must be uniform is the key: <span data-tex>k \mapsto kG</span> is a bijection onto <span data-tex>\langle G \rangle \setminus \{O\}</span>, so a uniform key gives a uniform point, whatever its coordinates look like.</td>
-                      <td>Yes. The outputs of a random oracle are uniform, and a skewed digest would be distinguishable from them.</td>
+                      <td>Yes, under the random-oracle idealisation: its outputs are uniform, and a skewed digest would be distinguishable from them.</td>
                     </tr>
                     <tr>
                       <th scope="row">Frequency of individual values (§5.3)</th>
                       <td>No. Abscissas in pairs and ordinates in threes, or once, are symmetries of the curve known in advance; they shorten a search by a small constant factor only.</td>
-                      <td>Yes. Poisson occupancy of the range is how a random function behaves, and Keccak-256 shows it.</td>
+                      <td>Yes, under the random-oracle idealisation: Poisson occupancy of the range is how a random function behaves, and Keccak-256 shows it.</td>
                     </tr>
                     <tr>
                       <th scope="row">Distribution of bits (§5.4)</th>
@@ -1381,7 +1437,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                     <tr>
                       <th scope="row">Apparent uniformity (§5.5)</th>
                       <td>No. A cosmetic property: the exact mirror symmetry is present on every curve and harmless.</td>
-                      <td>Yes, in the stronger form of indistinguishability from a random function, which an exact symmetry would violate.</td>
+                      <td>Yes, under the random-oracle idealisation, which an exact symmetry would contradict.</td>
                     </tr>
                     <tr>
                       <th scope="row">Correlation between input and output (§5.6)</th>
@@ -1391,7 +1447,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                     <tr>
                       <th scope="row">Avalanche-like behaviour (§5.7)</th>
                       <td>No. Met at the level of bits, yet <span data-tex>Q' = Q \pm 2^i G</span> exactly: the homomorphism on which public-key protocols rely.</td>
-                      <td>Yes. Avalanche and the strict avalanche criterion are design criteria, and an exact related-input relation would disqualify a hash.</td>
+                      <td>Yes. Avalanche and the strict avalanche criterion are design criteria, and an exact related-input relation would contradict the random-oracle idealisation.</td>
                     </tr>
                     <tr>
                       <th scope="row">Cost of inversion (§5.8)</th>
@@ -1416,12 +1472,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               cryptographic hash function compresses inputs of arbitrary length to a fixed length and must resist three
               attacks: finding an input with a given digest (preimage resistance), a second input with the same digest
               as a given one (second-preimage resistance), and any two inputs with the same digest (collision
-              resistance) [<a href="#ref-11">11</a>, Defs 1–3], [<a href="#ref-7">7</a>, §6.1]. In the design and analysis of
-              protocols, hash functions are moreover idealised as random oracles, functions whose every output bit is
-              uniform and independent of everything else [<a href="#ref-1">1</a>, §1.1, §2], and the avalanche of their bits is judged
-              by the strict avalanche criterion that Webster and Tavares introduced for the components of ciphers
-              [<a href="#ref-14">14</a>]. A hash is therefore expected to behave like a random function in every statistic
-              that can be computed on it; a one-way function is not.
+              resistance) [<a href="#ref-11">11</a>, Defs 1–3], [<a href="#ref-7">7</a>, §6.1]. These three are the
+              requirements. Beyond them, the analysis of protocols idealises a hash function as a random oracle, a
+              function whose every output bit is uniform and independent of everything else
+              [<a href="#ref-1">1</a>, §1.1, §2], [<a href="#ref-7">7</a>, §6.5], and the avalanche of hash bits is
+              judged by the strict avalanche criterion that Webster and Tavares introduced for the components of ciphers
+              [<a href="#ref-14">14</a>]. In this random-oracle idealisation a hash is modelled as a random function, so it
+              is expected to pass every statistical test that does not use its definition; nothing of the kind is asked
+              of a one-way function.
             </p>
             <p>
               With these definitions the properties explored in §5 can be classified, as in Table 8.
@@ -1433,8 +1491,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <span data-tex>\langle G \rangle \setminus \{O\}</span>, a uniform key gives a uniform point of the group,
               whatever its coordinates look like as integers. The exactly uniform ordinates of the supersingular curves
               and the lumped ordinates of <span data-tex>\mathbb{F}_{1051}</span> are equally harmless. For a hash,
-              uniform outputs are part of the requirement: a digest that favoured some values would be distinguishable
-              from a random oracle.
+              uniform outputs are part of the random-oracle idealisation: a digest that favoured some values would be
+              distinguishable from a random oracle.
             </p>
             <p>
               <em>Frequency of individual values.</em> The multiplicities of §5.3 are exact symmetries of the curve, and
@@ -1447,14 +1505,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               <em>Distribution of bits.</em> The bias of the top bits is inherited from the size of
               <span data-tex>p</span>, is identical for every key and is irrelevant to inversion. A hash whose outputs
-              cover exactly <span data-tex>2^{256}</span> values must have unbiased bits, and the frequency test of
+              cover exactly <span data-tex>2^{256}</span> values is expected, under the idealisation, to have unbiased
+              bits, and the frequency test of
               [<a href="#ref-12">12</a>, §2.1] is a standard check of this.
             </p>
             <p>
               <em>Apparent uniformity.</em> It is cosmetic for a one-way function, whose outputs may display any
-              symmetry that does not lead back to the key. For a hash the requirement is stronger than looking uniform:
-              it is indistinguishability from a random function, which an exact symmetry such as the mirror images of
-              §5.5 would violate.
+              symmetry that does not lead back to the key. For a hash the expectation is stronger than looking uniform:
+              under the random-oracle idealisation it should pass every test that does not use its definition, and an
+              exact symmetry such as the mirror images of §5.5 would contradict that idealisation.
             </p>
             <p>
               <em>Correlation between input and output.</em> It is relevant to both as a screen and conclusive for
@@ -1465,13 +1524,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <p>
               <em>Avalanche-like behaviour.</em> Avalanche is a design criterion of hash functions. Scalar
               multiplication satisfies it at the level of bits, yet it carries an exact related-input structure,
-              <span data-tex>Q' = Q \pm 2^i G</span>, that would disqualify a hash, since the output for one input
-              becomes predictable from the output for another. For public-key cryptography the same structure is not a
-              defect but the point. It is the homomorphism <span data-tex>(a + b)G = aG + bG</span>, which ECDSA
-              verification uses when it computes the combination <span data-tex>u_1 G + u_2 Q</span> of public points
-              [<a href="#ref-3">3</a>, §4.1.4], and which the non-hardened key derivation of BIP-32, examined in
-              <a href="{{base}}homework/02/">Homework 2</a>, uses to compute a child public key
-              <span data-tex>Q + tG</span> from the parent public key alone.
+              <span data-tex>Q' = Q \pm 2^i G</span>, that would disqualify a hash modelled as a random oracle, since
+              the output for one input becomes predictable from the output for another. For public-key cryptography the
+              same structure is not a defect but the point. It is the homomorphism <span data-tex>(a + b)G = aG + bG</span>,
+              which ECDSA verification uses when it computes the combination <span data-tex>u_1 G + u_2 Q</span> of public
+              points [<a href="#ref-3">3</a>, §4.1.4], and which the non-hardened key derivation examined in
+              <a href="{{base}}homework/02/">Homework 2</a> uses to compute a child public key from the parent public key
+              alone.
             </p>
             <p>
               Collisions separate the two notions most sharply. On <span data-tex>[1, n - 1]</span> the map
@@ -1488,8 +1547,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               supersingularity that make the toy curve and the curve over <span data-tex>\mathbb{F}_{1031}</span> easy to
               invert (§5.8). It is, second, the key. The definition of a one-way function assumes a uniformly random
               input, and the security of a key pair rests on that assumption being met: Breitner and Heninger computed
-              hundreds of Bitcoin and dozens of Ethereum private keys from signatures whose secret nonces were only
-              slightly biased [<a href="#ref-2">2</a>]. The defect there lay in the distribution of an input, not in the
+              hundreds of Bitcoin and dozens of Ethereum private keys from signatures whose per-signature secret nonces,
+              themselves scalars fed to <span data-tex>k \mapsto kG</span>, were not uniformly random
+              [<a href="#ref-2">2</a>]. The defect there lay in the distribution of an input, not in the
               behaviour of the outputs that §5 examines.
             </p>
             <p>
@@ -1497,11 +1557,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               visible pattern linking <span data-tex>k</span> to <span data-tex>Q</span>, or a cost of inversion growing
               too slowly would be evidence against it; their absence is not evidence for it, as the toy curve shows by
               passing several of the same tests while being invertible by inspection. For a hash the statistics carry
-              more weight, because behaving like a random function is part of what is asked of it, although even there
-              passing them is necessary rather than sufficient. The derivation of an Ethereum address uses each map for
-              what it offers: <span data-tex>k \mapsto kG</span> supplies the algebra that signatures need, and
-              Keccak-256 supplies compression and the behaviour of a random function, turning a structured 64-byte
-              public key into a 20-byte address.
+              more weight, because the random-oracle idealisation under which a hash is used asks it to behave like a
+              random function, although even there passing them is necessary rather than sufficient. The derivation of
+              an Ethereum address uses each map for what it offers: <span data-tex>k \mapsto kG</span> supplies the
+              algebra that signatures need, and Keccak-256 supplies compression and, as far as is known, the behaviour
+              of a random function, turning a structured 64-byte public key into a 20-byte address.
             </p>
           </section>
 
@@ -1553,8 +1613,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               sampling of 32 bytes from a seeded generator with seed {{fig.params.seed}} ({{fig.params.rejected}}
               rejections; the first key is <code>{{fig.params.firstKey}}</code>), Keccak-256 is applied to the same keys,
               and these results are labelled Simulated. The bit flips of the avalanche experiment use the seed
-              {{fig.params.seedAvalanche}} and the random keys of the discrete-logarithm experiment the seed
-              {{fig.params.seedEcdlp}}, both derived from {{fig.params.seed}}; the strict-avalanche matrices use the first
+              {{fig.params.seedAvalanche}}, the random keys of the discrete-logarithm experiment the seed
+              {{fig.params.seedEcdlp}}, and the structural Monte Carlo null of §5.2 the seed
+              {{fig.params.seedStructural}}, from which one seed is derived for the {{fig.params.structuralReplicates}}
+              replicates of each coordinate of each enumerated curve; all three are derived from {{fig.params.seed}}.
+              The strict-avalanche matrices use the first
               {{fig.params.sacKeys}} keys of the sample and the discrete-logarithm experiment {{fig.params.ecdlpTargets}}
               keys per curve. The generator is statistical, not cryptographic, and must never produce real keys. In the
               browser the sampled series of Figures 5, 7 and 10 can be redrawn on {{fig.params.resampleN}} fresh keys; the
@@ -1571,7 +1634,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <li><a href="{{site.repoUrl}}/blob/main/src/lib/toy-curve.js">src/lib/toy-curve.js</a>: the arithmetic of the toy curve, with a record of every group operation.</li>
               <li><a href="{{site.repoUrl}}/blob/main/public/homework/01/toy-ecc.html">public/homework/01/toy-ecc.html</a>: the standalone program of §3.4.</li>
               <li><a href="{{site.repoUrl}}/blob/main/src/lib/kg-study.js">src/lib/kg-study.js</a>: the experiments of §5 on the curves of Table 4, secp256k1 and Keccak-256.</li>
-              <li><a href="{{site.repoUrl}}/blob/main/src/lib/stats.js">src/lib/stats.js</a>: the chi-square, Poisson, Poisson-binomial and correlation statistics.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/stats.js">src/lib/stats.js</a>: the chi-square, Poisson, Monte Carlo and correlation statistics.</li>
               <li><a href="{{site.repoUrl}}/blob/main/src/lib/secp256k1.js">src/lib/secp256k1.js</a> and <a href="{{site.repoUrl}}/blob/main/src/lib/keccak.js">src/lib/keccak.js</a>: secp256k1 and Keccak-256 from their specifications.</li>
               <li><a href="{{site.repoUrl}}/blob/main/homework/01/figures.js">homework/01/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
             </ul>
