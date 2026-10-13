@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { latticeScale, lineSegments, renderLatticeSVG } from '../src/hw01/lattice.js';
+import { estimateTextWidth, infinityBox, latticeScale, lineSegments, placeLabels, renderLatticeSVG } from '../src/hw01/lattice.js';
 import { TOY_BASE, TOY_CURVE, addStep, points, subgroup } from '../src/lib/toy-curve.js';
 
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -144,4 +144,66 @@ test('one group operation draws its wrapped line, the third point, the drop and 
   assert.ok(/class="lat__result"[^>]*data-x="5" data-y="8"/.test(svg), '6G = (5, 8)');
   const vertical = renderLatticeSVG({ p: 17, points: [], line: { vertical: true, x: 3n }, id: 'v', title: 'T', desc: 'D' });
   assert.equal(count(vertical, 'class="lat__segment"'), 1);
+});
+
+/* Axis-aligned boxes { x0, y0, x1, y1 } overlap. */
+const boxesOverlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+/* A circle meets a box. */
+function circleMeetsBox(c, b) {
+  const dx = Math.max(b.x0 - c.cx, 0, c.cx - b.x1);
+  const dy = Math.max(b.y0 - c.cy, 0, c.cy - b.y1);
+  return dx * dx + dy * dy < c.r * c.r;
+}
+
+test('the toy public key is the most prominent mark and is labelled Q = 6G when asked', () => {
+  const all = points(TOY_CURVE);
+  const orbit = subgroup(TOY_CURVE, TOY_BASE);
+  const svg = renderLatticeSVG({ p: 17, points: all, orbit, highlight: orbit[5], highlightLabel: 'Q = 6G', id: 'q', title: 'T', desc: 'D' });
+  const radius = (re) => Number(svg.match(re)[1]);
+  const orbitR = radius(/class="lat__point is-orbit" data-x="1" data-y="5"[^>]*r="([\d.]+)"/);
+  const highlightR = radius(/class="lat__point is-orbit is-highlight"[^>]*r="([\d.]+)"/);
+  assert.ok(highlightR >= orbitR + 1.5, `highlight ${highlightR} against orbit ${orbitR}`);
+  assert.ok(svg.lastIndexOf('is-highlight') > svg.lastIndexOf('data-x="15" data-y="13"'), 'drawn above the other marks');
+  assert.ok(svg.includes('>Q = 6G<') && !svg.includes('>6G<'), 'the label names the public key');
+  assert.equal(count(svg, 'class="lat__label"'), 8);
+  const step = addStep(TOY_CURVE, orbit[4], TOY_BASE);
+  const op = renderLatticeSVG({ p: 17, points: all, orbit, line: { lambda: step.lambda, nu: step.nu }, third: step.third, result: step.result, id: 'r', title: 'T', desc: 'D' });
+  assert.ok(Number(op.match(/class="lat__result"[^>]*r="([\d.]+)"/)[1]) >= orbitR + 1.5, 'the result disc covers the orbit disc');
+});
+
+test('labels of the assignment orbit overlap neither each other, nor any mark, nor the mirror line, and stay inside the plot', () => {
+  const s = latticeScale({ p: 17, width: 440 });
+  const all = points(TOY_CURVE).map((Q) => ({ x: Number(Q.x), y: Number(Q.y) }));
+  const orbit = subgroup(TOY_CURVE, TOY_BASE).map((Q) => ({ x: Number(Q.x), y: Number(Q.y) }));
+  const r = 4.5;
+  const marks = all.map((Q) => ({ cx: s.x(Q.x), cy: s.y(Q.y), r: Q.x === 5 && Q.y === 8 ? r + 2 : r }));
+  const items = orbit.map((Q, i) => ({
+    id: i + 1,
+    text: i === 5 ? 'Q = 6G' : i === 0 ? 'G' : `${i + 1}G`,
+    cx: s.x(Q.x),
+    cy: s.y(Q.y),
+    r: i === 5 ? r + 2 : r,
+  }));
+  const bounds = { x0: s.left, y0: s.top, x1: s.left + s.size, y1: s.top + s.size };
+  const mirrorY = s.y(17 / 2);
+  const placed = placeLabels({ items, obstacles: marks, bounds, avoidY: [mirrorY] });
+  assert.equal(placed.length, items.length);
+  for (const [i, a] of placed.entries()) {
+    assert.ok(a.box.x0 >= bounds.x0 && a.box.x1 <= bounds.x1 && a.box.y0 >= bounds.y0 && a.box.y1 <= bounds.y1, `${a.text} inside`);
+    assert.ok(!(a.box.y0 < mirrorY && a.box.y1 > mirrorY), `${a.text} clear of the mirror line`);
+    assert.ok(a.box.x1 - a.box.x0 >= estimateTextWidth(a.text), 'the box holds the text');
+    for (const m of marks) assert.ok(!circleMeetsBox(m, a.box), `${a.text} clear of the mark at (${m.cx}, ${m.cy})`);
+    for (const b of placed.slice(i + 1)) assert.ok(!boxesOverlap(a.box, b.box), `${a.text} and ${b.text}`);
+  }
+  // The SVG prints the labels where placeLabels put them.
+  const svg = renderLatticeSVG({ p: 17, points: points(TOY_CURVE), orbit: subgroup(TOY_CURVE, TOY_BASE), highlight: { x: 5n, y: 8n }, highlightLabel: 'Q = 6G', id: 'l', title: 'T', desc: 'D' });
+  const q = placed.find((a) => a.text === 'Q = 6G');
+  assert.ok(svg.includes(`x="${Math.round(q.x * 100) / 100}" y="${Math.round(q.y * 100) / 100}" text-anchor="${q.anchor}">Q = 6G<`), 'same placement in the SVG');
+});
+
+test('the boxed O sits in the right margin, level with the top of the plot', () => {
+  const s = latticeScale({ p: 17, width: 440 });
+  const box = infinityBox(s);
+  assert.ok(box.x > s.left + s.size && box.x + box.side < s.width);
+  assert.equal(box.cx, box.x + box.side / 2);
 });

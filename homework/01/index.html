@@ -199,8 +199,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
             <figure class="chart-figure program-figure" aria-labelledby="listing1-title">
               <div class="program" data-program>
-                <pre class="program__output" data-program-output><!-- @figure id=programStatic --></pre>
                 <div class="program__controls" data-program-controls hidden></div>
+                <pre class="program__output" data-program-output tabindex="0" role="region" aria-labelledby="listing1-title"><!-- @figure id=programStatic --></pre>
+                <p class="visually-hidden" data-program-status aria-live="polite"></p>
               </div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="listing1-title">
@@ -286,21 +287,38 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </p>
 
             <figure class="chart-figure slowmo" data-slowmo aria-labelledby="fig4-title">
-              <div class="chart-figure__canvas slowmo__stage" data-slowmo-stage><!-- @figure id=slowMo --></div>
+              <div class="slowmo__layout">
+                <div class="chart-figure__canvas slowmo__stage" data-slowmo-stage><!-- @figure id=slowMo --></div>
+                <div class="slowmo__side" data-slowmo-side hidden></div>
+              </div>
               <div class="slowmo__controls" data-slowmo-controls hidden></div>
+              <div class="slowmo__console" data-slowmo-console hidden></div>
               <figcaption class="pplot__caption">
                 <p class="pplot__caption-title" id="fig4-title">
-                  <span class="pplot__fig-no">Figure 4.</span>Scalar multiplication slowed down: one group operation at a time on the lattice of E(F₁₇)
+                  <span class="pplot__fig-no">Figure 4.</span>Scalar multiplication slowed down: one group operation at a time on the lattice of E(F<sub>17</sub>)
                 </p>
                 <p>
-                  The printed figure shows the last step of the computation of <span data-tex>Q = 6G</span> by repeated
-                  addition, <span data-tex>5G + G</span>. The line through 5G = {{fig.slowMo.from}} and
-                  G = {{fig.toy.G}} has slope <span data-tex>\lambda</span> = {{fig.slowMo.lambda}} modulo 17; on the
-                  sheet, whose opposite edges are identified, it appears as parallel segments through its 17 lattice
-                  points. It meets the curve a third time at <span data-tex>R'</span> = {{fig.slowMo.third}} (open ring),
-                  and the reflection of <span data-tex>R'</span> across the dashed line <span data-tex>y = 17/2</span>
-                  is the result, 6G = {{fig.slowMo.result}} (red disc). The filled marks are the multiples of
-                  <span data-tex>G</span> computed so far.
+                  The figure replays the computation of <span data-tex>Q = kG</span> on the toy curve one group operation
+                  at a time; by default it runs the assignment, <span data-tex>G = (1, 5)</span> and
+                  <span data-tex>k = 6</span>, at the slowest of three speeds. In each operation the two operands pulse,
+                  the line through them modulo 17 is drawn segment by segment as it wraps across the edges of the sheet,
+                  marking its 17 lattice points, its third intersection <span data-tex>R'</span> with the curve appears
+                  as an open ring, the dashed drop reflects <span data-tex>R'</span> across the line
+                  <span data-tex>y = 17/2</span>, and the red accumulator lands on the result. The dial beside the sheet
+                  records the same operation in the group: the index of the accumulator modulo the order
+                  <span data-tex>n</span> of <span data-tex>G</span> advances by one tick for an addition and doubles for
+                  a doubling, in strict order, while the point itself jumps across the sheet. With double-and-add the
+                  bits of <span data-tex>k</span> are read from the most significant one. The torus view glues the
+                  opposite edges of the sheet: the wrapped segments of a line become one closed curve, and the reflection
+                  becomes the mirror through the plane of the equators. The transcript under the controls lists every
+                  multiple as it is reached.
+                </p>
+                <p>
+                  When the figure opens, and without scripts or in print, it shows the last step of the assignment,
+                  <span data-tex>5G + G</span>: the line through 5G = {{fig.slowMo.from}} and G = {{fig.toy.G}}, of
+                  slope <span data-tex>\lambda</span> = {{fig.slowMo.lambda}} modulo 17, meets the curve a third time at
+                  <span data-tex>R'</span> = {{fig.slowMo.third}} (open ring), whose reflection is the result,
+                  6G = {{fig.slowMo.result}} (red disc); the filled marks are the multiples of <span data-tex>G</span>.
                 </p>
               </figcaption>
               <p class="visually-hidden" data-slowmo-status aria-live="polite"></p>

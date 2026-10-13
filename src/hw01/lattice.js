@@ -111,17 +111,113 @@ export function lineSegments(p, lambda, nu) {
   return segments;
 }
 
+/**
+ * The boxed O, the point at infinity, in the right margin level with the top
+ * of the plot: its corner (x, y), its side and its centre.
+ * @param {{ left: number, top: number, size: number }} s a latticeScale
+ */
+export function infinityBox(s) {
+  const side = 22;
+  const x = round(s.left + s.size + 14);
+  const y = round(s.top + 6);
+  return { x, y, side, cx: x + side / 2, cy: y + side / 2 };
+}
+
+/* Advance widths of Libre Franklin at weight 700, in em, rounded up: labels are measured before any font loads. */
+const GLYPH_EM = { ' ': 0.27, '=': 0.6, '+': 0.6, '−': 0.6, '-': 0.4, G: 0.74, O: 0.8, Q: 0.8 };
+
+/** Estimated width in px of a label set in Libre Franklin 700 at `fontSize` px. */
+export function estimateTextWidth(text, fontSize = 11) {
+  let em = 0;
+  for (const c of String(text)) {
+    if (c in GLYPH_EM) em += GLYPH_EM[c];
+    else if (c >= '0' && c <= '9') em += 0.62;
+    else em += c === c.toUpperCase() ? 0.72 : 0.58;
+  }
+  return em * fontSize;
+}
+
+/*
+ * Candidate positions of a label around its mark, in order of preference:
+ * right, left, above, below, then the four diagonals. Each gives the text
+ * anchor and the baseline point; the label's cap height is 0.74 em.
+ */
+function candidates(item, fontSize, gap) {
+  const { cx, cy, r } = item;
+  const mid = cy + 0.36 * fontSize;
+  const d = 0.75 * r + gap;
+  return [
+    ['start', cx + r + gap, mid],
+    ['end', cx - r - gap, mid],
+    ['middle', cx, cy - r - gap - 0.06 * fontSize],
+    ['middle', cx, cy + r + gap + 0.74 * fontSize],
+    ['start', cx + d, cy - d],
+    ['end', cx - d, cy - d],
+    ['start', cx + d, cy + d + 0.74 * fontSize],
+    ['end', cx - d, cy + d + 0.74 * fontSize],
+  ];
+}
+
+/* The box of a label, including the 1.5 px paper halo printed around its glyphs. */
+function labelBox(anchor, x, y, width, fontSize) {
+  const pad = 1.5;
+  const x0 = anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2;
+  return { x0: x0 - pad, y0: y - 0.74 * fontSize - pad, x1: x0 + width + pad, y1: y + 0.06 * fontSize + pad };
+}
+
+const boxesOverlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+function circleMeetsBox(c, b) {
+  const dx = Math.max(b.x0 - c.cx, 0, c.cx - b.x1);
+  const dy = Math.max(b.y0 - c.cy, 0, c.cy - b.y1);
+  return dx * dx + dy * dy < c.r * c.r;
+}
+
+/**
+ * Places labels beside their marks, in the given order, so that they avoid
+ * one another, every mark (their own included), the horizontal lines `avoidY`
+ * (the mirror line) and the outside of `bounds`. Each label takes the first
+ * candidate position (right, left, above, below, diagonals) with the smallest
+ * penalty; a conflict that cannot be avoided is accepted at the least cost.
+ * @param {{ items: { id: any, text: string, cx: number, cy: number, r: number }[],
+ *   obstacles?: { cx: number, cy: number, r: number }[], bounds: { x0: number, y0: number, x1: number, y1: number },
+ *   avoidY?: number[], fontSize?: number, gap?: number }} options
+ * @returns {{ id: any, text: string, x: number, y: number, anchor: 'start'|'middle'|'end',
+ *   box: { x0: number, y0: number, x1: number, y1: number } }[]}
+ */
+export function placeLabels({ items, obstacles = [], bounds, avoidY = [], fontSize = 11, gap = 3 }) {
+  const placed = [];
+  for (const item of items) {
+    const width = estimateTextWidth(item.text, fontSize);
+    let best = null;
+    candidates(item, fontSize, gap).forEach(([anchor, x, y], order) => {
+      const box = labelBox(anchor, x, y, width, fontSize);
+      let score = order;
+      if (box.x0 < bounds.x0 || box.x1 > bounds.x1 || box.y0 < bounds.y0 || box.y1 > bounds.y1) score += 10000;
+      for (const other of placed) if (boxesOverlap(box, other.box)) score += 5000;
+      for (const c of obstacles) if (circleMeetsBox(c, box)) score += 2000;
+      if (circleMeetsBox(item, box)) score += 2000;
+      for (const ly of avoidY) if (box.y0 < ly && box.y1 > ly) score += 300;
+      if (!best || score < best.score) best = { score, anchor, x, y, box };
+    });
+    placed.push({ id: item.id, text: item.text, x: best.x, y: best.y, anchor: best.anchor, box: best.box });
+  }
+  return placed;
+}
+
 /* A point argument as plain numbers, or null. */
 const pt = (P) => (P ? { x: num(P.x), y: num(P.y) } : null);
 
 /**
  * The lattice of E(F_p) as an accessible SVG string.
- * @param {{ p: number|bigint, points?: {x,y}[], orbit?: {x,y}[], highlight?: {x,y}, labels?: string[],
- *   line?: { lambda: number|bigint, nu: number|bigint } | { vertical: true, x: number|bigint },
+ * @param {{ p: number|bigint, points?: {x,y}[], orbit?: {x,y}[], highlight?: {x,y}, highlightLabel?: string,
+ *   labels?: string[], line?: { lambda: number|bigint, nu: number|bigint } | { vertical: true, x: number|bigint },
  *   third?: {x,y}, result?: {x,y}, mirror?: boolean, infinity?: boolean | { label?: string, highlight?: boolean },
  *   width?: number, id: string, title: string, desc: string }} options
  *   points: every affine point; orbit: G, 2G, 3G, … in order (labelled kG unless `labels` is given);
- *   highlight: the point drawn as the plot-red disc; line, third, result: one group operation.
+ *   highlight: the point drawn as the plot-red disc, the most prominent mark, labelled `highlightLabel`
+ *   (for example "Q = 6G") when given; line, third, result: one group operation. Labels are placed
+ *   beside their marks clear of the other marks, of one another and of the mirror line (placeLabels).
  * @returns {string}
  */
 export function renderLatticeSVG({
@@ -129,6 +225,7 @@ export function renderLatticeSVG({
   points = [],
   orbit = [],
   highlight,
+  highlightLabel,
   labels,
   line,
   third,
@@ -206,16 +303,18 @@ export function renderLatticeSVG({
     out.push('</g>');
   }
 
-  // Every affine point; the orbit filled and indexed by k; the highlighted point in plot red.
+  // Every affine point; the orbit filled and indexed by k; the highlighted point, the most
+  // prominent mark (a larger plot-red disc in a paper ring), drawn last, above the others.
   const orbitIndex = new Map(orbit.map((Q, i) => [`${num(Q.x)},${num(Q.y)}`, i + 1]));
   const hl = pt(highlight);
+  const isHl = (Q) => Boolean(hl && hl.x === Q.x && hl.y === Q.y);
   const all = points.length ? points.map(pt) : orbit.map(pt);
+  const markR = r + 2; // the red discs: the highlighted point and the result
   out.push('<g class="lat__marks">');
-  for (const Q of all) {
+  for (const Q of [...all.filter((Q) => !isHl(Q)), ...all.filter(isHl)]) {
     const k = orbitIndex.get(`${Q.x},${Q.y}`);
-    const isHl = hl && hl.x === Q.x && hl.y === Q.y;
-    const cls = ['lat__point', k ? 'is-orbit' : '', isHl ? 'is-highlight' : ''].filter(Boolean).join(' ');
-    out.push(`<circle class="${cls}" data-x="${Q.x}" data-y="${Q.y}"${k ? ` data-k="${k}"` : ''} cx="${X(Q.x)}" cy="${Y(Q.y)}" r="${round(r)}"/>`);
+    const cls = ['lat__point', k ? 'is-orbit' : '', isHl(Q) ? 'is-highlight' : ''].filter(Boolean).join(' ');
+    out.push(`<circle class="${cls}" data-x="${Q.x}" data-y="${Q.y}"${k ? ` data-k="${k}"` : ''} cx="${X(Q.x)}" cy="${Y(Q.y)}" r="${round(isHl(Q) ? markR : r)}"/>`);
   }
   out.push('</g>');
 
@@ -226,26 +325,42 @@ export function renderLatticeSVG({
     out.push(`<line class="lat__drop" x1="${X(R3.x)}" y1="${Y(R3.y)}" x2="${X(R.x)}" y2="${Y(R.y)}" aria-hidden="true"/>`);
   }
   if (R3) out.push(`<circle class="lat__third" data-x="${R3.x}" data-y="${R3.y}" cx="${X(R3.x)}" cy="${Y(R3.y)}" r="${round(r + 3.5)}"/>`);
-  if (R) out.push(`<circle class="lat__result" data-x="${R.x}" data-y="${R.y}" cx="${X(R.x)}" cy="${Y(R.y)}" r="${round(r + 1)}"/>`);
+  if (R) out.push(`<circle class="lat__result" data-x="${R.x}" data-y="${R.y}" cx="${X(R.x)}" cy="${Y(R.y)}" r="${round(markR)}"/>`);
 
-  // Names of the orbit points, beside their marks and kept inside the sheet.
-  out.push('<g class="lat__labels" aria-hidden="true">');
-  orbit.forEach((Q0, i) => {
+  // Names of the orbit points, beside their marks, clear of the other marks, of one
+  // another and of the mirror line, and kept inside the sheet.
+  const radius = new Map(all.map((Q) => [`${Q.x},${Q.y}`, isHl(Q) ? markR : r]));
+  if (R) radius.set(`${R.x},${R.y}`, markR);
+  if (R3) radius.set(`${R3.x},${R3.y}`, r + 3.5);
+  const obstacles = [...radius].map(([key, rr]) => {
+    const [x, y] = key.split(',').map(Number);
+    return { cx: s.x(x), cy: s.y(y), r: rr };
+  });
+  const items = orbit.map((Q0, i) => {
     const Q = pt(Q0);
-    const text = labels?.[i] ?? (i === 0 ? 'G' : `${i + 1}G`);
-    const nearRight = Q.x >= P - 2;
-    const nearTop = Q.y >= P - 1;
-    const lx = round(s.x(Q.x) + (nearRight ? -(r + 3) : r + 3));
-    const ly = round(s.y(Q.y) + (nearTop ? r + 11 : -(r + 2)));
-    out.push(`<text class="lat__label" data-k="${i + 1}" x="${lx}" y="${ly}" text-anchor="${nearRight ? 'end' : 'start'}">${escapeXml(text)}</text>`);
+    const text = isHl(Q) && highlightLabel ? highlightLabel : (labels?.[i] ?? (i === 0 ? 'G' : `${i + 1}G`));
+    return { id: i + 1, text, cx: s.x(Q.x), cy: s.y(Q.y), r: radius.get(`${Q.x},${Q.y}`) ?? r, hl: isHl(Q) };
+  });
+  if (hl && highlightLabel && !orbitIndex.has(`${hl.x},${hl.y}`)) {
+    items.push({ id: 'highlight', text: highlightLabel, cx: s.x(hl.x), cy: s.y(hl.y), r: markR, hl: true });
+  }
+  const placed = placeLabels({
+    items,
+    obstacles,
+    bounds: { x0: s.left, y0: s.top, x1: s.left + s.size, y1: s.top + s.size },
+    avoidY: mirror ? [s.y(P / 2)] : [],
+  });
+  out.push('<g class="lat__labels" aria-hidden="true">');
+  placed.forEach((a, i) => {
+    const k = items[i].id === 'highlight' ? '' : ` data-k="${items[i].id}"`;
+    const flag = items[i].hl ? ' data-highlight' : '';
+    out.push(`<text class="lat__label"${k}${flag} x="${round(a.x)}" y="${round(a.y)}" text-anchor="${a.anchor}">${escapeXml(a.text)}</text>`);
   });
   out.push('</g>');
 
   if (infinity) {
     const opts = typeof infinity === 'object' ? infinity : {};
-    const bx = round(right + 14);
-    const by = round(s.top + 6);
-    const side = 22;
+    const { x: bx, y: by, side } = infinityBox(s);
     out.push(
       `<g class="lat__infinity${opts.highlight ? ' is-highlight' : ''}"${opts.label ? ` data-label="${escapeXml(opts.label)}"` : ''}>`,
       `<rect x="${bx}" y="${by}" width="${side}" height="${side}"/>`,

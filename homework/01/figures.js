@@ -513,6 +513,7 @@ export default async function provide({ root }) {
     points: toy.all,
     orbit: toy.orbit,
     highlight: Q,
+    highlightLabel: `Q = ${TOY_PRIVATE_KEY}G`,
     infinity: { label: `${toy.orbit.length + 1}G` },
     id: 'toy-curve',
     title: 'The 17 affine points of y² = x³ + 7 over F₁₇ and the multiples of G = (1, 5)',
