@@ -36,8 +36,9 @@
     width: 100%;
   }
 
+  /* The shared print sheet can load before the read layout, so its grid must be overridden firmly. */
   .read-layout {
-    display: block;
+    display: block !important;
     margin-top: 1.5rem;
   }
 
