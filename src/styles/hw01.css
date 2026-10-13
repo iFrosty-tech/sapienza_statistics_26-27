@@ -1,5 +1,7 @@
-/* Homework 01: experiment figures, the group-law construction, the live hash
-   demonstration and the data tables, in the vocabulary of the probability paper. */
+/* Homework 01: chart figures, the lattice of E(F_p), the group-law construction,
+   the toy program and the data tables, in the vocabulary of the probability paper.
+   Homework 02 loads this sheet too: the figure frame, chart primitives, heat map,
+   form fields, demo cells, worked listings and data tables are shared. */
 
 /* ---------- Figure frame (inline, like .pplot--inline) ---------- */
 .chart-figure {
@@ -18,10 +20,6 @@
   display: none;
 }
 
-.chart-figure__panel + .chart-figure__panel {
-  margin-top: var(--space-4);
-}
-
 .chart-figure__controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -33,9 +31,94 @@
   display: none;
 }
 
+/* Many series: the choice group takes the full width and the resample row sits below it. */
+.chart-figure__controls--stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chart-figure__resample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.chart-figure__note {
+  flex: 1 1 18rem;
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
 .chart-figure.is-computing .chart-figure__canvas {
   opacity: 0.6;
   transition: opacity var(--dur-state) var(--ease-out);
+}
+
+/* The provenance tag: "Simulated" for samples, "Enumeration" for exhaustive results, one printed style. */
+.pplot__provenance {
+  display: inline-block;
+  margin-left: 0.35em;
+  padding: 0 0.4em;
+  border: var(--hair) solid var(--ruling-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ruling-ink);
+  vertical-align: 0.15em;
+}
+
+/* Statistics whose headings carry symbols (x, y, χ², p): printed captions without the capitals,
+   which would turn x into X and χ into Χ. */
+.pplot__stats--math dt {
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+
+.pplot__stats--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 36rem) {
+  .pplot__stats--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Composed charts: panels side by side, as many columns as the chart decided ---------- */
+.chart-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.chart-panels[data-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-panels[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.chart-panel {
+  min-width: 0;
+}
+
+.chart-panel + .chart-panels,
+.chart-panels + .chart-panel {
+  margin-top: var(--space-5);
+}
+
+.chart-panel__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 /* ---------- Charts (SVG) ---------- */
@@ -111,10 +194,30 @@
   transform-origin: center;
 }
 
-.chart__point--brute {
+.chart__point--brute,
+.chart__point--ring {
   fill: var(--paper);
   stroke: var(--ink);
   stroke-width: 1.25;
+}
+
+/* A dense cloud of rings: hairline strokes keep it a texture rather than a blot. */
+.chart--scatter .chart__point--ring {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 0.75;
+}
+
+.chart--scatter .chart__swatch.chart__point--ring {
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.chart__trace {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
 }
 
 .chart__errorbar {
@@ -141,6 +244,18 @@
   stroke-width: 2;
 }
 
+/* Bit profile: the 95% range of a random sample and the exact expectation of each bit. */
+.chart__range {
+  stroke: var(--ruling);
+  stroke-width: 5;
+  stroke-linecap: butt;
+}
+
+.chart__tick-expected {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
 .chart__ylabel,
 .chart__xlabel {
   fill: var(--ink-soft);
@@ -158,6 +273,13 @@
   text-transform: uppercase;
 }
 
+/* In homework 01 the axis titles are formulas (x(kG), H(k) / 2^256, order n): they keep their case. */
+.chart-figure--formulas .chart__axis-title,
+.chart-figure--formulas .chart__panel-title {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
 .chart__annotation,
 .chart__bandlabel {
   fill: var(--ink-soft);
@@ -171,22 +293,27 @@
   font-size: 10.5px;
 }
 
-.chart__series-label {
+.chart__series-label,
+.chart__legend-label {
   fill: var(--ink);
   font-size: 11px;
   font-weight: 600;
 }
 
-/* ---------- Strict-avalanche heat map ---------- */
-.sac {
+/* ---------- Strict-avalanche heat maps ---------- */
+.sac-pair {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-5);
   align-items: start;
 }
 
-@media (max-width: 52rem) {
-  .sac {
+.sac-map {
+  min-width: 0;
+}
+
+@media (max-width: 36rem) {
+  .sac-pair {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -304,6 +431,140 @@
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--ruling-ink);
+}
+
+/* ---------- The lattice of E(F_p) (Fig. 2 and the slowed-down view) ---------- */
+.lat {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font-form);
+}
+
+.lat__ruling {
+  stroke: var(--ruling-minor);
+  stroke-width: 1;
+}
+
+.lat__ruling.is-major {
+  stroke: var(--ruling);
+}
+
+.lat__frame {
+  fill: none;
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+}
+
+.lat__tick {
+  fill: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lat__axis {
+  fill: var(--ruling-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lat__mirror {
+  stroke: var(--ruling-ink);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.lat__mirror-label {
+  fill: var(--ruling-ink);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.lat__segment {
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.lat__linepoint {
+  fill: var(--ink-soft);
+}
+
+.lat__point {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.lat__point.is-orbit {
+  fill: var(--ink);
+}
+
+.lat__point.is-highlight {
+  fill: var(--plot);
+  stroke: var(--paper);
+}
+
+.lat__third {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.lat__drop {
+  stroke: var(--ruling-ink);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+}
+
+.lat__result {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1.25;
+}
+
+.lat__label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lat__label--infinity {
+  fill: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lat__infinity rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.lat__infinity.is-highlight rect {
+  stroke: var(--plot);
+  stroke-width: 2;
+}
+
+.lat__infinity-mark {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.slowmo__stage .lat {
+  max-width: 34rem;
+}
+
+.slowmo__controls[hidden] {
+  display: none;
 }
 
 /* ---------- Group law (Fig. 1) ---------- */
@@ -424,17 +685,108 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* ---------- Live demonstration (Fig. 3) ---------- */
-.demo__controls {
+/* ---------- The toy program (§3): printed console and source listing ---------- */
+.program {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
-.demo__controls[hidden] {
+.program__output {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  overflow-x: auto;
+  border: var(--hair) solid var(--ink);
+  background: var(--paper);
+  font-family: var(--font-code);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  white-space: pre;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.program__output strong {
+  font-weight: 700;
+}
+
+.program__controls[hidden] {
   display: none;
 }
 
+.source {
+  margin-block: var(--space-5);
+  border-block: var(--hair) solid var(--ink);
+}
+
+.source > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding-inline: var(--space-2);
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  transition: background-color var(--dur-feedback) var(--ease-out);
+}
+
+.source > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A printed chevron that turns when the listing opens. */
+.source > summary::before {
+  content: '';
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: rotate(-45deg);
+  transition: transform var(--dur-state) var(--ease-out);
+}
+
+.source[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.source > summary:hover {
+  background: var(--paper-deep);
+}
+
+.source > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.source__note {
+  font-weight: 500;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.source__code {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  max-height: 36rem;
+  overflow: auto;
+  border: var(--hair) solid var(--ruling);
+  background: var(--paper-deep);
+  font-family: var(--font-code);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.source__code code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* ---------- Form fields and output cells (shared with homework 02) ---------- */
 .demo__row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -516,50 +868,6 @@
   color: var(--ink-soft);
 }
 
-.demo__verdict {
-  display: inline-block;
-  margin-left: 0.5em;
-  padding: 0 0.4em;
-  border: var(--hair) solid var(--ruling-ink);
-  font-family: var(--font-form);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--ruling-ink);
-  vertical-align: 0.15em;
-}
-
-.demo__verdict[data-equal='true'] {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-/* Digest bit grid: 16 × 16 cells, ink for ones; red marks the changed bits. */
-.bitgrid {
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  gap: 1px;
-  width: min(100%, 12rem);
-  margin-top: var(--space-2);
-  padding: 1px;
-  background: var(--ruling);
-  border: var(--hair) solid var(--ink);
-}
-
-.bitgrid__cell {
-  aspect-ratio: 1;
-  background: var(--paper);
-}
-
-.bitgrid__cell[data-bit='1'] {
-  background: var(--ink);
-}
-
-.bitgrid--xor .bitgrid__cell[data-bit='1'] {
-  background: var(--plot);
-}
-
 /* ---------- Data tables ---------- */
 .data-table {
   width: 100%;
@@ -621,7 +929,7 @@
   max-width: 100cqi;
 }
 
-/* Ten-column tables (Table 3) fit the reading measure at a tighter setting. */
+/* Wide tables fit the reading measure at a tighter setting. */
 .data-table--compact th,
 .data-table--compact td {
   padding: var(--space-1) var(--space-2);
@@ -631,6 +939,63 @@
 .data-table--compact thead th {
   font-size: 0.625rem;
   letter-spacing: 0.08em;
+}
+
+/* Heads that carry symbols keep their case (p, n, x, λ, ρ). */
+.data-table--math thead th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 0.75rem;
+}
+
+.data-table--math .katex {
+  font-size: 1em;
+}
+
+.data-table--steps th,
+.data-table--steps td {
+  white-space: nowrap;
+}
+
+.data-table__points {
+  overflow-wrap: anywhere;
+}
+
+/* A p-value under its coefficient, for the sampled rows. */
+.data-table__p {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.data-table td[data-draft] {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* A table with its caption printed above it, as a figure. */
+.table-figure {
+  margin-block: var(--space-6);
+}
+
+.table-figure > figcaption {
+  margin-bottom: var(--space-3);
+  font-family: var(--font-text);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.table-figure__no {
+  margin-right: 0.35em;
+  font-family: var(--font-form);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.table-figure .data-table {
+  margin-block: 0;
 }
 
 /* The assignment, quoted verbatim in §1: a ruled margin, as a quotation on a form */
@@ -644,6 +1009,17 @@
 
 .prose blockquote.assignment p {
   margin: 0;
+}
+
+.prose blockquote.assignment p + p,
+.prose blockquote.assignment p + ul,
+.prose blockquote.assignment ul + p {
+  margin-top: var(--space-3);
+}
+
+/* Paragraphs still to be written: printed faint, as a pending entry on a form. */
+.prose [data-draft] {
+  color: var(--ink-faint);
 }
 
 /* Acronyms expanded on first use carry the printed-form dotted rule, never a tooltip cursor */
@@ -686,6 +1062,13 @@
   overflow-wrap: anywhere;
 }
 
+/* ---------- Narrow sheets: panels stack even before the page script redraws them ---------- */
+@media (max-width: 36rem) {
+  .chart-panels[data-columns] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ---------- Print ---------- */
 @media print {
   .references a.ref-link::after {
@@ -697,8 +1080,9 @@
   [data-fig-status],
   .gl-controls,
   [data-gl-status],
-  .demo__controls,
-  [data-demo-status] {
+  [data-program-controls],
+  [data-slowmo-controls],
+  [data-slowmo-status] {
     display: none !important;
   }
 
@@ -706,7 +1090,13 @@
     opacity: 1;
   }
 
-  .sac {
-    grid-template-columns: minmax(0, 1fr);
+  .source__code {
+    max-height: none;
+    overflow: visible;
+    white-space: pre-wrap;
+  }
+
+  .program__output {
+    white-space: pre-wrap;
   }
 }

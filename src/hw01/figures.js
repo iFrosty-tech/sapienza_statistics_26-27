@@ -1,32 +1,27 @@
 /**
- * Page-side behaviour of the experiment figures: choose which hash function
- * is shown, redraw charts at the true pixel width, and draw new samples in a
- * Web Worker with a fresh seed. Figures are complete static HTML before this
- * runs; failure leaves the printed figure in place.
+ * Page-side behaviour of the chart figures of homework 01: choose which
+ * series (curve or function) is shown, redraw charts at their true pixel
+ * width, and draw a new sample of secp256k1 keys in a Web Worker with a fresh
+ * seed. Only the sampled series (secp256k1 and Keccak-256) can be redrawn: an
+ * enumeration already contains every k, so for those the button is disabled
+ * and its note says why. Figures are complete static HTML before this runs;
+ * a failure leaves the printed figure in place.
  *
  * Markup contract:
- *   <figure data-fig="avalanche" data-fig-kind="avalanche">
- *     <div data-fig-canvas> …series containers from the build… <script data-fig-stats> </div>
- *     <div data-fig-controls hidden> <input type=radio data-fig-series-choice value=…> <button data-fig-resample> </div>
- *     <span data-fig-stat="mean"> … <p data-fig-status aria-live="polite">
+ *   <figure data-fig="coordHist" data-fig-kind="coordHist">
+ *     <div data-fig-canvas> …series containers [data-fig-series] from the build… <script data-fig-stats> </div>
+ *     <div data-fig-controls hidden>
+ *       <input type=radio data-fig-series-choice value=…>
+ *       <button data-fig-resample> <p data-fig-resample-note>
+ *     </div>
+ *     <… data-fig-stat="c1"> … <p data-fig-status aria-live="polite">
  *   </figure>
  */
 
 import { freshSeed } from '../lib/normal.js';
-import { compactData, renderChart, statsOf } from './render.js';
+import { RESAMPLE_N, compactData, int, isSampled, renderChart, seriesFromStudy, statsOf } from './render.js';
 
 const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
-
-/** Sizes used when a figure is re-sampled in the browser (the build used larger ones). */
-export const RESAMPLE = Object.freeze({
-  bitFrequency: { n: 800 },
-  byteFrequency: { n: 800 },
-  hammingWeight: { n: 800 },
-  avalanche: { n: 800 },
-  sac: { trials: 8 },
-  runs: { n: 800 },
-  collisions: { n: 800 },
-});
 
 function prefersReducedMotion() {
   return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -66,6 +61,7 @@ function getWorker() {
   return worker;
 }
 
+/* Runs one resample in the worker: { kind, seed, N } → a partial study (meta and one experiment). */
 function runExperiment(message) {
   return new Promise((resolve, reject) => {
     const id = nextId;
@@ -76,7 +72,7 @@ function runExperiment(message) {
 }
 
 /**
- * Enhances one experiment figure.
+ * Enhances one chart figure.
  * @param {HTMLElement} figure
  */
 export function mountChartFigure(figure) {
@@ -85,24 +81,22 @@ export function mountChartFigure(figure) {
   if (!kind || !canvas) throw new Error('Chart figure: missing data-fig-kind or [data-fig-canvas].');
   const statusEl = figure.querySelector('[data-fig-status]');
   const button = figure.querySelector('[data-fig-resample]');
+  const note = figure.querySelector('[data-fig-resample-note]');
   const id = figure.dataset.fig;
 
   const stats = JSON.parse(figure.querySelector('[data-fig-stats]')?.textContent ?? '{}');
   const data = {};
-  for (const container of canvas.querySelectorAll('[data-fig-series]')) {
-    const json = container.querySelector('[data-fig-data]')?.textContent;
-    if (json) data[container.dataset.figSeries] = JSON.parse(json);
+  const keys = [];
+  for (const box of canvas.querySelectorAll('[data-fig-series]')) {
+    keys.push(box.dataset.figSeries);
+    const json = box.querySelector('[data-fig-data]')?.textContent;
+    if (json) data[box.dataset.figSeries] = JSON.parse(json);
   }
-  let current = figure.querySelector('[data-fig-series-choice]:checked')?.value ?? 'scalar';
+  let current = figure.querySelector('[data-fig-series-choice]:checked')?.value ?? keys.find((k) => !canvas.querySelector(`[data-fig-series="${k}"]`)?.hidden) ?? keys[0];
   let busy = false;
 
-  function width() {
-    return Math.max(280, Math.round(canvas.getBoundingClientRect().width));
-  }
-
-  function container(series) {
-    return canvas.querySelector(`[data-fig-series="${series}"]`);
-  }
+  const width = () => Math.max(280, Math.round(canvas.getBoundingClientRect().width));
+  const container = (series) => canvas.querySelector(`[data-fig-series="${series}"]`);
 
   function writeStats(series) {
     const values = stats[series];
@@ -119,23 +113,34 @@ export function mountChartFigure(figure) {
     if (!d || !box) return;
     const chart = box.querySelector('[data-fig-chart]');
     chart.innerHTML = renderChart(kind, d, { id: `${id}-${series}`, width: width(), rasterize: canvasRasterize });
-    if (animate) {
-      const marks = chart.querySelectorAll('.chart__bar, .chart__point, .chart__lollipop, .pplot__point, .heatmap__raster');
-      if (prefersReducedMotion()) {
-        chart.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 160 });
-      } else {
-        marks.forEach((m, i) => {
-          m.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], {
-            duration: 360,
-            delay: Math.min(i * 2, 220),
-            easing: EASE_OUT,
-            fill: 'backwards',
-          });
-        });
-        for (const line of chart.querySelectorAll('.chart__expected, .chart__theory, .pplot__fit')) {
-          line.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, delay: 240, easing: EASE_OUT, fill: 'backwards' });
-        }
-      }
+    if (!animate) return;
+    if (prefersReducedMotion()) {
+      chart.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 160 });
+      return;
+    }
+    // The data settle: marks drop onto their positions in a short stagger, then the reference lines print.
+    chart.querySelectorAll('.chart__bar, .chart__point, .chart__lollipop').forEach((mark, i) => {
+      mark.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], {
+        duration: 360,
+        delay: Math.min(i * 2, 220),
+        easing: EASE_OUT,
+        fill: 'backwards',
+      });
+    });
+    for (const line of chart.querySelectorAll('.chart__expected, .chart__theory, .chart__reference')) {
+      line.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, delay: 240, easing: EASE_OUT, fill: 'backwards' });
+    }
+  }
+
+  /* The resample button applies to sampled series only; its note says what it does, or why it cannot. */
+  function updateResample(series) {
+    if (!button) return;
+    const sampled = isSampled(series);
+    button.disabled = busy || !sampled;
+    if (note) {
+      note.textContent = sampled
+        ? `Draws ${int(RESAMPLE_N)} new private keys in this browser with a fresh seed and redraws secp256k1 and Keccak-256 together.`
+        : 'An enumeration already covers every k from 1 to n − 1: there is nothing to resample. Choose secp256k1 or Keccak-256 to draw a new sample.';
     }
   }
 
@@ -144,36 +149,35 @@ export function mountChartFigure(figure) {
     for (const box of canvas.querySelectorAll('[data-fig-series]')) box.hidden = box.dataset.figSeries !== series;
     writeStats(series);
     if (data[series]) redraw(series);
+    updateResample(series);
   }
 
   async function resample() {
-    if (busy) return;
+    if (busy || !isSampled(current)) return;
     busy = true;
-    const series = current;
-    if (button) button.disabled = true;
+    updateResample(current);
     figure.classList.add('is-computing');
-    if (statusEl) statusEl.textContent = `Computing a new sample for ${stats[series]?.series ?? series}…`;
+    const seed = freshSeed();
+    if (statusEl) statusEl.textContent = `Drawing ${int(RESAMPLE_N)} new private keys with seed ${seed}…`;
     try {
-      const seed = freshSeed();
-      const result = await runExperiment({ kind, variant: series, seed, ...RESAMPLE[kind] });
-      data[series] = compactData(kind, result) ?? result;
-      if (kind === 'sac') data[series] = result;
-      stats[series] = statsOf(kind, result);
-      if (series === current) {
-        redraw(series, { animate: true });
-        writeStats(series);
+      const partial = await runExperiment({ kind, seed, N: RESAMPLE_N });
+      for (const key of keys.filter(isSampled)) {
+        const d = seriesFromStudy(kind, partial, key);
+        data[key] = compactData(kind, d) ?? d;
+        stats[key] = statsOf(kind, d);
       }
+      redraw(current, { animate: true });
+      writeStats(current);
       if (statusEl) {
-        const s = stats[series];
-        const summary = s.p ? `p-value ${s.p}` : s.uniformityP ? `p-value ${s.uniformityP}` : s.maxAbsZ ? `max |z| ${s.maxAbsZ}` : '';
-        statusEl.textContent = `New sample drawn for ${s.series}: seed ${s.seed}${summary ? `, ${summary}` : ''}.`;
+        const s = stats[current];
+        statusEl.textContent = `New sample drawn in this browser: N = ${int(RESAMPLE_N)} private keys, seed ${seed}. ${s.c1h} ${s.c1}, ${s.c2h} ${s.c2}.`;
       }
     } catch (error) {
       console.error(error);
       if (statusEl) statusEl.textContent = 'The new sample could not be computed; the printed figure is unchanged.';
     } finally {
       busy = false;
-      if (button) button.disabled = false;
+      updateResample(current);
       figure.classList.remove('is-computing');
     }
   }
@@ -185,8 +189,9 @@ export function mountChartFigure(figure) {
     });
   }
   button?.addEventListener('click', resample);
+  updateResample(current);
 
-  // Charts printed by the build were drawn at 960px; redraw at the true width.
+  // Charts printed by the build were drawn at a nominal width; redraw at the true width.
   if (data[current]) redraw(current);
   if ('ResizeObserver' in globalThis) {
     let last = width();
@@ -208,7 +213,7 @@ export function mountChartFigure(figure) {
   return { show, resample };
 }
 
-/** Enhances every experiment figure under `root`. */
+/** Enhances every chart figure under `root`. */
 export function mountChartFigures(root = document) {
   const mounted = [];
   for (const figure of root.querySelectorAll('[data-fig]')) {

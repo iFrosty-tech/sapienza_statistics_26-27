@@ -16,6 +16,9 @@ import {
   renderBandChart,
   renderIntervalDots,
   renderCapacityBars,
+  renderScatter,
+  renderLineChart,
+  renderBitProfile,
 } from '../src/lib/charts.js';
 import { modelFromSample } from '../src/lib/normal.js';
 import { renderProbabilityPlotSVG, plotTitle, plotDescription } from '../src/lib/probability-plot.js';
@@ -224,4 +227,107 @@ test('capacity bars draw a hollow total and a filled part per row', () => {
   const frameW = Number(wide.match(/class="chart__frame" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/)[1]);
   const longest = Math.max(...[...wide.matchAll(/class="chart__capacity" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map((m) => Number(m[1])));
   assert.ok(longest <= frameW + 0.05, `bar ${longest} exceeds the frame ${frameW}`);
+});
+
+/* Frame rectangle [x, y, width, height] of a chart. */
+const frameOf = (svg) => svg.match(/class="chart__frame" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/).slice(1).map(Number);
+const inside = ([fx, fy, fw, fh], x, y) => x >= fx - 0.05 && x <= fx + fw + 0.05 && y >= fy - 0.05 && y <= fy + fh + 0.05;
+
+test('histogram edge ticks label the bin boundaries instead of the bins', () => {
+  const bins = Array.from({ length: 16 }, (_, k) => ({ label: String(k), observed: 10, expected: 10 }));
+  const edgeTicks = [0, 4, 8, 12, 16].map((at) => ({ at, label: String(at / 16) }));
+  const svg = renderHistogram({ id: 'he', title: 'T', desc: 'D', bins, edgeTicks, width: 400, height: 260 });
+  assert.equal(count(svg, 'class="chart__xlabel"'), 5);
+  const [fx, , fw] = frameOf(svg);
+  const xs = [...svg.matchAll(/class="chart__xlabel" x="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(xs[0] - fx) < 0.1 && Math.abs(xs[4] - (fx + fw)) < 0.1, 'first and last ticks on the frame edges');
+  assert.ok(Math.abs(xs[2] - (fx + fw / 2)) < 0.1, 'the middle edge sits halfway');
+  assert.ok(svg.includes('>0.5<'));
+});
+
+test('curve scatter accepts an explicit point radius', () => {
+  const svg = renderCurveScatter({ id: 'sr', title: 'T', desc: 'D', p: 17, points: [{ x: 1, y: 5 }], width: 300, radius: 4 });
+  assert.ok(/class="chart__point" cx="[\d.]+" cy="[\d.]+" r="4"/.test(svg));
+});
+
+test('scatter draws each series, breaks connecting lines at gaps, and draws the identity and vertical marks', () => {
+  const series = [
+    { key: 'seq', points: [{ x: 1, y: 2 }, { x: 2, y: 5 }, { x: 3, y: null }, { x: 4, y: 1 }, { x: 5, y: 3 }], connect: true },
+    { key: 'pairs', label: 'Pairs', points: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 2, y: 2 }], mark: 'ring' },
+  ];
+  const svg = renderScatter({
+    id: 'sc',
+    title: 'T',
+    desc: 'D',
+    series,
+    xDomain: [0, 6],
+    yDomain: [0, 6],
+    identity: true,
+    vMarks: [{ x: 3, label: 'O' }],
+    legend: true,
+    xLabel: 'k',
+    yLabel: 'x',
+  });
+  assert.ok(svg.startsWith('<svg') && svg.includes('role="img"'));
+  assert.equal(count(svg, 'class="chart__point"'), 4, 'four finite points in the first series');
+  assert.equal(count(svg, 'class="chart__point chart__point--ring"'), 2, 'coincident points are drawn once');
+  const trace = svg.match(/class="chart__trace" d="([^"]+)"/)[1];
+  assert.equal(count(trace, 'M'), 2, 'the gap at k = 3 starts a new sub-path');
+  assert.equal(count(svg, 'class="chart__reference"'), 1);
+  assert.equal(count(svg, 'class="chart__half"'), 1);
+  assert.ok(svg.includes('>O<') && svg.includes('>Pairs<'));
+  const frame = frameOf(svg);
+  for (const m of svg.matchAll(/class="chart__point[^"]*" cx="([\d.-]+)" cy="([\d.-]+)"/g)) {
+    assert.ok(inside(frame, Number(m[1]), Number(m[2])), `point (${m[1]}, ${m[2]}) inside the frame`);
+  }
+});
+
+test('a square scatter has a square plot area', () => {
+  const svg = renderScatter({ id: 'sq', title: 'T', desc: 'D', series: [{ key: 'a', points: [{ x: 1, y: 1 }] }], xDomain: [0, 10], yDomain: [0, 10], square: true, width: 500, height: 300 });
+  const [, , w, h] = frameOf(svg);
+  assert.ok(Math.abs(w - h) < 0.1, `${w} × ${h}`);
+});
+
+test('line chart draws one path per series, gaps for missing values, marks and power-of-two tick labels', () => {
+  const series = [
+    { key: 'a', label: 'Repeated addition', points: [{ x: 1, y: null }, { x: 2, y: 1 }, { x: 3, y: 2 }, { x: 4, y: 3 }] },
+    { key: 'b', label: 'Double-and-add', points: [{ x: 1, y: null }, { x: 2, y: 0.5 }, { x: 3, y: 1 }, { x: 4, y: 1.3 }] },
+  ];
+  const svg = renderLineChart({
+    id: 'lc',
+    title: 'T',
+    desc: 'D',
+    series,
+    marks: [{ x: 3, y: 2, label: 'k = 6' }],
+    xDomain: [1, 4],
+    yDomain: [0, 4],
+    yFormat: 'pow2',
+    xLabel: 'Bits',
+    yLabel: 'Operations',
+  });
+  assert.equal(count(svg, 'class="chart__curve chart__curve--'), 2);
+  const first = svg.match(/class="chart__curve chart__curve--0"[^>]*d="([^"]+)"/)[1];
+  assert.equal(count(first, 'M'), 1, 'the leading null is skipped');
+  assert.equal(count(svg, 'class="chart__mark"'), 1);
+  assert.ok(svg.includes('>k = 6<') && svg.includes('>Repeated addition<'));
+  assert.ok(svg.includes('2<tspan class="chart__sup"'), 'y ticks are printed as powers of two');
+  const frame = frameOf(svg);
+  for (const m of first.matchAll(/[ML]([\d.-]+),([\d.-]+)/g)) assert.ok(inside(frame, Number(m[1]), Number(m[2])));
+});
+
+test('bit profile draws, for every bit, the observed proportion, its exact expectation and the reference range', () => {
+  const bits = [
+    { observed: 0.5, expected: 0.4995, low: 0.47, high: 0.53 },
+    { observed: 0.49, expected: 0.4986, low: 0.47, high: 0.53 },
+    { observed: 0.03, expected: 0.0257, low: 0.016, high: 0.035 },
+  ];
+  const svg = renderBitProfile({ id: 'bp', title: 'T', desc: 'D', bits });
+  assert.equal(count(svg, 'class="chart__point"'), 3);
+  assert.equal(count(svg, 'class="chart__range"'), 3);
+  assert.equal(count(svg, 'class="chart__tick-expected"'), 3);
+  assert.equal(count(svg, 'class="chart__reference"'), 1, 'the line at one half');
+  const ys = [...svg.matchAll(/class="chart__point" cx="[\d.]+" cy="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.ok(ys[2] > ys[0], 'a smaller proportion is drawn lower');
+  const frame = frameOf(svg);
+  for (const m of svg.matchAll(/class="chart__point" cx="([\d.]+)" cy="([\d.]+)"/g)) assert.ok(inside(frame, Number(m[1]), Number(m[2])));
 });

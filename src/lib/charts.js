@@ -138,8 +138,12 @@ function powerLabel(base, k) {
 
 /**
  * Bars for observed counts with an optional stepped line of expected counts.
+ * Bins are labelled at their centres (every `labelEvery`-th), or, when
+ * `edgeTicks` is given, at bin boundaries instead: { at, label } puts the
+ * label on the left edge of bin `at` (at = bins.length is the right edge).
  * @param {{ id: string, title: string, desc: string, bins: { label: string, observed: number, expected?: number }[],
- *   width?: number, height?: number, xLabel?: string, yLabel?: string, labelEvery?: number, yMax?: number }} options
+ *   width?: number, height?: number, xLabel?: string, yLabel?: string, labelEvery?: number, yMax?: number,
+ *   edgeTicks?: { at: number, label: string }[] }} options
  */
 export function renderHistogram({
   id,
@@ -152,6 +156,7 @@ export function renderHistogram({
   yLabel = 'Count',
   labelEvery = 1,
   yMax,
+  edgeTicks,
 }) {
   const g = layout({ width, height });
   const hasExpected = bins.some((b) => typeof b.expected === 'number');
@@ -189,9 +194,9 @@ export function renderHistogram({
 
   out.push('<g class="chart__labels" aria-hidden="true">');
   out.push(yLabels(g, yTicks.values.map((value) => ({ label: formatNumber(value, yTicks.decimals), y: y(value) }))));
-  const labelled = bins
-    .map((b, i) => ({ label: escapeXml(b.label), x: x(i) + bandW / 2, i }))
-    .filter(({ i }) => i % labelEvery === 0);
+  const labelled = edgeTicks
+    ? edgeTicks.map((t) => ({ label: escapeXml(t.label), x: x(t.at) }))
+    : bins.map((b, i) => ({ label: escapeXml(b.label), x: x(i) + bandW / 2, i })).filter(({ i }) => i % labelEvery === 0);
   out.push(xLabels(g, labelled));
   out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
@@ -460,10 +465,15 @@ export function renderLogLog({
 
 /* ------------------------------------------------------ curve scatter */
 
-/** All affine points of y² = x³ + 7 over F_p, as a square scatter (the SVG is cut to the square). */
-export function renderCurveScatter({ id, title, desc, p, points, width = 960, height }) {
+/**
+ * All affine points of y² = x³ + 7 over F_p, as a square scatter (the SVG is
+ * cut to the square). `radius` overrides the point radius, which otherwise
+ * scales with the plot (small for dense clouds); `margin` overrides the
+ * default margins (tighter for small multiples).
+ */
+export function renderCurveScatter({ id, title, desc, p, points, width = 960, height, radius, margin = {} }) {
   const h = height ?? Math.min(width, 640);
-  const g0 = layout({ width, height: h, margin: { right: 28 } });
+  const g0 = layout({ width, height: h, margin: { right: 28, ...margin } });
   const side = Math.min(g0.plotW, g0.plotH);
   const g = { ...g0, plotW: side, plotH: side, right: g0.left + side, bottom: g0.top + side };
   const svgWidth = g.left + side + g.margin.right;
@@ -480,7 +490,7 @@ export function renderCurveScatter({ id, title, desc, p, points, width = 960, he
     `<text class="chart__annotation" x="${round(g.right - 4)}" y="${round(y(p / 2) - 5)}" text-anchor="end">y = p / 2</text>`,
   );
   out.push(frame(g), '</g>');
-  const r = Math.max(1.6, side / 230);
+  const r = radius ?? Math.max(1.6, side / 230);
   out.push('<g class="chart__data" aria-hidden="true">');
   for (const pt of points) out.push(`<circle class="chart__point" cx="${round(x(pt.x))}" cy="${round(y(pt.y))}" r="${round(r)}"/>`);
   out.push('</g>');
@@ -814,5 +824,267 @@ export function renderCapacityBars({
   out.push('<g class="chart__labels" aria-hidden="true">');
   out.push(xLabels(g, ticks.values.map((value) => ({ label: formatNumber(value, ticks.decimals), x: x(value) }))));
   out.push(axisTitles(g, xLabel, ''), '</g></svg>');
+  return out.join('');
+}
+
+/* ------------------------------------------------------------- scatter */
+
+/** Tick values of niceTicks restricted to [min, max]. */
+function ticksWithin(min, max, target) {
+  const t = niceTicks(min, max, target);
+  return { ...t, values: t.values.filter((v) => v >= min - 1e-9 && v <= max + 1e-9) };
+}
+
+/**
+ * A scatter plot on linear axes. Each series is a list of points { x, y };
+ * a missing value (y null, undefined or not finite) draws no point and breaks
+ * the connecting line. Points are plot red, or open ink rings with
+ * mark: 'ring'; connect: true joins consecutive points with an ink line.
+ * Points of one series that land on the same position (to 0.1 px) are drawn
+ * once, so a dense cloud does not repeat identical marks.
+ * Options: identity draws the dashed line y = x; vMarks draws dashed vertical
+ * rulings labelled above the frame (for instance the multiples of an order);
+ * legend prints the labelled series above the frame; square makes the plot
+ * area square (the SVG is cut to it).
+ * @param {{ id: string, title: string, desc: string,
+ *   series: { key: string, label?: string, points: { x: number, y: number|null }[], connect?: boolean, mark?: 'point'|'ring' }[],
+ *   xDomain?: [number, number], yDomain?: [number, number], identity?: boolean, vMarks?: { x: number, label: string }[],
+ *   legend?: boolean, square?: boolean, width?: number, height?: number, xLabel?: string, yLabel?: string, radius?: number }} options
+ */
+export function renderScatter({
+  id,
+  title,
+  desc,
+  series,
+  xDomain,
+  yDomain,
+  identity = false,
+  vMarks = [],
+  legend = false,
+  square = false,
+  width = 960,
+  height,
+  xLabel = '',
+  yLabel = '',
+  radius,
+}) {
+  const h = height ?? Math.round(width * 0.6);
+  const top = legend || vMarks.length ? 34 : 16;
+  let g = layout({ width, height: h, margin: { top } });
+  if (square) {
+    const side = Math.min(g.plotW, g.plotH);
+    g = { ...g, plotW: side, plotH: side, right: g.left + side, bottom: g.top + side };
+  }
+  const svgW = square ? Math.round(g.right + g.margin.right) : width;
+  const svgH = square ? Math.round(g.bottom + g.margin.bottom) : h;
+  const finite = series.flatMap((s) => s.points).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const xd = xDomain ?? [Math.min(...finite.map((p) => p.x)), Math.max(...finite.map((p) => p.x))];
+  const yd = yDomain ?? [Math.min(...finite.map((p) => p.y)), Math.max(...finite.map((p) => p.y))];
+  const x = linear(xd[0], xd[1], g.left, g.right);
+  const y = linear(yd[0], yd[1], g.bottom, g.top);
+  const xt = ticksWithin(xd[0], xd[1], g.narrow ? 4 : 6);
+  const yt = ticksWithin(yd[0], yd[1], g.narrow ? 4 : 5);
+  const r = radius ?? (g.narrow ? 2.2 : 2.8);
+  const out = [svgOpen({ id, width: svgW, height: svgH, title, desc, className: 'chart--scatter' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yt.values.filter((v) => v > yd[0] && v < yd[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(vRulings(g, xt.values.filter((v) => v > xd[0] && v < xd[1]).map((value) => ({ value, x: x(value) })), { major: () => false }));
+  for (const m of vMarks) {
+    out.push(
+      `<line class="chart__half" x1="${round(x(m.x))}" x2="${round(x(m.x))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
+      `<text class="chart__annotation" x="${round(x(m.x))}" y="${round(g.top - 5)}" text-anchor="middle">${escapeXml(m.label)}</text>`,
+    );
+  }
+  out.push(frame(g), '</g>');
+
+  if (identity) {
+    const a = Math.max(xd[0], yd[0]);
+    const b = Math.min(xd[1], yd[1]);
+    if (a < b) {
+      out.push(`<line class="chart__reference" x1="${round(x(a))}" y1="${round(y(a))}" x2="${round(x(b))}" y2="${round(y(b))}" aria-hidden="true"/>`);
+    }
+  }
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  for (const s of series) {
+    if (s.connect) {
+      let d = '';
+      let pen = 'M';
+      for (const p of s.points) {
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          pen = 'M';
+          continue;
+        }
+        d += `${pen}${round(x(p.x))},${round(y(p.y))}`;
+        pen = 'L';
+      }
+      if (d) out.push(`<path class="chart__trace" d="${d}"/>`);
+    }
+    const cls = s.mark === 'ring' ? 'chart__point chart__point--ring' : 'chart__point';
+    const seen = new Set();
+    for (const p of s.points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+      const cx = round(x(p.x));
+      const cy = round(y(p.y));
+      const key = `${cx},${cy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(`<circle class="${cls}" cx="${cx}" cy="${cy}" r="${r}"/>`);
+    }
+  }
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  if (legend) {
+    let lx = g.left;
+    for (const s of series.filter((t) => t.label)) {
+      const cls = s.mark === 'ring' ? 'chart__point chart__point--ring' : 'chart__point';
+      out.push(
+        `<circle class="chart__swatch ${cls}" cx="${round(lx + 5)}" cy="13" r="3.5"/>`,
+        `<text class="chart__legend-label" x="${round(lx + 13)}" y="17">${escapeXml(s.label)}</text>`,
+      );
+      lx += 26 + s.label.length * 6.2;
+    }
+  }
+  out.push(yLabels(g, yt.values.map((value) => ({ label: formatNumber(value, yt.decimals), y: y(value) }))));
+  out.push(xLabels(g, xt.values.map((value) => ({ label: formatNumber(value, xt.decimals), x: x(value) }))));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
+  return out.join('');
+}
+
+/* ----------------------------------------------------------- line chart */
+
+/**
+ * Lines on linear axes, one per series (missing values break the line), with
+ * optional marked points. With yFormat 'pow2' the y values are base-2
+ * logarithms and the ticks print as powers of two.
+ * @param {{ id: string, title: string, desc: string, series: { key: string, label?: string, points: { x: number, y: number|null }[] }[],
+ *   marks?: { x: number, y: number, label: string, dy?: number, anchor?: 'start'|'end' }[],
+ *   xDomain: [number, number], yDomain: [number, number], yFormat?: 'number'|'pow2',
+ *   width?: number, height?: number, xLabel?: string, yLabel?: string }} options
+ */
+export function renderLineChart({
+  id,
+  title,
+  desc,
+  series,
+  marks = [],
+  xDomain,
+  yDomain,
+  yFormat = 'number',
+  width = 960,
+  height = 360,
+  xLabel = '',
+  yLabel = '',
+}) {
+  const g = layout({ width, height });
+  const x = linear(xDomain[0], xDomain[1], g.left, g.right);
+  const y = linear(yDomain[0], yDomain[1], g.bottom, g.top);
+  const xt = ticksWithin(xDomain[0], xDomain[1], g.narrow ? 4 : 6);
+  const pow2 = yFormat === 'pow2';
+  const yValues = pow2 ? log2Ticks(yDomain[0], yDomain[1], g.narrow ? 4 : 5) : ticksWithin(yDomain[0], yDomain[1], 5).values;
+  const yDecimals = pow2 ? 0 : niceTicks(yDomain[0], yDomain[1], 5).decimals;
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--line' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yValues.filter((v) => v > yDomain[0] && v < yDomain[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(vRulings(g, xt.values.filter((v) => v > xDomain[0] && v < xDomain[1]).map((value) => ({ value, x: x(value) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  series.forEach((s, i) => {
+    let d = '';
+    let pen = 'M';
+    let last = null;
+    for (const p of s.points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+        pen = 'M';
+        continue;
+      }
+      d += `${pen}${round(x(p.x))},${round(y(p.y))}`;
+      pen = 'L';
+      last = p;
+    }
+    const dash = DASHES[i % DASHES.length];
+    out.push(`<path class="chart__curve chart__curve--${i}"${dash ? ` stroke-dasharray="${dash}"` : ''} d="${d}"/>`);
+    if (s.label && last) {
+      out.push(
+        `<text class="chart__series-label" x="${round(x(last.x) - 4)}" y="${round(y(last.y) - 7)}" text-anchor="end">${escapeXml(s.label)}</text>`,
+      );
+    }
+  });
+  for (const m of marks) {
+    const mx = x(m.x);
+    const my = y(m.y);
+    const end = m.anchor === 'end';
+    out.push(
+      `<circle class="chart__mark" cx="${round(mx)}" cy="${round(my)}" r="4.5"/>`,
+      `<text class="chart__annotation" x="${round(mx + (end ? -9 : 9))}" y="${round(my + 4 + (m.dy ?? 0))}" text-anchor="${end ? 'end' : 'start'}">${escapeXml(m.label)}</text>`,
+    );
+  }
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(yLabels(g, yValues.map((value) => ({ label: pow2 ? powerLabel(2, value) : formatNumber(value, yDecimals), y: y(value) }))));
+  out.push(xLabels(g, xt.values.map((value) => ({ label: formatNumber(value, xt.decimals), x: x(value) }))));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
+  return out.join('');
+}
+
+/* ---------------------------------------------------------- bit profile */
+
+/**
+ * The proportion of ones at each bit position: the observed proportion as a
+ * point, its exact expectation as an ink tick, a reference range (for
+ * instance the 95% range of a uniform random sample of the same size) as a
+ * vertical line, and the level one half as a dashed reference.
+ * @param {{ id: string, title: string, desc: string, bits: { observed: number, expected: number, low: number, high: number }[],
+ *   reference?: number, yDomain?: [number, number], width?: number, height?: number, xLabel?: string, yLabel?: string }} options
+ */
+export function renderBitProfile({
+  id,
+  title,
+  desc,
+  bits,
+  reference = 0.5,
+  yDomain = [0, 1],
+  width = 960,
+  height = 300,
+  xLabel = 'Bit position j (0 = least significant)',
+  yLabel = 'Proportion of ones',
+}) {
+  const g = layout({ width, height });
+  const y = linear(yDomain[0], yDomain[1], g.bottom, g.top);
+  const band = g.plotW / bits.length;
+  const cx = (j) => g.left + (j + 0.5) * band;
+  const yt = ticksWithin(yDomain[0], yDomain[1], 4);
+  const tickHalf = Math.min(10, band * 0.32);
+  const every = band >= 18 ? 1 : band >= 9 ? 2 : 4;
+  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--bits' })];
+
+  out.push('<g class="chart__rulings" aria-hidden="true">');
+  out.push(hRulings(g, yt.values.filter((v) => v > yDomain[0] && v < yDomain[1]).map((value) => ({ value, y: y(value) })), { major: () => false }));
+  out.push(frame(g), '</g>');
+  out.push(
+    `<line class="chart__reference" x1="${g.left}" x2="${round(g.right)}" y1="${round(y(reference))}" y2="${round(y(reference))}" aria-hidden="true"/>`,
+  );
+
+  out.push('<g class="chart__data" aria-hidden="true">');
+  bits.forEach((b, j) => {
+    const x = round(cx(j));
+    out.push(
+      `<line class="chart__range" x1="${x}" x2="${x}" y1="${round(y(b.low))}" y2="${round(y(b.high))}"/>`,
+      `<line class="chart__tick-expected" x1="${round(cx(j) - tickHalf)}" x2="${round(cx(j) + tickHalf)}" y1="${round(y(b.expected))}" y2="${round(y(b.expected))}"/>`,
+      `<circle class="chart__point" cx="${x}" cy="${round(y(b.observed))}" r="${g.narrow ? 3 : 3.75}"/>`,
+    );
+  });
+  out.push('</g>');
+
+  out.push('<g class="chart__labels" aria-hidden="true">');
+  out.push(`<text class="chart__annotation" x="${round(g.right - 4)}" y="${round(y(reference) - 5)}" text-anchor="end">½</text>`);
+  out.push(yLabels(g, yt.values.map((value) => ({ label: formatNumber(value, yt.decimals), y: y(value) }))));
+  out.push(xLabels(g, bits.map((_, j) => ({ label: String(j), x: cx(j), j })).filter((t) => t.j % every === 0)));
+  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
 }
