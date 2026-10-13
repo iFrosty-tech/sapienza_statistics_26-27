@@ -206,9 +206,8 @@ export function jacobianAdd(j1, j2) {
 }
 
 /**
- * Mixed addition: a Jacobian point plus an affine point (Z2 = 1). This is the
- * operation the toy hash performs once per message byte, so it is the one
- * worth keeping cheap.
+ * Mixed addition: a Jacobian point plus an affine point (Z2 = 1), cheaper than
+ * a general addition because the second point needs no normalisation.
  */
 export function jacobianAddAffine(j, point) {
   if (point === INFINITY) return j;
@@ -265,7 +264,6 @@ export function mul(point, k) {
 /**
  * The table [0·Q, 1·Q, …, (count − 1)·Q] of affine points, built with
  * successive mixed additions and a single batched inversion at the end.
- * The toy hash keeps one such table per message byte position.
  * @param {{x: bigint, y: bigint} | null} point
  * @param {number} [count=256]
  */

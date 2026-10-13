@@ -8,10 +8,8 @@ import {
   clipLineToRange,
   renderHistogram,
   renderZStrip,
-  renderCollisionCurve,
   renderLogLog,
   renderCurveScatter,
-  renderNakamoto,
   renderHeatMap,
   renderBandChart,
   renderIntervalDots,
@@ -89,16 +87,6 @@ test('z-score strip draws 256 lollipops and the ±1.96 and ±3 bands', () => {
   assert.equal(count(svg, 'class="chart__zero"'), 1);
 });
 
-test('collision curve draws the theory line, one point per sample size and error bars', () => {
-  const points = [10, 50, 100].map((m) => ({ m, empirical: m / 120, theory: m / 100 }));
-  const theory = Array.from({ length: 101 }, (_, m) => ({ m, p: m / 100 }));
-  const svg = renderCollisionCurve({ id: 'c', title: 'T', desc: 'D', points, theory, subsets: 50, halfPoint: 50 });
-  assert.equal(count(svg, 'class="chart__theory"'), 1);
-  assert.equal(count(svg, 'class="chart__point"'), 3);
-  assert.equal(count(svg, 'class="chart__errorbar"'), 3);
-  assert.ok(svg.includes('chart__half'));
-});
-
 test('log-log plot renders every series, the reference lines and the marks in both panels', () => {
   const series = [
     { key: 'bsgs', label: 'BSGS', points: [{ x: 128, y: 12 }, { x: 256, y: 17 }] },
@@ -120,18 +108,6 @@ test('curve scatter draws one point per affine point and the mirror ruling', () 
   const svg = renderCurveScatter({ id: 's', title: 'T', desc: 'D', p: 11, points });
   assert.equal(count(svg, 'class="chart__point"'), 3);
   assert.ok(svg.includes('chart__mirror'));
-});
-
-test('Nakamoto chart draws one curve per attacker share and the confirmation ruling', () => {
-  const curves = [0.1, 0.3].map((q) => ({
-    q,
-    label: `q = ${q}`,
-    values: Array.from({ length: 11 }, (_, z) => ({ z, p: Math.exp(-z * (1 - q)) })),
-  }));
-  const svg = renderNakamoto({ id: 'n', title: 'T', desc: 'D', curves, markZ: 6 });
-  assert.equal(count(svg, 'class="chart__curve'), 2);
-  assert.ok(svg.includes('q = 0.1') && svg.includes('q = 0.3'));
-  assert.ok(svg.includes('chart__half'));
 });
 
 test('heat map composes the raster, a legend and the accessible description', () => {

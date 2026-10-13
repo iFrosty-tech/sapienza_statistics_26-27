@@ -254,68 +254,6 @@ export function renderZStrip({ id, title, desc, z, width = 960, height = 320, xL
   return out.join('');
 }
 
-/* ------------------------------------------------------ collision curve */
-
-/**
- * Probability of at least one collision against the sample size: the exact
- * birthday curve as a line, the empirical frequencies as points with 95%
- * binomial error bars. The bars are the binomial standard error of the subset
- * proportion for the fixed pool the subsets are drawn from; they do not
- * measure the uncertainty of the birthday law, since the subsets overlap.
- */
-export function renderCollisionCurve({
-  id,
-  title,
-  desc,
-  points,
-  theory,
-  subsets,
-  halfPoint,
-  width = 960,
-  height = 400,
-  xLabel = 'Sample size m',
-  yLabel = 'P(at least one collision)',
-}) {
-  const g = layout({ width, height });
-  const mMax = Math.max(...points.map((p) => p.m), ...theory.map((t) => t.m));
-  const xTicks = niceTicks(0, mMax, g.narrow ? 4 : 8);
-  const x = linear(0, mMax, g.left, g.right);
-  const y = linear(0, 1, g.bottom, g.top);
-  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--collision' })];
-
-  out.push('<g class="chart__rulings" aria-hidden="true">');
-  out.push(hRulings(g, [0.25, 0.5, 0.75].map((value) => ({ value, y: y(value) })), { major: (v) => v === 0.5 }));
-  out.push(vRulings(g, xTicks.values.filter((v) => v > 0 && v < mMax).map((value) => ({ value, x: x(value) })), { major: () => false }));
-  if (halfPoint) {
-    out.push(
-      `<line class="chart__half" x1="${round(x(halfPoint))}" x2="${round(x(halfPoint))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
-      `<text class="chart__annotation" x="${round(x(halfPoint) + 6)}" y="${round(g.top + 14)}">P = ½ at m = ${halfPoint}</text>`,
-    );
-  }
-  out.push(frame(g), '</g>');
-
-  const d = theory.map((t, i) => `${i === 0 ? 'M' : 'L'}${round(x(t.m))},${round(y(t.p))}`).join('');
-  out.push(`<path class="chart__theory" d="${d}" aria-hidden="true"/>`);
-
-  out.push('<g class="chart__data" aria-hidden="true">');
-  for (const p of points) {
-    const se = Math.sqrt((p.empirical * (1 - p.empirical)) / subsets);
-    const lo = Math.max(0, p.empirical - 1.96 * se);
-    const hi = Math.min(1, p.empirical + 1.96 * se);
-    out.push(
-      `<line class="chart__errorbar" x1="${round(x(p.m))}" x2="${round(x(p.m))}" y1="${round(y(lo))}" y2="${round(y(hi))}"/>`,
-      `<circle class="chart__point" cx="${round(x(p.m))}" cy="${round(y(p.empirical))}" r="${g.narrow ? 3 : 3.75}"/>`,
-    );
-  }
-  out.push('</g>');
-
-  out.push('<g class="chart__labels" aria-hidden="true">');
-  out.push(yLabels(g, [0, 0.25, 0.5, 0.75, 1].map((value) => ({ label: formatNumber(value, 2), y: y(value) }))));
-  out.push(xLabels(g, xTicks.values.map((value) => ({ label: formatNumber(value, xTicks.decimals), x: x(value) }))));
-  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
-  return out.join('');
-}
-
 /* ------------------------------------------------------------- log–log */
 
 function log2Ticks(min, max, target) {
@@ -498,72 +436,6 @@ export function renderCurveScatter({ id, title, desc, p, points, width = 960, he
   out.push(yLabels(g, ticks.map((value) => ({ label: String(value), y: y(value) }))));
   out.push(xLabels(g, ticks.map((value) => ({ label: String(value), x: x(value) }))));
   out.push(axisTitles(g, 'x', 'y'), '</g></svg>');
-  return out.join('');
-}
-
-/* ------------------------------------------------------------ Nakamoto */
-
-const DASHES = ['', '7 4', '2 3', '9 3 2 3'];
-
-/**
- * Nakamoto's catch-up probability against the number of confirmations, one
- * curve per attacker share q, on a logarithmic probability axis.
- */
-export function renderNakamoto({
-  id,
-  title,
-  desc,
-  curves,
-  markZ,
-  floor = 1e-7,
-  width = 960,
-  height = 420,
-  xLabel = 'Confirmations z',
-  yLabel = 'P(attacker catches up)',
-}) {
-  const g = layout({ width, height, margin: { right: 74 } });
-  const zMax = Math.max(...curves.flatMap((c) => c.values.map((v) => v.z)));
-  const x = linear(0, zMax, g.left, g.right);
-  const yExp = linear(Math.log10(floor), 0, g.bottom, g.top);
-  const y = (p) => yExp(Math.log10(Math.max(p, floor)));
-  const out = [svgOpen({ id, width, height, title, desc, className: 'chart--nakamoto' })];
-  const decades = [];
-  for (let k = 0; k >= Math.log10(floor); k -= 1) decades.push(k);
-  const xTicks = niceTicks(0, zMax, g.narrow ? 5 : 10).values;
-
-  out.push('<g class="chart__rulings" aria-hidden="true">');
-  out.push(hRulings(g, decades.filter((k) => k !== 0 && k > Math.log10(floor)).map((k) => ({ value: k, y: yExp(k) })), { major: () => false }));
-  out.push(vRulings(g, xTicks.filter((v) => v > 0 && v < zMax).map((value) => ({ value, x: x(value) })), { major: () => false }));
-  if (markZ !== undefined) {
-    out.push(
-      `<line class="chart__half" x1="${round(x(markZ))}" x2="${round(x(markZ))}" y1="${g.top}" y2="${round(g.bottom)}"/>`,
-      `<text class="chart__annotation" x="${round(x(markZ) + 6)}" y="${round(g.top + 14)}">z = ${markZ}</text>`,
-    );
-  }
-  out.push(frame(g), '</g>');
-
-  out.push('<g class="chart__data" aria-hidden="true">');
-  curves.forEach((c, i) => {
-    const visible = [];
-    for (const v of c.values) {
-      visible.push(v);
-      if (v.p < floor) break;
-    }
-    const d = visible.map((v, k) => `${k === 0 ? 'M' : 'L'}${round(x(v.z))},${round(y(v.p))}`).join('');
-    out.push(`<path class="chart__curve chart__curve--${i}" d="${d}"${DASHES[i % DASHES.length] ? ` stroke-dasharray="${DASHES[i % DASHES.length]}"` : ''}/>`);
-    // Curves that leave the sheet through the floor are labelled where they exit, inside the frame.
-    const last = visible[visible.length - 1];
-    const atFloor = last.p < floor;
-    out.push(
-      `<text class="chart__series-label" x="${round(atFloor ? x(last.z) + 6 : g.right + 6)}" y="${round(atFloor ? g.bottom - 8 - 14 * (i % 2) : y(last.p) + 4)}" text-anchor="start">${escapeXml(c.label)}</text>`,
-    );
-  });
-  out.push('</g>');
-
-  out.push('<g class="chart__labels" aria-hidden="true">');
-  out.push(yLabels(g, decades.map((k) => ({ label: k === 0 ? '1' : powerLabel(10, k), y: yExp(k) }))));
-  out.push(xLabels(g, xTicks.map((value) => ({ label: String(value), x: x(value) }))));
-  out.push(axisTitles(g, xLabel, yLabel), '</g></svg>');
   return out.join('');
 }
 
@@ -954,6 +826,8 @@ export function renderScatter({
 }
 
 /* ----------------------------------------------------------- line chart */
+
+const DASHES = ['', '7 4', '2 3', '9 3 2 3'];
 
 /**
  * Lines on linear axes, one per series (missing values break the line), with
