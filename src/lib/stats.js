@@ -396,3 +396,140 @@ export function geometricCdf(t, p) {
   if (t < 1) return 0;
   return -Math.expm1(Math.floor(t) * Math.log1p(-p));
 }
+
+/* ------------------------------------------------------------------------ */
+/* Poisson and Poisson-binomial laws                                         */
+/* ------------------------------------------------------------------------ */
+
+/** P(M = m) for M ~ Poisson(λ), computed in log space: e^−λ λ^m / m!. */
+export function poissonPmf(m, lambda) {
+  if (!Number.isInteger(m) || m < 0) return 0;
+  if (lambda === 0) return m === 0 ? 1 : 0;
+  return Math.exp(m * Math.log(lambda) - lambda - lnGamma(m + 1));
+}
+
+/**
+ * The pmf of a Poisson-binomial variable, the number of successes in
+ * independent Bernoulli trials with unequal probabilities p_1, …, p_m, as an
+ * array of length m + 1. Dynamic programming over the trials: after trial j,
+ * P(S = s) = P(S′ = s)(1 − p_j) + P(S′ = s − 1) p_j, which costs O(m²) and
+ * involves no cancellation.
+ * @param {number[]} probs success probabilities in [0, 1]
+ */
+export function poissonBinomialPmf(probs) {
+  const pmf = new Array(probs.length + 1).fill(0);
+  pmf[0] = 1;
+  probs.forEach((p, j) => {
+    if (!(p >= 0 && p <= 1)) throw new Error(`probability ${j} is not in [0, 1]`);
+    for (let s = j + 1; s >= 1; s -= 1) pmf[s] = pmf[s] * (1 - p) + pmf[s - 1] * p;
+    pmf[0] *= 1 - p;
+  });
+  return pmf;
+}
+
+/**
+ * Pearson's chi-square test after pooling adjacent categories: categories are
+ * merged from the left until each pooled bin has an expected count of at
+ * least `minExpected`, and a remainder on the right is merged into the last
+ * bin (the rule of binnedBinomialChiSquare, for any reference law).
+ * @param {number[]} observed
+ * @param {number[]} expected
+ * @param {{ minExpected?: number, ddof?: number }} [options]
+ * @returns {{ statistic: number, df: number, p: number, bins: { from: number, to: number, observed: number, expected: number }[] }}
+ */
+export function pooledChiSquare(observed, expected, { minExpected = 5, ddof = 0 } = {}) {
+  if (observed.length !== expected.length) throw new Error('observed and expected need the same length');
+  const bins = [];
+  let from = 0;
+  let o = 0;
+  let e = 0;
+  for (let i = 0; i < observed.length; i += 1) {
+    o += observed[i];
+    e += expected[i];
+    if (e >= minExpected) {
+      bins.push({ from, to: i, observed: o, expected: e });
+      from = i + 1;
+      o = 0;
+      e = 0;
+    }
+  }
+  if (from < observed.length) {
+    const last = bins.pop() ?? { from: 0, observed: 0, expected: 0 };
+    bins.push({ from: last.from, to: observed.length - 1, observed: last.observed + o, expected: last.expected + e });
+  }
+  if (bins.length - 1 - ddof < 1) {
+    return { statistic: 0, df: 0, p: Number.NaN, bins, note: 'too few pooled categories for a chi-square test' };
+  }
+  const fit = chiSquareGoodnessOfFit(bins.map((b) => b.observed), bins.map((b) => b.expected), { ddof });
+  return { ...fit, bins };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Correlation                                                               */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Pearson's product-moment correlation coefficient of two paired samples,
+ * computed from centred values (two passes). NaN when a variable is constant.
+ * @param {ArrayLike<number>} xs
+ * @param {ArrayLike<number>} ys
+ */
+export function pearson(xs, ys) {
+  const n = xs.length;
+  if (n !== ys.length) throw new Error('pearson needs paired samples of equal length');
+  let mx = 0;
+  let my = 0;
+  for (let i = 0; i < n; i += 1) {
+    mx += xs[i];
+    my += ys[i];
+  }
+  mx /= n;
+  my /= n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i += 1) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    sxy += dx * dy;
+    sxx += dx * dx;
+    syy += dy * dy;
+  }
+  if (sxx === 0 || syy === 0) return Number.NaN;
+  return Math.max(-1, Math.min(1, sxy / Math.sqrt(sxx * syy)));
+}
+
+/** Ranks 1 … n of the values, ties receiving the average of the ranks they span. */
+export function averageRanks(values) {
+  const order = Array.from(values, (_, i) => i).sort((i, j) => values[i] - values[j]);
+  const ranks = new Array(values.length);
+  for (let start = 0; start < order.length; ) {
+    let end = start + 1;
+    while (end < order.length && values[order[end]] === values[order[start]]) end += 1;
+    const rank = (start + end + 1) / 2; // mean of the ranks start + 1 … end
+    for (let i = start; i < end; i += 1) ranks[order[i]] = rank;
+    start = end;
+  }
+  return ranks;
+}
+
+/** Spearman's rank correlation: Pearson's r of the average ranks. */
+export function spearman(xs, ys) {
+  return pearson(averageRanks(xs), averageRanks(ys));
+}
+
+/**
+ * Two-sided test of H0: ρ = 0 by Fisher's transformation. Under H0 and for a
+ * bivariate normal sample, z = atanh(r)·sqrt(n − 3) is approximately N(0, 1);
+ * this is a large-sample approximation, used here as a descriptive yardstick
+ * also for non-normal data and for Spearman's ρ.
+ * @param {number} r correlation coefficient
+ * @param {number} n number of pairs
+ * @returns {{ z: number, p: number }}
+ */
+export function fisherZTest(r, n) {
+  if (!(n > 3) || Number.isNaN(r)) return { z: Number.NaN, p: Number.NaN };
+  if (Math.abs(r) >= 1) return { z: Math.sign(r) * Infinity, p: 0 };
+  const z = Math.atanh(r) * Math.sqrt(n - 3);
+  return { z, p: Math.min(1, 2 * normCdf(-Math.abs(z))) };
+}

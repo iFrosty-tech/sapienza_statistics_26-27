@@ -195,3 +195,89 @@ test('collision probability keeps tiny values (no cancellation in 1 − e^−x)'
   const approx = (1e6 * (1e6 - 1)) / 2 ** 161;
   assert.ok(p > 0 && Math.abs(p / approx - 1) < 1e-9, `p = ${p}`);
 });
+
+test('Poisson pmf: known values, unit mass and the m = 0 term', async () => {
+  const { poissonPmf } = await import('../src/lib/stats.js');
+  near(poissonPmf(2, 3), (9 / 2) * Math.exp(-3), 1e-15);
+  near(poissonPmf(0, 0.5), Math.exp(-0.5), 1e-15);
+  assert.equal(poissonPmf(-1, 2), 0);
+  assert.equal(poissonPmf(0, 0), 1);
+  assert.equal(poissonPmf(3, 0), 0);
+  let s = 0;
+  for (let m = 0; m <= 60; m += 1) s += poissonPmf(m, 7.5);
+  near(s, 1, 1e-12);
+});
+
+test('Poisson-binomial pmf by dynamic programming', async () => {
+  const { poissonBinomialPmf } = await import('../src/lib/stats.js');
+  // Two trials with p = 0.5 and 0.2: P(0) = 0.4, P(1) = 0.5, P(2) = 0.1.
+  const two = poissonBinomialPmf([0.5, 0.2]);
+  assert.equal(two.length, 3);
+  [0.4, 0.5, 0.1].forEach((v, k) => near(two[k], v, 1e-15));
+  // Equal probabilities reduce it to the binomial law.
+  const equal = poissonBinomialPmf(new Array(30).fill(0.3));
+  const binomial = binomialPmfTable(30, 0.3);
+  equal.forEach((v, k) => near(v, binomial[k], 1e-13, `k = ${k}`));
+  // Unequal probabilities: unit mass and mean Σ p_j.
+  const probs = Array.from({ length: 40 }, (_, j) => (j + 1) / 50);
+  const pmf = poissonBinomialPmf(probs);
+  near(pmf.reduce((a, b) => a + b, 0), 1, 1e-12);
+  near(pmf.reduce((a, v, k) => a + k * v, 0), probs.reduce((a, b) => a + b, 0), 1e-10);
+  assert.deepEqual(poissonBinomialPmf([]), [1]);
+  assert.throws(() => poissonBinomialPmf([1.5]));
+});
+
+test('Pearson correlation: exact lines and Anscombe (1973), data set I', async () => {
+  const { pearson } = await import('../src/lib/stats.js');
+  near(pearson([1, 2, 3, 4], [2, 4, 6, 8]), 1, 1e-15);
+  near(pearson([1, 2, 3, 4], [8, 6, 4, 2]), -1, 1e-15);
+  const x = [10, 8, 13, 9, 11, 14, 6, 4, 12, 7, 5];
+  const y = [8.04, 6.95, 7.58, 8.81, 8.33, 9.96, 7.24, 4.26, 10.84, 4.82, 5.68];
+  near(pearson(x, y), 0.81642, 5e-6);
+  // A symmetric design gives r = 0 exactly in exact arithmetic.
+  near(pearson([1, 2, 3, 4, 5], [4, 1, 0, 1, 4]), 0, 1e-15);
+  assert.ok(Number.isNaN(pearson([1, 1, 1], [1, 2, 3])), 'a constant variable has no correlation');
+  assert.throws(() => pearson([1, 2], [1]));
+});
+
+test('Spearman correlation with average ranks for ties', async () => {
+  const { spearman, averageRanks } = await import('../src/lib/stats.js');
+  assert.deepEqual(averageRanks([10, 20, 20, 30]), [1, 2.5, 2.5, 4]);
+  assert.deepEqual(averageRanks([3, 1, 2]), [3, 1, 2]);
+  // A monotone transform does not change the ranks.
+  const x = [0.3, 2.5, 1.1, 7, 4.2, 3.3, 0.01];
+  assert.equal(spearman(x, x.map((v) => Math.exp(3 * v))), 1);
+  assert.equal(spearman(x, x.map((v) => -(v ** 3))), -1);
+  // Hours of television against IQ (the textbook example): ρ = −29/165.
+  const iq = [106, 100, 86, 101, 99, 103, 97, 113, 112, 110];
+  const tv = [7, 27, 2, 50, 28, 29, 20, 12, 6, 17];
+  near(spearman(iq, tv), -29 / 165, 1e-12);
+});
+
+test('Fisher z-test of a correlation coefficient (large-sample approximation)', async () => {
+  const { fisherZTest } = await import('../src/lib/stats.js');
+  const zero = fisherZTest(0, 50);
+  assert.equal(zero.z, 0);
+  near(zero.p, 1, 1e-6);
+  // r = 0.5, n = 28: z = atanh(0.5)·5 = 2.74653, two-sided p = 0.006023.
+  const t = fisherZTest(0.5, 28);
+  near(t.z, Math.atanh(0.5) * 5, 1e-12);
+  near(t.p, 0.006023, 2e-6);
+  near(fisherZTest(-0.5, 28).p, t.p, 1e-15);
+  assert.equal(fisherZTest(1, 10).p, 0);
+  assert.ok(Number.isNaN(fisherZTest(0.2, 3).p), 'n ≤ 3 leaves no degrees of freedom');
+});
+
+test('pooled chi-square merges small expected counts from the left', async () => {
+  const { pooledChiSquare } = await import('../src/lib/stats.js');
+  const r = pooledChiSquare([10, 3, 2, 1], [9, 4, 2, 1]);
+  assert.deepEqual(r.bins.map((b) => [b.from, b.to]), [[0, 0], [1, 3]]);
+  near(r.statistic, 1 / 9 + 1 / 7, 1e-12);
+  assert.equal(r.df, 1);
+  const exact = pooledChiSquare([5, 10, 5], [5, 10, 5]);
+  assert.equal(exact.statistic, 0);
+  assert.equal(exact.df, 2);
+  const tiny = pooledChiSquare([1, 1], [1, 1]);
+  assert.equal(tiny.df, 0);
+  assert.ok(Number.isNaN(tiny.p));
+});
