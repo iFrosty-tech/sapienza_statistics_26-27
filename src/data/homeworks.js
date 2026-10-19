@@ -54,6 +54,6 @@ export default [
       'A hashed EC-ElGamal scheme on secp256k1 with private keys restricted to a small range is set against the Caesar cipher. The Caesar key is recovered by letter-frequency χ² and n-gram scoring, with the success rate measured as a function of ciphertext length, while the toy scheme falls to a search of its restricted key space, an attack that owes nothing to the statistics of the plaintext.',
     topics: ['Elliptic-curve cryptography', 'Classical ciphers', 'Cryptanalysis', 'Statistical inference'],
     published: '2026-10-19',
-    status: 'upcoming',
+    status: 'published',
   },
 ];

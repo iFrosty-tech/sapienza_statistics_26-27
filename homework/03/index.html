@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw03.js"></script>
+  </head>
+  <body class="page page--homework"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Toy ECC encryption and decryption</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Caesar cipher</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Comparison of the two schemes</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Statistical cryptanalysis of the Caesar cipher</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Attack on the restricted key space</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Discussion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                Homework 2 — Using the toy cryptographic scheme based on the secp256k1 elliptic curve developed in Part 1
+                of the previous homework, encrypt and decrypt a simple message. Describe the main steps of the algorithm
+                and the role of the keys.
+              </p>
+              <p>
+                The Caesar Cipher: Implement the Caesar cipher to encrypt and decrypt the same message. Discuss the
+                similarities and differences between the two schemes, focusing on their encryption and decryption
+                procedures, key spaces, and statistical properties.
+              </p>
+              <p>
+                Statistical Cryptanalysis of the Caesar Cipher: Given a sufficiently large corpus of text in a known
+                language, design and implement a simple algorithm to recover the key of the Caesar cipher by exploiting
+                the statistical distribution of letters. Test the algorithm on ciphertexts of different lengths and
+                discuss its effectiveness and limitations.
+              </p>
+              <p>
+                Optional: Compare alternative approaches, such as exhaustive key search, letter-frequency analysis, and
+                n-gram scoring.
+              </p>
+              <p>
+                The toy scheme developed in Part 1 uses the secp256k1 elliptic curve but restricts the private key to a
+                small range to make experiments computationally feasible. Design and implement a simple attack to recover
+                the private key, or otherwise decrypt the message, exploiting this restricted key space. Discuss the
+                differences between this attack and the statistical attack against the Caesar cipher. Explain why the
+                same approach would not necessarily be feasible against a properly configured ECC scheme using a
+                sufficiently large private-key space.
+              </p>
+              <p>
+                Optional: Discuss alternative attacks and explain which weaknesses arise from the restricted key space and
+                which, if any, could arise from the design of the toy scheme itself.
+              </p>
+            </blockquote>
+            <p class="placeholder">
+              Section placeholder. The restricted private key of the toy scheme lies in
+              <span data-tex>[1, 2^{20}]</span>, a space of {{fig.keySpace.toy.log2}} bits against
+              {{fig.keySpace.caesar.log2}} bits for the Caesar cipher.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Toy ECC encryption and decryption</h2>
+            <p class="placeholder">
+              Section placeholder: the key pair, the ephemeral scalar, the shared secret and the keystream of the hashed
+              EC-ElGamal scheme, with the worked example below.
+            </p>
+            <div class="worked">
+              <div><span class="caption">Message</span><span class="worked__value">{{fig.repeat.message}}</span></div>
+              <div><span class="caption">Private key k, restricted to 1 … 2<sup>{{fig.params.toyBits}}</sup></span><span class="worked__value">{{fig.repeat.privateKey}}</span></div>
+              <div><span class="caption">Public key Q = kG, compressed</span><span class="worked__value">{{fig.repeat.publicKey}}</span></div>
+              <div><span class="caption">Ephemeral scalar r, hexadecimal</span><span class="worked__value">{{fig.repeat.ephemeral}}</span></div>
+              <div><span class="caption">Ephemeral point R = rG, compressed</span><span class="worked__value">{{fig.repeat.eccR1}}</span></div>
+              <div><span class="caption">Shared secret S = rQ = kR, abscissa</span><span class="worked__value">{{fig.repeat.sharedX}}</span></div>
+              <div><span class="caption">Keystream</span><span class="worked__value">{{fig.repeat.keystream}}</span></div>
+              <div><span class="caption">Ciphertext c</span><span class="worked__value">{{fig.repeat.eccC1}}</span></div>
+              <div><span class="caption">Key-confirmation tag</span><span class="worked__value">{{fig.repeat.eccTag1}}</span></div>
+            </div>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Caesar cipher</h2>
+            <p class="placeholder">
+              Section placeholder. Under the key {{fig.repeat.caesarKey}} the message of §2 becomes
+              <code>{{fig.repeat.caesarCiphertext}}</code>.
+            </p>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Comparison of the two schemes</h2>
+            <p class="placeholder">Section placeholder: procedures, key spaces and statistical properties of the two schemes.</p>
+
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>Key spaces of the Caesar cipher, the toy scheme and
+                secp256k1 with a full-size key (placeholder caption).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=keySpaces --></div>
+            </figure>
+
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>The same message encrypted twice under each scheme with the
+                same key (placeholder caption).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=repeated --></div>
+            </figure>
+
+            <figure class="chart-figure" data-fig="letters" data-fig-kind="letters" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=letters --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>Letter and byte distributions of one message under both schemes
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p class="placeholder">
+                  Caption placeholder. The Caesar ciphertext is a cyclic shift of the plaintext histogram by
+                  {{fig.compare.key}} places, with the same index of coincidence {{fig.compare.ic.caesarLetters}}; the bytes
+                  of the toy EC ciphertext give <span data-tex>\chi^2</span> = {{fig.compare.eccBytesVsUniform256.statistic}}
+                  on {{fig.compare.eccBytesVsUniform256.df}} degrees of freedom ({{fig.compare.eccBytesVsUniform256.pEq}}).
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Characters</dt><dd>{{fig.compare.chars}}</dd></div>
+                  <div><dt>IC, plaintext</dt><dd>{{fig.compare.ic.plainLetters}}</dd></div>
+                  <div><dt>IC, Caesar</dt><dd>{{fig.compare.ic.caesarLetters}}</dd></div>
+                  <div><dt>IC, EC bytes</dt><dd>{{fig.compare.ic.eccBytes}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Message drawn from the held-out text; Caesar key and toy key pair from seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>Index of coincidence and χ² tests of the message of Figure 1
+                under both schemes (placeholder caption).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=statistics --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Statistical cryptanalysis of the Caesar cipher</h2>
+            <p class="placeholder">
+              Section placeholder. The letter frequencies come from {{fig.corpus.trainingBooks}} training books
+              ({{fig.corpus.trainingLetters}} letters); the ciphertexts are windows of {{fig.corpus.heldoutTitle}} by
+              {{fig.corpus.heldoutAuthor}}. The χ² method reaches 95% success from {{fig.caesar.chiSquare.l95}} letters,
+              the trigram score from {{fig.caesar.trigram.l95}}.
+            </p>
+
+            <figure class="chart-figure" data-fig="success" data-fig-kind="success" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=success --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Success rate of key recovery against ciphertext length
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p class="placeholder">
+                  Caption placeholder: {{fig.params.windows}} ciphertexts per length, Wilson 95% intervals, chance level
+                  1/26 = {{fig.caesar.baseline}}.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>χ², 95% from</dt><dd>{{fig.caesar.chiSquare.l95}}</dd></div>
+                  <div><dt>Log-likelihood, 95% from</dt><dd>{{fig.caesar.logLikelihood.l95}}</dd></div>
+                  <div><dt>Bigram, 95% from</dt><dd>{{fig.caesar.bigram.l95}}</dd></div>
+                  <div><dt>Trigram, 95% from</dt><dd>{{fig.caesar.trigram.l95}}</dd></div>
+                </dl>
+                <p class="pplot__seed">{{fig.params.windows}} windows per length of the held-out text, uniform keys; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="chart-figure" data-fig="rank" data-fig-kind="rank" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=rank --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Mean rank of the true key against ciphertext length
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p class="placeholder">Caption placeholder: at L = 5 the trigram score ranks the true key {{fig.caesar.trigram.L5.rank}} on average.</p>
+                <p class="pplot__seed">The ciphertexts of Figure 2; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>Success rate at selected lengths, with Wilson 95% intervals,
+                and the shortest lengths from which each method succeeds in 95% and 99% of the trials (placeholder caption).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=caesarSummary --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Attack on the restricted key space</h2>
+            <p class="placeholder">
+              Section placeholder. Baby-step giant-step recovers the private key {{fig.demo.k}} of §2 in
+              {{fig.demo.bsgsOperations}} group operations, against {{fig.demo.bruteOperations}} for brute force; the fitted
+              slopes are {{fig.attack.brute.slope}} and {{fig.attack.bsgs.slope}}.
+            </p>
+
+            <figure class="chart-figure" data-fig="attack" data-fig-kind="attack" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=attack --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>Cost of the attacks on the restricted key space against the key size
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p class="placeholder">Caption placeholder: {{fig.params.keysPerBits}} random keys per key size.</p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Slope, brute force</dt><dd>{{fig.attack.brute.slope}}</dd></div>
+                  <div><dt>Slope, BSGS</dt><dd>{{fig.attack.bsgs.slope}}</dd></div>
+                  <div><dt>Slope, kangaroo</dt><dd>{{fig.attack.kangaroo.slope}}</dd></div>
+                  <div><dt>Brute force, op/s</dt><dd>{{fig.attack.brute.rate}}</dd></div>
+                </dl>
+                <p class="pplot__seed">{{fig.params.keysPerBits}} keys per size, private keys uniform on 1 … 2<sup>b</sup>; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>The fitted cost of each attack extrapolated to 128- and
+                256-bit keys, and Pollard's rho on the full secp256k1 group (placeholder caption).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=attackCost --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Discussion</h2>
+            <p class="placeholder">
+              Section placeholder. A full-range ephemeral is essential: with a {{fig.demo.ephemeralBits}}-bit ephemeral the
+              message is recovered in {{fig.demo.ephemeralOperations}} operations whatever the size of the private key.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p class="placeholder">
+              Section placeholder. The study takes about {{fig.params.computeSeconds}} seconds (last computed
+              {{fig.params.computedAt}}); its results are cached under <code>node_modules/.cache/hw03/</code> with the key
+              <code>{{fig.params.cacheKey}}</code>.
+            </p>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <ol></ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

@@ -1,0 +1,52 @@
+/* Homework 03: the Caesar cipher and the toy elliptic-curve scheme, in the
+   vocabulary of the probability paper. Figure frames, data tables, worked
+   values and the chart primitives come from hw01.css; this file adds what
+   homework 03 needs. */
+
+/* ---------- Placeholders awaiting the written argument ---------- */
+.prose .placeholder {
+  padding: var(--space-2) var(--space-3);
+  outline: var(--hair) dashed var(--ruling);
+  outline-offset: -1px;
+  color: var(--ink-faint);
+}
+
+.data-table--scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ---------- Chart primitives added for homework 03 ---------- */
+
+/* Wilson intervals of a success rate: a band printed under the measured line. */
+.chart__band-area {
+  fill: var(--ruling-minor);
+  stroke: none;
+}
+
+.chart__trace {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+
+/* Fig. 4: the spread of the operation counts over the random keys of one size. */
+.chart--attack .chart__range {
+  stroke: var(--ink-soft);
+  stroke-width: 1.25;
+}
+
+/* ---------- Tables ---------- */
+.data-table--hw03 tbody th {
+  font-weight: 600;
+}
+
+.data-table--hw03 td.is-number,
+.data-table--hw03 th.is-number {
+  white-space: nowrap;
+}
+
+.data-table--repeat code.is-nowrap {
+  white-space: nowrap;
+}
