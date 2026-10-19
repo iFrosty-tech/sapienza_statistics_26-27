@@ -121,9 +121,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Sized for two figures (01) and growing with a short label such as 1.1. */
   min-width: 1.75em;
   margin-top: 0.08em;
-  padding: 0.12em 0.2em;
+  padding: 0.12em 0.25em;
   border: var(--rule) solid var(--ink);
   font-size: 0.7em;
   line-height: 1;

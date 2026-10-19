@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <!-- @include partials/head-meta.html -->
-    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
     <meta name="description" content="{{hw.abstract}}" />
     <script type="module" src="/src/hw02.js"></script>
   </head>
@@ -111,7 +111,7 @@
               was run by the author: §3.8 gives a procedure by which a reader can repeat the comparison in a wallet,
               and the evidence offered here is the agreement with published vectors checked at build time. The
               statistical tests of §4 can reveal certain departures from the behaviour of an ideal random function;
-              as in <a href="{{base}}homework/01/">Homework 1</a>, passing them is a necessary condition for a
+              as in <a href="{{base}}homework/01/">Exercise 1</a>, passing them is a necessary condition for a
               function meant to behave like a random one, such as a hash, not a proof of its security. Timings are measured on one machine with one
               thread and are meant as orders of magnitude only.
             </p>
@@ -621,7 +621,7 @@
               the component <span data-tex>s</span> of a valid signature to lie in the lower half of its range,
               <span data-tex>0 &lt; s &lt; n/2 + 1</span> [<a href="#ref-29">29</a>, Appendix F]. A signature is produced with the private
               key and a fresh secret nonce and is verified with the public key alone, which a hash
-              function on its own does not offer. <a href="{{base}}homework/01/">Homework 1</a> computes this scalar
+              function on its own does not offer. <a href="{{base}}homework/01/">Exercise 1</a> computes this scalar
               multiplication on a toy curve with the same equation, <span data-tex>y^2 = x^3 + 7</span> over the field of
               17 elements, and examines its group law and the statistical behaviour of the map
               <span data-tex>k \mapsto kG</span> in detail.
@@ -845,7 +845,7 @@
               with <span data-tex>H_0</span>, not that <span data-tex>H_0</span> has been proved. Since this section
               reports 31 p-values, some of them on overlapping data, an occasional value below 0.05 would be expected
               even if every hypothesis held; the reading follows the whole set rather than any single value. Finally,
-              as Homework 1 found for elliptic-curve scalar multiplication, whose outputs on a toy curve pass several
+              as Exercise 1 found for elliptic-curve scalar multiplication, whose outputs on a toy curve pass several
               tests of this kind although its discrete logarithm can be read off a table, statistical
               indistinguishability from a random function is necessary for a primitive meant to behave like a hash, as
               the functions of this section are, but not sufficient: a function can pass every test of this section and
@@ -1822,7 +1822,7 @@
               defect lies in the distribution of a secret, not in the functions applied to it.
             </p>
             <p>
-              The statistical lesson is the one Homework 1 drew for scalar multiplication: the security of a key rests
+              The statistical lesson is the one Exercise 1 drew for scalar multiplication: the security of a key rests
               on the distribution of the secret input, which no statistic of the outputs can certify, and the
               experiments of this page illustrate it directly. Their wallets were generated, for reproducibility, from Mulberry32, a statistical
               generator whose whole state is one 32-bit integer: every wallet of Figure 8 is determined by the seed

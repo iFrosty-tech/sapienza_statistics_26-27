@@ -6,7 +6,8 @@
       To publish homework NN:
         1. Copy this folder to homework/NN/ (two digits, e.g. homework/03/).
         2. Add an entry with number NN to src/data/homeworks.js; the title, date,
-           topics and abstract in the page header come from that entry.
+           topics and abstract in the page header come from that entry, and its optional
+           label and shortLabel name the page (they never change its address).
         3. Replace every placeholder section below. Inline TeX goes in a span with the
            data-tex attribute, display TeX in a div with data-tex-display; both are
            rendered with KaTeX at build time.
@@ -14,7 +15,7 @@
            as in section 3 below; src/lib/probability-plot.js documents the markup contract.
     -->
     <!-- @include partials/head-meta.html -->
-    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
     <meta name="description" content="{{hw.abstract}}" />
     <script type="module" src="/src/homework.js"></script>
   </head>

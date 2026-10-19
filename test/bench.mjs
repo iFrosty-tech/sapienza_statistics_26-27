@@ -5,8 +5,10 @@
  * Homework 02: PBKDF2-HMAC-SHA512, the whole mnemonic-to-address pipeline,
  * Keccak-256 throughput and public-key derivation.
  */
-import { mul, G, N } from '../src/lib/secp256k1.js';
+import { mul, G, N, P, toJacobian, jacobianAddAffine } from '../src/lib/secp256k1.js';
 import { createRandom } from '../src/lib/random.js';
+import { babyStepGiantStep } from '../src/lib/restricted-key-attack.js';
+import { TOY_KEY_BITS } from '../src/lib/toy-ecc-encryption.js';
 import { pbkdf2HmacSha512 } from '../src/lib/sha512.js';
 import { keccak256 } from '../src/lib/keccak.js';
 import { deriveEthereumAccount, uncompressedPublicKey } from '../src/lib/ethereum.js';
@@ -43,6 +45,40 @@ console.log(`keccak256 on 1 MiB: ${keccakMs.toFixed(0)} ms → ${(1000 / keccakM
 const publicKeys = Array.from({ length: 2000 }, () => rnd.bytes(64));
 time('keccak256, 64-byte messages (public keys)', (i) => keccak256(publicKeys[i % publicKeys.length]), 20000);
 time('uncompressedPublicKey(k), 256-bit k', (i) => uncompressedPublicKey((BigInt(`0x${Buffer.from(messages[i]).toString('hex')}`) % (N - 1n)) + 1n), 200);
+
+/*
+ * Homework 2 (toy ECC encryption vs Caesar): the restricted-key attack.
+ * TOY_KEY_BITS is chosen so that a live brute force finishes in a browser
+ * worker in seconds. The incremental-addition rate below justifies the choice:
+ * at r additions/s, brute force of a bits-bit key costs ≈ 2^(bits−1)/r seconds
+ * on average, and baby-step giant-step costs ≈ 2·2^(bits/2) operations.
+ */
+{
+  const steps = 300000;
+  const Q = mul(G, 123456789n);
+  let acc = toJacobian(G);
+  let hits = 0;
+  const t = performance.now();
+  for (let j = 1; j <= steps; j += 1) {
+    if (acc.Z !== 0n) {
+      const z2 = (acc.Z * acc.Z) % P;
+      if ((Q.x * z2) % P === acc.X) hits += 1;
+    }
+    acc = jacobianAddAffine(acc, G);
+  }
+  const rate = (steps * 1000) / (performance.now() - t);
+  console.log(`\nsecp256k1 incremental add + projective compare: ${rate.toFixed(0)} ops/s (hits ${hits})`);
+  for (const bits of [20, 22, 24]) {
+    const avg = 2 ** (bits - 1) / rate;
+    console.log(`  brute force ${bits}-bit key: ~2^${bits - 1} ops, ~${avg.toFixed(1)} s average` +
+      `${bits === TOY_KEY_BITS ? '  ← TOY_KEY_BITS' : ''}`);
+  }
+  const k = 15485863n; // < 2^24
+  const b0 = performance.now();
+  const bsgs = babyStepGiantStep(mul(G, k), 24);
+  console.log(`  BSGS 24-bit key: ${bsgs.operations} ops in ${(performance.now() - b0).toFixed(0)} ms ` +
+    `(table ${bsgs.tableSize}), k ${bsgs.found ? 'recovered' : 'MISSED'}`);
+}
 
 /* Homework 02 experiments at their default sizes (opt-in, about a minute): node test/bench.mjs --experiments */
 if (process.argv.includes('--experiments')) {

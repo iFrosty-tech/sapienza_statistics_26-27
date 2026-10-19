@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw03.js"></script>
+  </head>
+  <body class="page page--homework"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Toy ECC encryption and decryption</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Caesar cipher</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Comparison of the two schemes</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Statistical cryptanalysis of the Caesar cipher</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Attack on the restricted key space</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Discussion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                Homework 2 — Using the toy cryptographic scheme based on the secp256k1 elliptic curve developed in Part 1
+                of the previous homework, encrypt and decrypt a simple message. Describe the main steps of the algorithm
+                and the role of the keys.
+              </p>
+              <p>
+                The Caesar Cipher: Implement the Caesar cipher to encrypt and decrypt the same message. Discuss the
+                similarities and differences between the two schemes, focusing on their encryption and decryption
+                procedures, key spaces, and statistical properties.
+              </p>
+              <p>
+                Statistical Cryptanalysis of the Caesar Cipher: Given a sufficiently large corpus of text in a known
+                language, design and implement a simple algorithm to recover the key of the Caesar cipher by exploiting
+                the statistical distribution of letters. Test the algorithm on ciphertexts of different lengths and
+                discuss its effectiveness and limitations.
+              </p>
+              <p>
+                Optional: Compare alternative approaches, such as exhaustive key search, letter-frequency analysis, and
+                n-gram scoring.
+              </p>
+              <p>
+                The toy scheme developed in Part 1 uses the secp256k1 elliptic curve but restricts the private key to a
+                small range to make experiments computationally feasible. Design and implement a simple attack to recover
+                the private key, or otherwise decrypt the message, exploiting this restricted key space. Discuss the
+                differences between this attack and the statistical attack against the Caesar cipher. Explain why the
+                same approach would not necessarily be feasible against a properly configured ECC scheme using a
+                sufficiently large private-key space.
+              </p>
+              <p>
+                Optional: Discuss alternative attacks and explain which weaknesses arise from the restricted key space and
+                which, if any, could arise from the design of the toy scheme itself.
+              </p>
+            </blockquote>
+            <p>
+              The assignment sets two ciphers side by side that fail for opposite reasons. The Caesar cipher has a key
+              space of 26 shifts, {{fig.keySpace.caesar.log2}} bits, and its ciphertext carries the letter statistics of
+              the plaintext almost intact; the toy elliptic-curve scheme produces ciphertexts that no simple statistic
+              distinguishes from random bytes, but its private key is drawn from
+              <span data-tex>[1, 2^{20}]</span>, a space of {{fig.keySpace.toy.log2}} bits against the
+              {{fig.keySpace.secp256k1.log2}} bits of a full secp256k1 key. The first is broken by statistical inference
+              from the ciphertext, the second by an exact search of the key space that never looks at the ciphertext at
+              all.
+            </p>
+            <p>
+              The page is organised as follows. §2 builds the toy public-key encryption scheme on the key generation
+              <span data-tex>Q = kG</span> of
+              <a href="{{base}}homework/01/">Exercise 1</a>
+              of Homework 1, encrypts and decrypts a message and describes the role of each key; §3 encrypts the same
+              message with the Caesar cipher; §4 compares the two schemes in their procedures, key spaces and statistical
+              properties. §5 designs and tests five estimators of the Caesar key on ciphertexts of 1 to 500 letters,
+              which answers the optional comparison of approaches. §6 recovers the private key of the toy scheme by three
+              searches of its restricted key space, contrasts this attack with the statistical one and explains why it
+              does not scale to a full-size key. §7, the optional part, separates the weaknesses due to the restricted key
+              space from those of the toy design and concludes. Every number on the page is computed when the page is
+              built, from the parameters and seeds listed in the appendix.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Toy ECC encryption and decryption</h2>
+
+            <h3 id="s2-1">2.1 Key generation and the restricted key space</h3>
+            <p>
+              The curve is secp256k1 of the SEC 2 standard: the points <span data-tex>(x, y)</span> with
+              <span data-tex>y^2 = x^3 + 7</span> over <span data-tex>\mathbb{F}_p</span>,
+              <span data-tex>p = 2^{256} - 2^{32} - 977</span>, together with the point at infinity
+              <span data-tex>O</span>, and a base point <span data-tex>G</span> of prime order
+              <span data-tex>n \approx 2^{256}</span> with cofactor 1, so that <span data-tex>G</span> generates the whole
+              group [<a href="#ref-2">2</a>, §2.4.1]. Part 1 of
+              <a href="{{base}}homework/01/">Exercise 1</a>
+              implemented the group law and the map from a private key to a public key: a private key is an integer
+              <span data-tex>k</span> and the public key is the point <span data-tex>Q = kG</span>, computed by
+              double-and-add. On secp256k1 the program of that exercise accepts any key in
+              <span data-tex>[1, n - 1]</span>, a 256-bit integer, as SEC 1 prescribes for key-pair generation
+              [<a href="#ref-1">1</a>, §3.2.1].
+            </p>
+            <p>
+              The toy scheme keeps the curve, the base point and the map <span data-tex>k \mapsto kG</span> unchanged and
+              restricts only the distribution of the private key:
+            </p>
+            <div class="equation" id="eq-keygen">
+              <div data-tex-display>
+                k \sim \mathrm{Uniform}\{1, 2, \dots, 2^{B}\}, \qquad Q = kG, \qquad B = 20 .
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              The key is drawn by taking <span data-tex>\lceil B/8 \rceil</span> random bytes, keeping their
+              <span data-tex>B</span> low-order bits and adding one, which gives an exactly uniform value with no modular
+              bias. The size <span data-tex>B = 20</span> is set by the cost of the simplest attack.
+              The brute-force walk of §6 runs at {{fig.attack.brute.rate}} group operations per second on the build
+              machine, so it recovers a {{fig.params.toyBits}}-bit key in {{fig.attack.brute.meanSecondsToy}} s on
+              average and in {{fig.attack.brute.worstSecondsToy}} s in the worst case: short enough for the attacks to run
+              live in a browser, long enough for their costs to be measured and to differ by orders of magnitude.
+              Nothing else in the scheme depends on <span data-tex>B</span>; the restriction is the designed weakness of
+              the exercise.
+            </p>
+
+            <h3 id="s2-2">2.2 Encryption</h3>
+            <p>
+              A key pair of this kind does not encrypt by itself: the scalar multiplication is a one-way map, not a cipher.
+              The scheme used here is hashed EC-ElGamal. ElGamal's public-key cryptosystem [<a href="#ref-3">3</a>] masks a
+              message with a Diffie–Hellman value shared between a fresh random exponent of the sender and the public key
+              of the receiver; transposed to the group of an elliptic curve, and with the shared value passed through a
+              hash function to produce a keystream, this is the structure of the Elliptic Curve Integrated Encryption
+              Scheme (ECIES) [<a href="#ref-1">1</a>, §5.1], [<a href="#ref-5">5</a>, §4.5.1]. The hash is Keccak-256, the
+              function of Ethereum examined in <a href="{{base}}homework/01/">Exercise 1</a>. To encrypt a message
+              <span data-tex>m</span>, a string of <span data-tex>\ell</span> bytes in UTF-8, to the public key
+              <span data-tex>Q</span>, the sender:
+            </p>
+            <ol>
+              <li>
+                draws an ephemeral scalar <span data-tex>r</span> uniformly from <span data-tex>[1, n - 1]</span>, by
+                rejection sampling of 32 random bytes, and computes the ephemeral point <span data-tex>R = rG</span>;
+              </li>
+              <li>computes the shared point <span data-tex>S = rQ</span>;</li>
+              <li>
+                derives a keystream from the compressed encoding of <span data-tex>S</span> (33 bytes: a prefix
+                <code>02</code> or <code>03</code> for the parity of <span data-tex>y</span>, then
+                <span data-tex>x</span> [<a href="#ref-1">1</a>, §2.3.3]) by Keccak-256 in counter mode, with a 4-byte
+                big-endian counter <span data-tex>\langle i \rangle_4</span> and the label <code>KS</code>:
+              </li>
+            </ol>
+            <div class="equation" id="eq-keystream">
+              <div data-tex-display>
+                K = \Big( H\big(\langle 0 \rangle_4 \,\|\, \texttt{KS} \,\|\, \mathrm{comp}(S)\big) \,\|\,
+                H\big(\langle 1 \rangle_4 \,\|\, \texttt{KS} \,\|\, \mathrm{comp}(S)\big) \,\|\, \cdots \Big)_{1 \dots \ell},
+                \qquad H = \text{Keccak-256};
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <ol start="4">
+              <li>masks the message with the keystream, byte by byte,</li>
+            </ol>
+            <div class="equation" id="eq-xor">
+              <div data-tex-display>
+                c = m \oplus K ;
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <ol start="5">
+              <li>and computes a key-confirmation tag over the shared point and the masked bytes,</li>
+            </ol>
+            <div class="equation" id="eq-tag">
+              <div data-tex-display>
+                t = H\big(\texttt{TAG} \,\|\, \mathrm{comp}(S) \,\|\, c\big) .
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              The ciphertext is the triple <span data-tex>(R, c, t)</span>: the compressed ephemeral point, the masked
+              bytes and the 32-byte tag. The ephemeral scalar <span data-tex>r</span> and the shared point
+              <span data-tex>S</span> are discarded. The worked example below follows the first encryption of Table 2 step
+              by step. Each byte of <span data-tex>c</span> is the exclusive or of a byte of the message with the byte of
+              the keystream in the same position: the first character, <code>M</code>, has the code <code>4d</code>, and
+              its exclusive or with the first keystream byte is the first ciphertext byte.
+            </p>
+            <div class="worked">
+              <div><span class="caption">Message</span><span class="worked__value">{{fig.repeat.message}}</span></div>
+              <div><span class="caption">Private key k, restricted to 1 … 2<sup>{{fig.params.toyBits}}</sup></span><span class="worked__value">{{fig.repeat.privateKey}}</span></div>
+              <div><span class="caption">Public key Q = kG, compressed</span><span class="worked__value">{{fig.repeat.publicKey}}</span></div>
+              <div><span class="caption">Ephemeral scalar r, hexadecimal</span><span class="worked__value">{{fig.repeat.ephemeral}}</span></div>
+              <div><span class="caption">Ephemeral point R = rG, compressed</span><span class="worked__value">{{fig.repeat.eccR1}}</span></div>
+              <div><span class="caption">Shared secret S = rQ = kR, abscissa</span><span class="worked__value">{{fig.repeat.sharedX}}</span></div>
+              <div><span class="caption">Keystream</span><span class="worked__value">{{fig.repeat.keystream}}</span></div>
+              <div><span class="caption">Ciphertext c</span><span class="worked__value">{{fig.repeat.eccC1}}</span></div>
+              <div><span class="caption">Key-confirmation tag</span><span class="worked__value">{{fig.repeat.eccTag1}}</span></div>
+            </div>
+
+            <h3 id="s2-3">2.3 Decryption and correctness</h3>
+            <p>
+              The receiver, who holds <span data-tex>k</span>, decodes <span data-tex>R</span> and rejects it unless it is
+              a point of the curve other than <span data-tex>O</span>; computes <span data-tex>S' = kR</span>; recomputes the
+              tag <span data-tex>H(\texttt{TAG} \,\|\, \mathrm{comp}(S') \,\|\, c)</span> and rejects the ciphertext if it
+              differs from <span data-tex>t</span>; and otherwise derives the keystream <span data-tex>K'</span> from
+              <span data-tex>S'</span> by (2) and returns <span data-tex>m = c \oplus K'</span>. Decryption is correct
+              because the receiver obtains the same point as the sender:
+            </p>
+            <div class="equation" id="eq-correct">
+              <div data-tex-display>
+                S' = kR = k(rG) = (kr)G = (rk)G = r(kG) = rQ = S ,
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              which uses only the fact, recalled in §2.2 of Exercise 1, that <span data-tex>k \mapsto kG</span> is a
+              homomorphism from <span data-tex>\mathbb{Z}/n\mathbb{Z}</span> to the group of the curve, together with the
+              commutativity of the product of integers. With <span data-tex>S' = S</span> the keystream is the same,
+              <span data-tex>(m \oplus K) \oplus K = m</span>, and the tag matches. A wrong private key gives a different
+              point, a different tag and a rejection rather than a garbled message; so does any change to
+              <span data-tex>c</span> or to <span data-tex>t</span>.
+            </p>
+
+            <h3 id="s2-4">2.4 The role of the keys</h3>
+            <ul>
+              <li>
+                <strong>The private key <span data-tex>k</span></strong> is the only long-term secret, held by the
+                receiver. It is needed for decryption, through <span data-tex>S = kR</span>, and for nothing else.
+                Recovering it from <span data-tex>Q</span> is the elliptic-curve discrete logarithm problem (ECDLP), and
+                the whole security of the scheme against an attacker who sees only public values rests on that problem
+                being hard.
+              </li>
+              <li>
+                <strong>The public key <span data-tex>Q = kG</span></strong> is published. Anyone can encrypt to it, and
+                it is the only information about <span data-tex>k</span> that leaves the receiver. Encryption needs no
+                shared secret, which is what makes the scheme asymmetric.
+              </li>
+              <li>
+                <strong>The ephemeral scalar <span data-tex>r</span></strong> is chosen by the sender for one message,
+                kept secret and discarded after encryption; only its trace <span data-tex>R = rG</span> is transmitted. It
+                randomises the encryption: two encryptions of the same message to the same key use different
+                <span data-tex>r</span>, hence different <span data-tex>S</span> and unrelated keystreams. It must be
+                secret, because anyone who knows <span data-tex>r</span> computes <span data-tex>S = rQ</span> without
+                <span data-tex>k</span>, and fresh, because a repeated <span data-tex>r</span> repeats the keystream (§7).
+              </li>
+              <li>
+                <strong>The shared point <span data-tex>S</span></strong> is never transmitted. The sender computes it as
+                <span data-tex>rQ</span> and the receiver as <span data-tex>kR</span>; an eavesdropper who sees
+                <span data-tex>Q</span> and <span data-tex>R</span> but neither scalar faces the elliptic-curve
+                Diffie–Hellman problem. The keystream and the tag are derived from it, with the labels
+                <code>KS</code> and <code>TAG</code> keeping the two uses apart.
+              </li>
+            </ul>
+            <p>
+              The panel below lets the reader generate a key pair with a restricted private key, encrypt a message of
+              their own, and follow each step of encryption and decryption with its intermediate values.
+            </p>
+            <div class="demo" data-demo="ecc" data-message="{{fig.repeat.message}}">
+              <p class="demo__fallback">
+                The interactive encryption panel runs in the online version of this page; the worked example above lists the same steps for
+                the message of Table 2.
+              </p>
+            </div>
+
+            <h3 id="s2-5">2.5 A teaching scheme, not ECIES</h3>
+            <p>
+              The scheme has the shape of ECIES but none of its guarantees, and it must not be used to protect anything.
+              Standard ECIES derives its keying material with a specified key derivation function
+              [<a href="#ref-1">1</a>, §3.6] and splits it into an encryption key and a separate key for a standard MAC
+              scheme [<a href="#ref-1">1</a>, §3.7, §5.1.3]; the toy scheme uses an ad hoc counter-mode hash for the
+              keystream and an ad hoc hash of the shared point and the ciphertext as tag, separated only by their labels.
+              Its arithmetic is written for readability with JavaScript integers of arbitrary size, with no attempt at
+              constant-time execution, so the time it takes depends on the bits of <span data-tex>k</span> and
+              <span data-tex>r</span>, the starting point of the timing and power-analysis attacks on implementations
+              [<a href="#ref-5">5</a>, §5.3]. A real deployment would use a full-range private key, a vetted
+              implementation of a standardised scheme, with a standard key derivation function, an authenticated
+              encryption or MAC algorithm with independent keys, validation of every received point
+              [<a href="#ref-1">1</a>, §3.2.2] and a cryptographically secure source of randomness for
+              <span data-tex>k</span> and <span data-tex>r</span> [<a href="#ref-1">1</a>, §3.10]; §7 returns to these
+              differences.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Caesar cipher</h2>
+            <p>
+              The Caesar cipher is the simplest additive substitution: every letter of the plaintext is replaced by the
+              letter a fixed number of places further along the alphabet, wrapping around from Z to A
+              [<a href="#ref-9">9</a>, Ch. 1]. Identifying the letters A, B, …, Z with the residues
+              <span data-tex>0, 1, \dots, 25</span> of <span data-tex>\mathbb{Z}/26\mathbb{Z}</span>, the key is a residue
+              <span data-tex>k</span>, and encryption and decryption are
+            </p>
+            <div class="equation" id="eq-caesar">
+              <div data-tex-display>
+                E_k(x) = (x + k) \bmod 26, \qquad D_k(y) = (y - k) \bmod 26, \qquad D_k(E_k(x)) = x .
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              The implementation shifts upper-case and lower-case letters within their own case and leaves every other
+              character unchanged: spaces, digits, punctuation and letters outside A–Z pass through as they are. A
+              Caesar ciphertext therefore keeps the case pattern, the word lengths and the punctuation of the
+              plaintext, which the n-gram and dictionary methods of §5 will exploit. The key <span data-tex>k = 0</span>
+              leaves the text unchanged, so of the 26 keys 25 actually encrypt. Encryption and decryption are the same
+              operation with opposite shifts, and both use the same key: the cipher is symmetric.
+            </p>
+            <p>
+              Under the key {{fig.repeat.caesarKey}}, the shift traditionally attributed to Caesar himself, the message of §2 becomes
+            </p>
+            <div class="worked">
+              <div><span class="caption">Message</span><span class="worked__value">{{fig.repeat.message}}</span></div>
+              <div><span class="caption">Key k</span><span class="worked__value">{{fig.repeat.caesarKey}}</span></div>
+              <div><span class="caption">Ciphertext E<sub>k</sub>(m)</span><span class="worked__value">{{fig.repeat.caesarCiphertext}}</span></div>
+              <div><span class="caption">Decryption D<sub>k</sub>(E<sub>k</sub>(m))</span><span class="worked__value">{{fig.repeat.message}}</span></div>
+            </div>
+            <p>
+              Each letter has moved {{fig.repeat.caesarKey}} places, M to P and E to H, and decryption moves it back. The
+              repeated letters of <code>MEET</code> remain repeated in <code>PHHW</code>: this is the whole weakness of the
+              cipher in miniature. The panel below encrypts and decrypts any text under a chosen shift.
+            </p>
+            <div class="demo" data-demo="caesar" data-message="{{fig.repeat.message}}" data-key="{{fig.repeat.caesarKey}}">
+              <p class="demo__fallback">
+                The interactive Caesar panel runs in the online version of this page; the example above shows the encryption and decryption of
+                the message of §2.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Comparison of the two schemes</h2>
+
+            <h3 id="s4-1">4.1 Encryption and decryption procedures</h3>
+            <p>
+              The two schemes share one structural feature. Both add a key-dependent mask to the plaintext symbol by
+              symbol and remove it by the inverse operation: the Caesar cipher adds the constant <span data-tex>k</span>
+              modulo 26 to every letter, and the toy scheme adds the keystream <span data-tex>K</span> modulo 2 to every
+              bit, by (3). In this sense the toy scheme is a stream cipher whose keystream is set up by a public-key key
+              agreement, and the Caesar cipher is a stream cipher whose keystream is a single symbol repeated. Everything
+              else differs.
+            </p>
+            <ul>
+              <li>
+                <strong>Symmetric against asymmetric.</strong> The Caesar cipher encrypts and decrypts with the same key,
+                which sender and receiver must share in advance. The toy scheme encrypts with the public key
+                <span data-tex>Q</span> and decrypts with the private key <span data-tex>k</span>; the sender needs no
+                secret except the ephemeral <span data-tex>r</span>, which it creates itself.
+              </li>
+              <li>
+                <strong>Deterministic against randomised.</strong> The Caesar cipher maps a message to the same ciphertext
+                every time; the toy scheme draws a fresh <span data-tex>r</span> for each encryption. Table 2 encrypts the
+                message of §2 twice under each scheme: the Caesar ciphertexts are identical, whereas the two toy
+                ciphertexts differ in the ephemeral point, in the tag and in {{fig.repeat.differingBits}} of the
+                {{fig.repeat.totalBits}} bits of <span data-tex>c</span>, close to the half expected of two independent
+                keystreams. An observer of the Caesar channel learns when a message is repeated; an observer of the toy
+                channel does not.
+              </li>
+              <li>
+                <strong>Alphabet and format.</strong> The Caesar cipher acts on the 26 letters and preserves everything
+                else, including the length, the word boundaries and the case. The toy scheme acts on bytes, so it encrypts
+                any data, and hides the word structure; it preserves only the length of the message in bytes and adds 65
+                bytes, the 33 of <span data-tex>R</span> and the 32 of <span data-tex>t</span>.
+              </li>
+              <li>
+                <strong>Integrity.</strong> A modified Caesar ciphertext decrypts to a modified plaintext without any
+                warning. The toy scheme rejects any ciphertext whose tag does not match the shared point (§2.3).
+              </li>
+              <li>
+                <strong>Cost.</strong> Caesar encryption costs one addition per letter. The toy scheme costs two scalar
+                multiplications to encrypt, <span data-tex>rG</span> and <span data-tex>rQ</span>, and one to decrypt,
+                <span data-tex>kR</span>, each of a few hundred group operations, plus one Keccak-256 evaluation per 32
+                bytes of message.
+              </li>
+            </ul>
+
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>The message of §2 encrypted twice under each scheme with the
+                same key: the Caesar cipher under the key {{fig.repeat.caesarKey}}, the toy scheme under the public key of
+                §2 with two independent ephemeral scalars. Hexadecimal values are truncated to 16 digits; both toy
+                ciphertexts decrypt to the message.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=repeated --></div>
+            </figure>
+
+            <h3 id="s4-2">4.2 Key spaces</h3>
+            <p>
+              Table 1 compares the number of keys. The Caesar cipher has 26 keys, about
+              2<sup>{{fig.keySpace.caesar.log2}}</sup>; the toy scheme has
+              <span data-tex>2^{20} = 1\,048\,576</span>, some forty thousand times more; a full
+              secp256k1 key ranges over <span data-tex>n - 1 \approx 2^{256}</span> values. The last column gives the
+              time a search of the whole space would take at the rates measured on this machine: the 26 Caesar keys,
+              each tried with the dictionary test of §5, in a fraction of a millisecond; the toy key space by the
+              brute-force walk of §6 in seconds; the full secp256k1 key space in a time that dwarfs the age of the
+              universe.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>Key spaces of the Caesar cipher, the toy scheme and
+                secp256k1 with a full-size key, with the time of an exhaustive search: for the Caesar cipher at the
+                measured rate of {{fig.caesar.exhaustiveRate}} candidate decryptions per second with the dictionary test,
+                for the elliptic-curve key spaces at the measured brute-force rate of {{fig.attack.brute.rate}} group
+                operations per second.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=keySpaces --></div>
+            </figure>
+            <p>
+              The size of the key space is necessary for security but far from sufficient. A general monoalphabetic
+              substitution, which replaces each letter by an arbitrary permutation of the alphabet, has
+              <span data-tex>26!</span> ≈ 2<sup>{{fig.keySpace.substitution.log2}}</sup> keys, more than a modern
+              128-bit cipher, and is still broken by hand from the letter frequencies [<a href="#ref-9">9</a>, Ch. 2]. The
+              Caesar cipher fails on both counts: its key space can be enumerated, and, as the next subsection shows, its
+              ciphertext tells which key is right. The toy scheme fails on the first count only.
+            </p>
+
+            <h3 id="s4-3">4.3 Statistical properties</h3>
+            <p>
+              Figure 1 takes a message of {{fig.compare.chars}} characters ({{fig.compare.letters}} letters) from the
+              held-out text of §5 and shows the histogram of its letters, of the letters of its Caesar ciphertext under
+              the key {{fig.compare.key}}, and of the bytes of its toy ciphertext. The Caesar histogram is the plaintext
+              histogram rotated by {{fig.compare.key}} places, bar for bar: the counts are the same numbers attached to
+              different letters. The toy histogram is flat, with the scatter expected of {{fig.compare.bytes}} draws from
+              256 equally likely values.
+            </p>
+            <p>
+              The index of coincidence summarises this contrast in one number. Introduced by Friedman
+              [<a href="#ref-4">4</a>], it is the probability that two symbols drawn at random without replacement from a
+              text are equal:
+            </p>
+            <div class="equation" id="eq-ic">
+              <div data-tex-display>
+                \mathrm{IC} = \frac{\sum_{i} n_i (n_i - 1)}{N (N - 1)} ,
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <p>
+              where <span data-tex>n_i</span> is the count of the <span data-tex>i</span>-th symbol and
+              <span data-tex>N = \sum_i n_i</span>. For a long text whose symbols follow the probabilities
+              <span data-tex>p_i</span> it tends to <span data-tex>\sum_i p_i^2</span>: {{fig.compare.ic.english}} for the
+              English letter frequencies of the training corpus, against <span data-tex>1/26 \approx</span>
+              {{fig.compare.ic.uniform26}} for uniformly distributed letters and <span data-tex>1/256 \approx</span>
+              {{fig.compare.ic.uniform256}} for uniformly distributed bytes. The index is invariant under any permutation
+              <span data-tex>\pi</span> of the symbols, because relabelling only reorders the terms of the sum: if the
+              ciphertext counts are <span data-tex>n'_{\pi(i)} = n_i</span>, then
+              <span data-tex>\sum_i n'_i (n'_i - 1) = \sum_i n_i (n_i - 1)</span>. A Caesar shift is the permutation
+              <span data-tex>\pi(i) = (i + k) \bmod 26</span>, so the Caesar ciphertext has exactly the index of its
+              plaintext, {{fig.compare.ic.caesarLetters}}, whatever the key.
+            </p>
+            <figure class="chart-figure" data-fig="letters" data-fig-kind="letters" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=letters --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>Letter and byte distributions of one message under both schemes
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The letter counts of the message and of its Caesar ciphertext under the key {{fig.compare.key}}, and the
+                  byte counts of its toy elliptic-curve ciphertext. The Caesar histogram is a cyclic shift of the plaintext
+                  histogram by {{fig.compare.key}} places, with the same index of coincidence
+                  {{fig.compare.ic.caesarLetters}}; the bytes of the toy ciphertext give
+                  <span data-tex>\chi^2</span> = {{fig.compare.eccBytesVsUniform256.statistic}} on
+                  {{fig.compare.eccBytesVsUniform256.df}} degrees of freedom against the uniform law
+                  ({{fig.compare.eccBytesVsUniform256.pEq}}).
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Characters</dt><dd>{{fig.compare.chars}}</dd></div>
+                  <div><dt>IC, plaintext</dt><dd>{{fig.compare.ic.plainLetters}}</dd></div>
+                  <div><dt>IC, Caesar</dt><dd>{{fig.compare.ic.caesarLetters}}</dd></div>
+                  <div><dt>IC, EC bytes</dt><dd>{{fig.compare.ic.eccBytes}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Message drawn from the held-out text; Caesar key and toy key pair from seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+            <p>
+              Table 3 adds Pearson's <span data-tex>\chi^2</span> tests. Against the English frequencies the Caesar
+              ciphertext gives <span data-tex>\chi^2</span> = {{fig.compare.caesarVsEnglish.statistic}} on
+              {{fig.compare.caesarVsEnglish.df}} degrees of freedom: its letters are nothing like English. Against the
+              English frequencies shifted by the key it gives {{fig.compare.caesarVsShiftedEnglish.statistic}}, exactly
+              the value of the plaintext against unshifted English, because the two comparisons involve the same pairs of
+              numbers. That value still rejects the null hypothesis ({{fig.compare.plainVsEnglish.pEq}}): with
+              {{fig.compare.letters}} letters the test detects the small but real difference between the letter
+              frequencies of one novelist and the average of six others. This is a first warning, taken up in §5, that the
+              <span data-tex>\chi^2</span> statistic is useful as a distance between a text and a language rather than as
+              a test of whether a text is English. The toy ciphertext, finally, is compatible with uniform bytes
+              ({{fig.compare.eccBytesVsUniform256.pEq}}), with an index of {{fig.compare.ic.eccBytes}}, although the UTF-8
+              bytes of its plaintext are as far from uniform as text can be (<span data-tex>\chi^2</span> =
+              {{fig.compare.plainBytesVsUniform256.statistic}}, index {{fig.compare.ic.plainBytes}}).
+            </p>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>Index of coincidence and Pearson χ² goodness-of-fit tests of
+                the message of Figure 1, of its Caesar ciphertext under the key {{fig.compare.key}} and of its toy
+                elliptic-curve ciphertext. The English reference is the letter distribution of the training corpus of §5.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=statistics --></div>
+            </figure>
+            <p>
+              The two outcomes have different explanations. The Caesar cipher is a fixed relabelling of the alphabet, so
+              it preserves the distribution of the plaintext up to that relabelling, and every statistic that does not
+              depend on the names of the letters, the index of coincidence first among them, survives encryption
+              unchanged. Recovering the key then amounts to finding the relabelling that turns the ciphertext
+              distribution back into the known distribution of the language, which is the subject of §5. The toy scheme
+              destroys the distribution of the plaintext under a modelling assumption: if Keccak-256 in counter mode
+              behaves as a random function of the shared point, the keystream is uniform and independent of the message,
+              and for every message <span data-tex>m</span> and every byte string <span data-tex>\gamma</span> of the same
+              length,
+            </p>
+            <div class="equation" id="eq-otp">
+              <div data-tex-display>
+                \Pr(c = \gamma \mid m) = \Pr(K = \gamma \oplus m) = 2^{-8\ell} ,
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              the argument of the one-time pad: the ciphertext has the same uniform distribution whatever the message.
+              Two remarks qualify this result. First, the assumption is an idealisation of the hash, not a property
+              proven of Keccak-256; the test of Table 3 is consistent with it but cannot prove it. Second, and more
+              important here, statistical indistinguishability from random says nothing about the size of the key space.
+              The ciphertext of Figure 1 was produced with a {{fig.params.toyBits}}-bit private key that §6 recovers in
+              a fraction of a second; its bytes look uniform because the keystream is derived from a uniformly random 256-bit
+              ephemeral scalar, not because the private key is strong.
+            </p>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Statistical cryptanalysis of the Caesar cipher</h2>
+
+            <h3 id="s5-1">5.1 The corpus</h3>
+            <p>
+              The known language is English, and its statistics are estimated from {{fig.corpus.trainingBooks}}
+              public-domain novels of the nineteenth century from Project Gutenberg [<a href="#ref-7">7</a>], by six
+              different authors: <cite>Pride and Prejudice</cite> by Jane Austen, <cite>A Tale of Two Cities</cite> by
+              Charles Dickens, <cite>Moby-Dick</cite> by Herman Melville, <cite>The Adventures of Sherlock Holmes</cite> by
+              Arthur Conan Doyle, <cite>Frankenstein</cite> by Mary Shelley and <cite>The Adventures of Tom Sawyer</cite> by
+              Mark Twain. Each text is stripped of the Project Gutenberg header, licence and footer, and normalised:
+              diacritics are removed, apostrophes inside words are dropped, every other run of non-letters becomes one
+              space and the letters are folded to upper case. The training corpus so obtained holds
+              {{fig.corpus.trainingLetters}} letters in {{fig.corpus.trainingWords}} words. From it are estimated the 26
+              letter frequencies, the counts of the {{fig.corpus.bigrams}} distinct bigrams and
+              {{fig.corpus.trigrams}} distinct trigrams found inside words, and a dictionary of the
+              {{fig.corpus.dictionaryWords}} most frequent words, which covers {{fig.corpus.dictionaryCoverage}} of the
+              word occurrences of the corpus.
+            </p>
+            <p>
+              The ciphertexts are drawn from a seventh book, never used for training, by a seventh author:
+              <cite>{{fig.corpus.heldoutTitle}}</cite> ({{fig.corpus.heldoutYear}}) by {{fig.corpus.heldoutAuthor}}, of which
+              the first {{fig.corpus.heldoutMaxChars}} normalised characters, {{fig.corpus.heldoutLetters}} letters, are
+              kept. Training and test texts are thus disjoint by construction, so that the success rates below are not
+              inflated by attacking the text on which the model was fitted; they measure the realistic situation of an
+              analyst whose model of the language comes from other texts. The books, their roles and the hashes that
+              identify them are listed in the appendix.
+            </p>
+
+            <h3 id="s5-2">5.2 Five estimators of the key</h3>
+            <p>
+              Let <span data-tex>y</span> be a ciphertext with <span data-tex>N</span> letters and let
+              <span data-tex>o_j</span> be the count of the letter <span data-tex>j</span> in it. Decrypting with the
+              candidate key <span data-tex>\kappa</span> moves the count of the ciphertext letter
+              <span data-tex>i + \kappa</span> to the plaintext letter <span data-tex>i</span>, so the candidate plaintext
+              has the counts <span data-tex>o^{(\kappa)}_i = o_{(i + \kappa) \bmod 26}</span>. Let
+              <span data-tex>p_i</span> be the English letter frequencies of the training corpus. Every method below
+              evaluates all 26 candidates and returns the best; they differ only in the criterion by which a candidate
+              plaintext is judged to be English [<a href="#ref-9">9</a>, Ch. 1].
+            </p>
+            <p>
+              <strong>Letter frequencies and the <span data-tex>\chi^2</span> distance.</strong> The first estimator
+              chooses the key whose candidate plaintext is closest to the English frequencies in Pearson's sense:
+            </p>
+            <div class="equation" id="eq-chi">
+              <div data-tex-display>
+                \hat\kappa_{\chi^2} = \arg\min_{\kappa} X^2(\kappa), \qquad
+                X^2(\kappa) = \sum_{i=0}^{25} \frac{\big(o^{(\kappa)}_i - N p_i\big)^2}{N p_i} .
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>
+              <strong>Multinomial maximum likelihood.</strong> If the letters of the plaintext are modelled as
+              independent draws from <span data-tex>p</span>, the probability of the ciphertext under the key
+              <span data-tex>\kappa</span> is <span data-tex>\prod_t p_{(y_t - \kappa) \bmod 26}</span>, and the
+              maximum-likelihood estimator maximises the log-likelihood
+            </p>
+            <div class="equation" id="eq-ll">
+              <div data-tex-display>
+                \hat\kappa_{\mathrm{ML}} = \arg\max_{\kappa} \ell(\kappa), \qquad
+                \ell(\kappa) = \sum_{i=0}^{25} o^{(\kappa)}_i \ln p_i
+                = -N \, H\big(q^{(\kappa)}, p\big) ,
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              where <span data-tex>q^{(\kappa)} = o^{(\kappa)} / N</span> is the empirical distribution of the candidate
+              plaintext and <span data-tex>H(q, p) = -\sum_i q_i \ln p_i</span> the cross-entropy. Since
+              <span data-tex>H(q, p) = H(q) + D(q \,\|\, p)</span>, and the entropy <span data-tex>H(q^{(\kappa)})</span>,
+              like the index of coincidence, does not depend on <span data-tex>\kappa</span>, maximising the likelihood
+              is the same as minimising the Kullback–Leibler divergence of the candidate plaintext from English. The two
+              letter-frequency estimators are therefore close relatives: the likelihood-ratio statistic
+              <span data-tex>G^2 = 2N\,D(q \,\|\, p)</span> and Pearson's <span data-tex>X^2</span> agree to second order
+              when <span data-tex>q</span> is close to <span data-tex>p</span>. They differ when the counts are small,
+              because <span data-tex>X^2</span> divides by the expected count <span data-tex>N p_i</span>: a single
+              J, Q, X or Z, with <span data-tex>p_i</span> below one per cent, contributes a large term, whereas in
+              <span data-tex>\ell</span> it contributes only a bounded <span data-tex>\ln p_i</span>.
+            </p>
+            <p>
+              <strong>N-gram scoring.</strong> The letter frequencies ignore the order of the letters. A bigram or trigram
+              model scores each candidate plaintext by the log-probability of its overlapping n-grams:
+            </p>
+            <div class="equation" id="eq-ngram">
+              <div data-tex-display>
+                \hat\kappa_{n} = \arg\max_{\kappa} \sum_{g \,\in\, \mathcal{G}_n(D_\kappa(y))} \ln \hat P(g), \qquad
+                \hat P(g) = \frac{c(g)}{T_n} \text{ if } c(g) &gt; 0, \quad
+                \hat P(g) = \frac{\varepsilon}{T_n} \text{ otherwise},
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>
+              where <span data-tex>\mathcal{G}_n(x)</span> is the multiset of n-grams of <span data-tex>x</span> that lie
+              inside a word, <span data-tex>c(g)</span> the count of <span data-tex>g</span> in the training corpus,
+              <span data-tex>T_n</span> the total number of training n-grams and
+              <span data-tex>\varepsilon</span> = {{fig.params.smoothing}} a pseudo-count that gives an n-gram never seen
+              in training a floor below every seen one, instead of probability zero. The score is a pseudo-likelihood:
+              it treats the overlapping n-grams as if they were independent, which they are not, but it ranks the
+              candidates well, which is all an estimator of the key needs. N-grams never span a space, because the
+              Caesar ciphertext keeps the word boundaries of the plaintext.
+            </p>
+            <p>
+              <strong>Exhaustive search with a dictionary.</strong> The last method is the plain search of the key
+              space: decrypt with each of the 26 keys and keep the candidate that looks most like English, judged by the
+              fraction of its words that belong to the dictionary of {{fig.corpus.dictionaryWords}} common words. Seen
+              this way, every method of this section is an exhaustive search: with 26 keys, enumeration is free, and the
+              whole difficulty lies in the criterion that recognises the plaintext. The four statistical criteria give
+              every candidate a graded score; the dictionary gives a coarse one, and many candidates of a short text tie
+              at zero.
+            </p>
+
+            <h3 id="s5-3">5.3 Experimental design</h3>
+            <p>
+              For each length <span data-tex>L</span> of a grid of 21 values from 1 to 500 letters,
+              {{fig.params.windows}} windows of exactly <span data-tex>L</span> letters are drawn from the held-out text,
+              each starting at a letter chosen uniformly at random and keeping the spaces between its words. Each window
+              is encrypted under a key drawn uniformly from <span data-tex>\{0, \dots, 25\}</span>, and all five methods
+              attack the same ciphertexts, so the comparison between methods is paired. A trial succeeds when the method's
+              best key is the true key. When several keys tie for the best score, as happens when a ciphertext has no
+              letter, no n-gram or no dictionary word, one of them is chosen uniformly at random, so that a method without
+              information scores the chance level <span data-tex>1/26 \approx</span> {{fig.caesar.baseline}} instead of
+              the bias of a fixed tie-breaking order; the rank of the true key is its mid-rank among tied scores, 1 being
+              the best. The success rate <span data-tex>\hat\pi = s/N_w</span> of <span data-tex>s</span> successes in
+              <span data-tex>N_w</span> = {{fig.params.windows}} trials carries the Wilson score interval
+              [<a href="#ref-10">10</a>]
+            </p>
+            <div class="equation" id="eq-wilson">
+              <div data-tex-display>
+                \frac{\hat\pi + \dfrac{z^2}{2N_w} \pm z \sqrt{\dfrac{\hat\pi(1 - \hat\pi)}{N_w} + \dfrac{z^2}{4N_w^2}}}{1 + \dfrac{z^2}{N_w}},
+                \qquad z = 1.96 ,
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              which, unlike the normal approximation <span data-tex>\hat\pi \pm z\sqrt{\hat\pi(1-\hat\pi)/N_w}</span>, stays
+              inside <span data-tex>[0, 1]</span> and does not shrink to zero width when the observed rate is 0 or 100%, the
+              rates that dominate this study at its two ends. The shortest length for a success rate of 95% (or 99%) is the smallest
+              <span data-tex>L</span> of the grid from which the rate stays at or above that level for every longer
+              length. Every window, key and tie-break comes from streams derived from the seed {{fig.params.seed}}.
+            </p>
+            <p>
+              The panel below applies the five methods to any ciphertext the reader types or pastes, and ranks the 26
+              keys under each of them.
+            </p>
+            <div class="demo" data-demo="cryptanalysis">
+              <p class="demo__fallback">
+                The interactive cryptanalysis panel runs in the online version of this page; Figures 2 and 3 and Table 4 report the same
+                methods on {{fig.params.windows}} ciphertexts per length.
+              </p>
+            </div>
+
+            <h3 id="s5-4">5.4 Results</h3>
+            <figure class="chart-figure" data-fig="success" data-fig-kind="success" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=success --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Success rate of key recovery against ciphertext length
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The share of {{fig.params.windows}} ciphertexts per length whose key each method recovers, with Wilson
+                  95% intervals as bands, on a logarithmic length axis. The chance level of a method that cannot separate
+                  the keys is 1/26 = {{fig.caesar.baseline}}.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>χ², 95% from</dt><dd>{{fig.caesar.chiSquare.l95}}</dd></div>
+                  <div><dt>Log-likelihood, 95% from</dt><dd>{{fig.caesar.logLikelihood.l95}}</dd></div>
+                  <div><dt>Bigram, 95% from</dt><dd>{{fig.caesar.bigram.l95}}</dd></div>
+                  <div><dt>Trigram, 95% from</dt><dd>{{fig.caesar.trigram.l95}}</dd></div>
+                </dl>
+                <p class="pplot__seed">{{fig.params.windows}} windows per length of the held-out text, uniform keys; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+            <p>
+              Figure 2 and Table 4 show the success rate of each method against the length of the ciphertext. All five
+              methods break the cipher with near certainty from a few dozen letters: from 50 letters every rate is at
+              least {{fig.caesar.chiSquare.L50.rate}}. They differ markedly on short texts. The bigram score reaches 95%
+              from {{fig.caesar.bigram.l95}} letters and 99% from {{fig.caesar.bigram.l99}}, the trigram score from
+              {{fig.caesar.trigram.l95}} and {{fig.caesar.trigram.l99}}; the two letter-frequency estimators need
+              {{fig.caesar.logLikelihood.l95}} letters for 95%, and for 99% the likelihood needs
+              {{fig.caesar.logLikelihood.l99}} and the <span data-tex>\chi^2</span> distance
+              {{fig.caesar.chiSquare.l99}}; the dictionary search reaches 95% from {{fig.caesar.exhaustive.l95}} letters
+              and 99% from {{fig.caesar.exhaustive.l99}}. At five letters, the length of a single word, the bigram score is
+              right {{fig.caesar.bigram.L5.rate}} of the time, the likelihood {{fig.caesar.logLikelihood.L5.rate}}, the
+              <span data-tex>\chi^2</span> distance {{fig.caesar.chiSquare.L5.rate}} and the dictionary
+              {{fig.caesar.exhaustive.L5.rate}}.
+            </p>
+            <p>
+              The shortest ciphertexts show what each criterion can see. A single letter carries no n-gram and almost
+              never a dictionary word, so the bigram and trigram scores tie on every key and fall to the chance level
+              ({{fig.caesar.bigram.L1.rate}} and {{fig.caesar.trigram.L1.rate}}). The letter-frequency estimators,
+              given one letter, choose the key that decrypts it to E, the most frequent letter of English, and succeed
+              exactly when the plaintext letter was E: {{fig.caesar.chiSquare.L1.rate}}, close to the frequency of E in
+              English text. A two-letter window contains a bigram only if it is a two-letter word, and a trigram never,
+              so the trigram score stays at chance up to <span data-tex>L = 2</span>
+              ({{fig.caesar.trigram.L2.rate}}) and catches up with the bigram score from about ten letters. Figure 3 shows
+              the same experiment through the mean rank of the true key: even where a method fails, the true key is
+              usually near the top, with a mean rank of {{fig.caesar.trigram.L5.rank}} for the trigram score and
+              {{fig.caesar.bigram.L5.rank}} for the bigram score at five letters, so that a short list of candidates
+              would almost always contain it.
+            </p>
+            <figure class="chart-figure" data-fig="rank" data-fig-kind="rank" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=rank --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Mean rank of the true key against ciphertext length
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The mean rank of the true key among the 26 candidates, 1 being the best and 13.5 the expectation without
+                  information. At <span data-tex>L = 5</span> the trigram score ranks the true key
+                  {{fig.caesar.trigram.L5.rank}} on average, the bigram score {{fig.caesar.bigram.L5.rank}}.
+                </p>
+                <p class="pplot__seed">The ciphertexts of Figure 2; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>Success rate of each method at selected lengths, in per cent,
+                with Wilson 95% intervals, and the shortest lengths from which each method succeeds in at least 95% and
+                99% of the trials at every longer length of the grid; {{fig.params.windows}} ciphertexts per length.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=caesarSummary --></div>
+            </figure>
+
+            <h3 id="s5-5">5.5 Effectiveness and limitations</h3>
+            <p>
+              The attack is effective because the cipher leaves the statistics of the plaintext intact and the key has
+              very little to hide. A back-of-the-envelope count makes this precise. Under the unigram model of the
+              training corpus a letter of English carries an entropy of {{fig.corpus.letterEntropy}} bits, against the
+              <span data-tex>\log_2 26 \approx 4.70</span> bits of a uniformly random letter; each letter of ciphertext
+              therefore supplies about {{fig.corpus.redundancy}} bits of evidence about the shift, and the
+              <span data-tex>\log_2 26</span> bits of the key are exhausted after about {{fig.corpus.unicity}} letters.
+              The letter-frequency estimators indeed become reliable from one to two dozen letters, while the n-gram
+              scores, which also exploit the dependence between neighbouring letters, a much larger source of
+              redundancy, need fewer. The limitations follow from the same count.
+            </p>
+            <ul>
+              <li>
+                <strong>Very short texts.</strong> Below about ten letters no method is reliable, because the ciphertext
+                does not contain enough information to single out one key; several keys then give plausible plaintexts
+                and the estimator can only rank them (Figure 3). Short English words that are themselves shifts of other
+                words make the ambiguity concrete: <code>ADD</code> and <code>BEE</code> differ by a shift of 1,
+                <code>CHEER</code> and <code>JOLLY</code> by a shift of 7.
+              </li>
+              <li>
+                <strong>Unusual texts.</strong> The estimators assume that the plaintext follows the frequencies of the
+                corpus. A lipogram written without the letter E, a list of proper names, a text full of abbreviations or a
+                message in another language violates that assumption, and the letter-frequency methods, which rely on a
+                handful of dominant letters, are the most exposed; the n-gram scores degrade more gracefully, because they
+                rest on many weak constraints rather than a few strong ones. Digits and punctuation are not encrypted at
+                all and leak directly.
+              </li>
+              <li>
+                <strong>Mismatch between corpus and target.</strong> The held-out novel differs significantly from the
+                training average (<span data-tex>\chi^2</span> = {{fig.compare.plainVsEnglish.statistic}},
+                {{fig.compare.plainVsEnglish.pEq}}, §4.3), yet the key is recovered with near certainty from a few dozen
+                letters. Recovery does not require the plaintext to fit the model, only that the true decryption fit it
+                better than the 25 wrong ones, a much weaker condition: the wrong decryptions are shifted profiles, far
+                from any language. A model trained on modern technical prose or on another language would degrade the
+                short-text rates, not the long-text ones.
+              </li>
+              <li>
+                <strong>Validity of the <span data-tex>\chi^2</span> approximation.</strong> The asymptotic
+                <span data-tex>\chi^2_{25}</span> law of Pearson's statistic requires expected counts of the order of five
+                or more in every cell, which for the rarest letters means thousands of letters. In this attack the
+                statistic is used only as a distance to be minimised, so its distribution is irrelevant to the choice of
+                the key; but its p-values would be meaningless at the lengths that matter, and its division by tiny
+                expected counts makes it oversensitive to a single rare letter, which is why it trails the likelihood
+                below 50 letters.
+              </li>
+              <li>
+                <strong>Ties.</strong> A criterion that cannot separate the keys returns a tie, not an answer. The
+                dictionary search suffers most: at short lengths most candidates contain no dictionary word, and its rate
+                is the lowest of the five from 2 to 15 letters.
+              </li>
+              <li>
+                <strong>Cost.</strong> Cost is no limitation. One complete search of the 26 keys with the dictionary test
+                takes about {{fig.caesar.exhaustiveMicroseconds}} µs on a 100-letter ciphertext, and the statistical
+                criteria are cheaper still. With 26 keys the obstacle to exhaustive search is never the enumeration; it is
+                recognising the right plaintext when it appears.
+              </li>
+            </ul>
+
+            <h3 id="s5-6">5.6 Comparison of the approaches</h3>
+            <p>
+              The optional comparison of exhaustive key search, letter-frequency analysis and n-gram scoring has a clear
+              outcome on this corpus. N-gram scoring is the most efficient criterion, because it uses the dependence
+              between adjacent letters, which the letter frequencies discard: there are {{fig.corpus.bigrams}} distinct
+              bigrams in the training corpus against 26 letters, and a wrong shift produces improbable pairs almost at
+              once. The bigram score is the best from two letters on, and the trigram score comes within a percentage point of
+              it from about ten letters; the trigram model, with {{fig.corpus.trigrams}} distinct trigrams estimated from the same corpus,
+              is sparser, needs words of at least three letters and leans more on the smoothing floor. Among the
+              letter-frequency methods the likelihood, the optimal estimator under its own model, matches the
+              <span data-tex>\chi^2</span> distance on the shortest texts and is clearly better from about eight letters. The exhaustive search with a dictionary is
+              the weakest at short lengths and as good as the others from about 50 letters: its criterion is binary at
+              the level of a word, and it fails on texts whose words are rare. The comparison also shows that the three
+              approaches are not alternatives so much as components: the key space is always searched exhaustively, and
+              letter frequencies, n-grams and dictionaries are three ways of recognising the plaintext, of increasing
+              precision per letter and decreasing robustness to unusual text. One caveat applies to every result of this
+              section: the ciphertexts keep the spaces between words. A ciphertext stripped of spaces, as classical
+              practice wrote it in groups of five letters, would remove the word boundaries on which the n-gram and
+              dictionary criteria rely, a case this study does not measure.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Attack on the restricted key space</h2>
+
+            <h3 id="s6-1">6.1 Three searches of the key space</h3>
+            <p>
+              The attacker knows the curve, the base point <span data-tex>G</span>, the public key
+              <span data-tex>Q</span> and the fact that <span data-tex>k \in [1, 2^{b}]</span>, with
+              <span data-tex>b = B = 20</span> for the scheme of §2. The problem is the discrete
+              logarithm of <span data-tex>Q</span> restricted to an interval of width
+              <span data-tex>w = 2^{b}</span>. Its solution is unique: <span data-tex>k \mapsto kG</span> is injective on
+              <span data-tex>[1, n - 1]</span> and <span data-tex>2^{b} &lt; n</span>. Three generic algorithms, which use
+              nothing but the group operation and the comparison of points, were implemented.
+            </p>
+            <p>
+              <strong>Brute force.</strong> The walk <span data-tex>P_1 = G</span>,
+              <span data-tex>P_{j+1} = P_j + G</span> visits <span data-tex>G, 2G, 3G, \dots</span> and stops when
+              <span data-tex>P_j = Q</span>, which happens at <span data-tex>j = k</span> after
+              <span data-tex>k - 1</span> additions. For a uniform key the expected cost is
+              <span data-tex>(2^{b} - 1)/2 \approx 2^{b-1}</span> additions, with constant memory. The implementation
+              keeps <span data-tex>P_j</span> in Jacobian coordinates and compares it with <span data-tex>Q</span>
+              projectively, which avoids a field inversion per step.
+            </p>
+            <p>
+              <strong>Baby-step giant-step.</strong> Shanks' method trades memory for time. With
+              <span data-tex>m = \lceil 2^{b/2} \rceil</span>, every key in the interval can be written
+              <span data-tex>k = im + j</span> with <span data-tex>0 \le i &lt; m</span> and
+              <span data-tex>1 \le j \le m</span>. The baby steps store the points <span data-tex>G, 2G, \dots, mG</span>
+              in a hash table; the giant steps compute <span data-tex>Q, Q - mG, Q - 2mG, \dots</span> until one of them is
+              found in the table, since
+            </p>
+            <div class="equation" id="eq-bsgs">
+              <div data-tex-display>
+                Q - i(mG) = jG \iff Q = (im + j)G \iff k = im + j .
+              </div>
+              <span class="equation__no">(13)</span>
+            </div>
+            <p>
+              The table costs <span data-tex>m - 1</span> additions and the giant steps
+              <span data-tex>m/2</span> on average, about <span data-tex>1.5 \cdot 2^{b/2}</span> operations in all, but
+              the table holds <span data-tex>m</span> points: <span data-tex>2^{10} = 1024</span> for a 20-bit key.
+            </p>
+            <p>
+              <strong>Pollard's kangaroo.</strong> Pollard's lambda method [<a href="#ref-6">6</a>] keeps the square-root
+              time of baby-step giant-step with constant memory. A tame kangaroo starts at the known point
+              <span data-tex>2^{b} G</span> and makes jumps <span data-tex>P \mapsto P + s_{h(P)} G</span>, where the
+              class <span data-tex>h(P)</span> of the current point, computed from its abscissa, selects one of a small
+              set of jump sizes whose mean is about <span data-tex>\sqrt{w}/2</span>; after a fixed number of jumps it
+              stops and sets a trap at its final point, of known logarithm <span data-tex>2^{b} + d_{\mathrm{tame}}</span>,
+              where <span data-tex>d_{\mathrm{tame}}</span> is the distance it has travelled. A wild kangaroo starts at
+              <span data-tex>Q</span> and jumps by the same rule. Because each jump depends only on the current point,
+              once the wild kangaroo lands on any point of the tame path it follows that path to the trap, and then
+            </p>
+            <div class="equation" id="eq-kangaroo">
+              <div data-tex-display>
+                Q + d_{\mathrm{wild}}\,G = \big(2^{b} + d_{\mathrm{tame}}\big)\,G
+                \quad \Longrightarrow \quad k = 2^{b} + d_{\mathrm{tame}} - d_{\mathrm{wild}} .
+              </div>
+              <span class="equation__no">(14)</span>
+            </div>
+            <p>
+              The expected cost is of the order of <span data-tex>\sqrt{w}</span> jumps, with memory for two points. The
+              implementation runs the tame kangaroo for <span data-tex>4\sqrt{w}</span> jumps and restarts with a new
+              assignment of the jumps when the wild kangaroo overshoots the trap, which makes it reliable at the price of a larger constant.
+            </p>
+            <figure class="chart-figure" data-fig="attack" data-fig-kind="attack" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas" data-fig-canvas><!-- @figure id=attack --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>Cost of the attacks on the restricted key space against the key size
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The number of group operations each attack spends to recover a private key uniform on
+                  <span data-tex>[1, 2^{b}]</span>, on a logarithmic scale, with the range over {{fig.params.keysPerBits}}
+                  random keys per key size and the least-squares line of <span data-tex>\log_2</span> of the mean on
+                  <span data-tex>b</span>. A slope of 1 means a cost proportional to the size of the key space, a slope of
+                  1/2 a cost proportional to its square root. Every key was recovered and checked.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Slope, brute force</dt><dd>{{fig.attack.brute.slope}}</dd></div>
+                  <div><dt>Slope, BSGS</dt><dd>{{fig.attack.bsgs.slope}}</dd></div>
+                  <div><dt>Slope, kangaroo</dt><dd>{{fig.attack.kangaroo.slope}}</dd></div>
+                  <div><dt>Brute force, op/s</dt><dd>{{fig.attack.brute.rate}}</dd></div>
+                </dl>
+                <p class="pplot__seed">{{fig.params.keysPerBits}} keys per size, private keys uniform on 1 … 2<sup>b</sup>; seed {{fig.params.seed}}.</p>
+              </figcaption>
+              <p class="visually-hidden" data-fig-status aria-live="polite"></p>
+            </figure>
+            <p>
+              Figure 4 measures the three attacks on {{fig.params.keysPerBits}} random keys of each size, up to
+              {{fig.params.bruteMaxBits}} bits for brute force, {{fig.params.kangarooMaxBits}} for the kangaroo and
+              {{fig.params.bsgsMaxBits}} for baby-step giant-step. The fitted slopes of <span data-tex>\log_2</span> of the
+              mean cost on <span data-tex>b</span> are {{fig.attack.brute.slope}} for brute force,
+              {{fig.attack.bsgs.slope}} for baby-step giant-step and {{fig.attack.kangaroo.slope}} for the kangaroo, with
+              correlations of {{fig.attack.brute.r}}, {{fig.attack.bsgs.r}} and {{fig.attack.kangaroo.r}}: the predicted
+              exponents 1 and 1/2. The brute-force slope falls short of 1 by more than the others fall from 1/2 because
+              its cost, <span data-tex>k - 1</span>, is itself uniform, and the mean of
+              {{fig.params.keysPerBits}} uniform values has a relative standard deviation of about 20%; the square-root
+              methods vary much less from key to key. The intercepts reflect the constants: baby-step giant-step is close
+              to its <span data-tex>1.5 \cdot 2^{b/2}</span>, the kangaroo, with its long tame walk and its restarts,
+              spends several times more. In time the ranking is tempered by the cost per operation: the brute-force walk
+              runs at {{fig.attack.brute.rate}} operations per second, baby-step giant-step, whose affine additions each
+              need an inversion and a hash lookup, at {{fig.attack.bsgs.rate}}, and the kangaroo at
+              {{fig.attack.kangaroo.rate}}.
+            </p>
+
+            <h3 id="s6-2">6.2 Recovering the key of §2 and decrypting the message</h3>
+            <p>
+              Applied to the public key of §2, baby-step giant-step returns
+              <span data-tex>k</span> = {{fig.demo.k}} after {{fig.demo.bsgsOperations}} group operations; brute force
+              finds it after {{fig.demo.bruteOperations}} additions, one fewer than the key itself, and the kangaroo after
+              {{fig.demo.kangarooOperations}} operations. The result is certain: the attacker checks that
+              <span data-tex>kG = Q</span>, which holds for exactly one key. The message then follows by the receiver's
+              own decryption of §2.3: <span data-tex>S = kR</span>, the tag is verified, and the keystream removed from
+              <span data-tex>c</span> gives <code>{{fig.demo.message}}</code>. Once <span data-tex>k</span> is known, every
+              message ever encrypted to <span data-tex>Q</span>, past or future, is readable in the same way: the
+              scheme has no forward secrecy. The panel below runs the three attacks in a background thread on a
+              freshly generated key and decrypts the message when the key is found.
+            </p>
+            <div class="demo" data-demo="key-recovery" data-message="{{fig.repeat.message}}" data-rate-brute="{{fig.attack.brute.rate}}" data-rate-bsgs="{{fig.attack.bsgs.rate}}" data-rate-kangaroo="{{fig.attack.kangaroo.rate}}">
+              <p class="demo__fallback">
+                The interactive key-recovery panel runs in the online version of this page; the recovery of the key of §2 is reported above
+                and the cost of the three attacks in Figure 4.
+              </p>
+            </div>
+
+            <h3 id="s6-3">6.3 Decrypting without the private key</h3>
+            <p>
+              The assignment also allows an attack that decrypts the message otherwise. Recovering
+              <span data-tex>k</span> is one way to obtain the shared point; recovering the ephemeral scalar is another,
+              since <span data-tex>S = rQ</span>. With the full-range <span data-tex>r</span> of §2.2 this is as hard as
+              the full ECDLP, but if the scheme were implemented with an ephemeral scalar restricted like the private key,
+              the same searches would find <span data-tex>r</span> from <span data-tex>R</span> whatever the size of
+              <span data-tex>k</span>. The study demonstrates this with a private key of 254 bits, far beyond any search,
+              and an ephemeral scalar restricted to {{fig.demo.ephemeralBits}} bits: baby-step giant-step on
+              <span data-tex>R</span> returns <span data-tex>r</span> = {{fig.demo.ephemeral}} after
+              {{fig.demo.ephemeralOperations}} operations, and <span data-tex>S = rQ</span> decrypts the ciphertext to
+              <code>{{fig.demo.ephemeralMessage}}</code>. This attack exploits a design error, not the restricted private
+              key, and §7 classifies it accordingly.
+            </p>
+
+            <h3 id="s6-4">6.4 Differences from the statistical attack on the Caesar cipher</h3>
+            <ul>
+              <li>
+                <strong>What the attack uses.</strong> The Caesar attack uses the ciphertext and a statistical model of
+                the language, and nothing else. The attack on the toy scheme uses neither: it needs only the public key
+                <span data-tex>Q</span> and the base point <span data-tex>G</span>, both public before any message is
+                sent, and the ciphertext is consulted only after the key has been found, to read the message. It works on
+                messages in any language, on random bytes, and before the first message exists.
+              </li>
+              <li>
+                <strong>What is exploited.</strong> The Caesar attack exploits a leak: the cipher preserves the
+                distribution of the plaintext (§4.3). The attack on the toy scheme exploits no leak at all; the ciphertext
+                is statistically indistinguishable from random bytes, and the public key is a point of the curve like any
+                other. It exploits only the smallness of the space in which the key was chosen.
+              </li>
+              <li>
+                <strong>The nature of the answer.</strong> The Caesar attack is statistical inference: it returns the
+                most plausible key, which is wrong with a probability that depends on the length of the ciphertext and on
+                how well the language model fits it (§5.4), and its answer can only be judged by reading the decryption.
+                The attack on the toy scheme is a search verified by an exact algebraic check, <span data-tex>kG = Q</span>:
+                it either finds the key, with certainty, or has not finished. Its running time is random, its answer is
+                not.
+              </li>
+              <li>
+                <strong>How the cost scales.</strong> The cost of the Caesar attack does not grow with anything: the key
+                space is fixed at 26. The cost of the attack on the toy scheme grows exponentially with the key size, as
+                <span data-tex>2^{b/2}</span> for the best of the three methods, and this growth is what a properly
+                configured scheme relies on.
+              </li>
+            </ul>
+
+            <h3 id="s6-5">6.5 Why the attack does not scale to a full-size key</h3>
+            <p>
+              Table 5 extrapolates the fitted lines of Figure 4 to keys of 128 and 256 bits. A full secp256k1 key is
+              uniform on <span data-tex>[1, n - 1]</span>, so the interval is the whole group. Brute force would need
+              about <span data-tex>2^{255}</span> additions; baby-step giant-step about <span data-tex>2^{128}</span>
+              operations and a table of <span data-tex>2^{128}</span> points, a memory requirement that alone rules it out;
+              the kangaroo, by its theoretical cost, about <span data-tex>2^{129}</span> operations. On the full group the best known method is
+              Pollard's rho [<a href="#ref-6">6</a>], which needs about <span data-tex>\sqrt{\pi n/2}</span> group
+              operations with negligible memory, and <span data-tex>\sqrt{\pi n/4}</span> ≈ 2<sup>{{fig.attack.rho.log2}}</sup>
+              when the negation map is used to identify each point with its negative [<a href="#ref-5">5</a>, §4.1.2].
+            </p>
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>The fitted cost of each attack of Figure 4 extrapolated to
+                128- and 256-bit keys, beside its theoretical expectation, and Pollard's rho on the full secp256k1 group;
+                times at the rate measured for each attack on the build machine and at
+                {{fig.attack.fastRate}} group operations per second.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=attackCost --></div>
+            </figure>
+            <p>
+              These numbers are not an artefact of slow code. At the rate of the brute-force walk measured here, Pollard's
+              rho on secp256k1 would take {{fig.attack.rho.yearsMeasured}}; at {{fig.attack.fastRate}} operations per
+              second, a rate far beyond any single machine, it would take {{fig.attack.rho.yearsFast}}, about
+              {{fig.attack.rho.universeAges}} times the age of the universe of roughly 13.8 billion years.
+              Parallelisation divides the time by the number of processors and no more [<a href="#ref-5">5</a>, §4.1.2], so
+              even a billion such machines leave the attack out of reach. Nor can a cleverer generic algorithm be expected:
+              Shoup proved that any generic algorithm for the discrete logarithm in a group whose order has a largest
+              prime factor <span data-tex>p</span> needs of the order of <span data-tex>\sqrt{p}</span> group operations
+              [<a href="#ref-8">8</a>], and the order of secp256k1 is itself a prime close to <span data-tex>2^{256}</span>.
+              Faster, non-generic attacks are known only for special classes of curves, which secp256k1 avoids
+              [<a href="#ref-5">5</a>, §4.1.4]. The gap between the toy scheme and the real one is therefore the gap
+              between <span data-tex>2^{10}</span> and <span data-tex>2^{128}</span> operations, a factor of
+              <span data-tex>2^{118}</span>.
+            </p>
+            <p>
+              The assignment's wording, that the approach would not <em>necessarily</em> be feasible, is apt. A full-size
+              key space removes the generic search, and nothing else: a properly sized key that is generated from a weak
+              random source, reused across protocols or leaked through the implementation can still be recovered, by
+              attacks that §7 separates from the ones above.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Discussion</h2>
+
+            <h3 id="s7-1">7.1 Weaknesses that arise from the restricted key space</h3>
+            <p>
+              The attacks of §6 depend on the restricted key space and on nothing else; they would apply unchanged to a
+              flawless implementation of standard ECIES with a {{fig.params.toyBits}}-bit private key. Three further
+              consequences of the restriction are worth stating.
+            </p>
+            <ul>
+              <li>
+                <strong>Precomputation reusable across users.</strong> The baby-step table depends only on
+                <span data-tex>G</span> and <span data-tex>b</span>, not on the victim. An attacker who stores all
+                <span data-tex>2^{20}</span> multiples <span data-tex>jG</span>, about
+                {{fig.keySpace.toy.tableMB}} MB of compressed points, recovers the key of any user by one table lookup, and
+                every user of the scheme falls at the cost of the first. A table of intermediate size trades storage for
+                the giant steps that remain per user.
+              </li>
+              <li>
+                <strong>Collisions between users.</strong> With <span data-tex>2^{20}</span>
+                possible keys, the birthday bound gives an even chance that two of about
+                {{fig.keySpace.toy.birthday}} independent users share a private key, and so can read each other's
+                messages without any computation, as soon as they notice that their public keys are equal.
+              </li>
+              <li>
+                <strong>No forward secrecy.</strong> Every message sent to <span data-tex>Q</span> is protected by the same
+                <span data-tex>k</span>; a key found by a search, today or years later, opens the whole history.
+              </li>
+            </ul>
+
+            <h3 id="s7-2">7.2 Weaknesses that arise from the design of the toy scheme</h3>
+            <p>
+              Other weaknesses would survive a full-size private key, because they belong to the construction of §2
+              rather than to the distribution of <span data-tex>k</span>.
+            </p>
+            <ul>
+              <li>
+                <strong>A restricted or predictable ephemeral scalar.</strong> The security of each message rests as much
+                on <span data-tex>r</span> as on <span data-tex>k</span>. §6.3 recovered a {{fig.demo.ephemeralBits}}-bit
+                ephemeral from <span data-tex>R</span> in {{fig.demo.ephemeralOperations}} operations although the
+                private key had 254 bits; an ephemeral drawn from a weak or seeded generator is just as fatal. The library
+                draws <span data-tex>r</span> from the full range with the cryptographic generator of the host, but
+                nothing in the ciphertext format protects against an implementation that does not.
+              </li>
+              <li>
+                <strong>A reused ephemeral scalar.</strong> Two messages encrypted with the same <span data-tex>r</span>
+                share <span data-tex>R</span>, <span data-tex>S</span> and the keystream, so
+                <span data-tex>c_1 \oplus c_2 = m_1 \oplus m_2</span>: the keystream cancels, and the two plaintexts can be
+                separated with the language statistics of §5. Ephemeral reuse turns the toy scheme back into a problem of
+                statistical cryptanalysis, the kind of attack its random keystream was meant to rule out.
+              </li>
+              <li>
+                <strong>An ad hoc integrity check.</strong> Without the tag, the scheme would be malleable: flipping a bit
+                of <span data-tex>c</span> flips the same bit of the decrypted message, undetected. The tag of (4) detects
+                such changes, but it is a hash of the secret and the data rather than a standard MAC with an independent
+                key [<a href="#ref-1">1</a>, §3.7], and its security is argued only informally. It confirms that the sender
+                knew <span data-tex>S</span>, not who the sender was: anyone can encrypt to <span data-tex>Q</span>, so
+                anyone can produce a ciphertext with a valid tag. Public-key encryption alone gives confidentiality, not
+                authentication of the origin.
+              </li>
+              <li>
+                <strong>Key derivation without a standard function.</strong> The keystream and the tag are derived from
+                the same input, the compressed shared point, separated only by the labels <code>KS</code> and
+                <code>TAG</code>, by a construction specified on this page alone; standard ECIES uses a specified key
+                derivation function and independent keys for encryption and authentication
+                [<a href="#ref-1">1</a>, §3.6, §5.1.3].
+              </li>
+              <li>
+                <strong>Point validation.</strong> A scheme that combined its private key with an unchecked received point
+                would be exposed to invalid-curve and small-subgroup attacks, in which a crafted point reveals
+                <span data-tex>k</span> modulo small numbers. The implementation is not exposed here: every point it
+                receives, <span data-tex>Q</span> or <span data-tex>R</span>, is either decoded from its compressed form,
+                which yields a point of secp256k1 or an error, or given by its coordinates; in both cases it is checked to
+                lie on the curve, and the point at infinity is rejected. Because the cofactor of secp256k1 is 1, every other point of the curve has the prime order
+                <span data-tex>n</span>, and these checks amount to the full public-key validation of SEC 1
+                [<a href="#ref-1">1</a>, §3.2.2].
+              </li>
+              <li>
+                <strong>Side channels.</strong> The arithmetic is not constant-time: the double-and-add multiplication by
+                <span data-tex>k</span> and <span data-tex>r</span> takes a time that depends on their bits, and the
+                implementation makes no attempt to resist timing or power analysis [<a href="#ref-5">5</a>, §5.3].
+              </li>
+              <li>
+                <strong>Length.</strong> The ciphertext has exactly the length of the message, which is therefore
+                revealed; the Caesar cipher shares this property.
+              </li>
+            </ul>
+            <p>
+              The distinction matters for the conclusion of §6. Enlarging the private key to its full 256 bits removes
+              the weaknesses of §7.1 and none of those of §7.2; a real system needs both a full key space and a sound
+              construction and implementation.
+            </p>
+
+            <h3 id="s7-3">7.3 Conclusion</h3>
+            <p>
+              The Caesar cipher and the toy elliptic-curve scheme are both insecure, for complementary reasons. The Caesar
+              cipher is a relabelling of the alphabet: it preserves the distribution of the plaintext, its index of
+              coincidence exactly, and its 26 keys are recovered by statistical inference from the ciphertext alone. On
+              ciphertexts from a held-out novel the bigram score identifies the key in 95% of cases from
+              {{fig.caesar.bigram.l95}} letters, and every method studied does so from {{fig.caesar.chiSquare.l95}}
+              letters; the limits of the attack are those of the information in short or unusual texts, not of
+              computation. The toy scheme, hashed EC-ElGamal on secp256k1, produces ciphertexts indistinguishable from
+              random bytes and is randomised, but its private key lies in a space of
+              <span data-tex>2^{20}</span> values; generic searches recover it from the public key
+              alone, exactly and with a cost growing as <span data-tex>2^{b/2}</span>, in {{fig.demo.bsgsOperations}} group
+              operations by baby-step giant-step. The same searches on a full 256-bit key would need some
+              <span data-tex>2^{128}</span> operations, which no foreseeable computation can perform. Statistical
+              properties of the ciphertext, the subject of the comparison, thus decide the fate of the classical cipher
+              and say nothing about the modern one, whose security rests on the size of its key space and on the
+              soundness of its construction.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure, table and statistic on this page is computed when the page is built, from the parameters,
+              seeds and data printed here, and can be recomputed by anyone from the repository: <code>npm test</code>
+              runs the test suite, which covers the Caesar cipher, the toy scheme, the three attacks and the studies, and
+              <code>npm run build</code> rebuilds the page. The study takes about {{fig.params.computeSeconds}} seconds
+              (last computed {{fig.params.computedAt}}); its results are cached under
+              <code>node_modules/.cache/hw03/</code> with the key <code>{{fig.params.cacheKey}}</code>, a hash of the
+              parameters, of the source of every module and data file involved and of the figure provider itself, so that
+              a change to any of them recomputes everything.
+            </p>
+            <p>
+              All random streams are derived from the master seed {{fig.params.seed}}, one per experiment and per length or
+              key size, by a seeded statistical generator; it is not a cryptographic generator and must never produce
+              real keys, which the interactive panels draw from the cryptographic generator of the browser. The
+              parameters of the study are: {{fig.params.windows}} ciphertexts per length on a grid of 21 lengths from 1 to
+              500 letters; an n-gram pseudo-count of {{fig.params.smoothing}}; a message of {{fig.params.compareChars}}
+              characters for Figure 1 and Table 3; private keys of the toy scheme restricted to
+              {{fig.params.toyBits}} bits; {{fig.params.keysPerBits}} random keys per key size in Figure 4, with key sizes
+              from 8 bits up to {{fig.params.bruteMaxBits}} bits for brute force, {{fig.params.kangarooMaxBits}} for the
+              kangaroo and {{fig.params.bsgsMaxBits}} for baby-step giant-step, in steps of 2; and an ephemeral scalar of
+              {{fig.demo.ephemeralBits}} bits for the demonstration of §6.3. Operation counts are deterministic for a seed;
+              rates and times depend on the machine that builds the page.
+            </p>
+            <p>
+              The corpus is derived by <code>node scripts/hw03-corpus.mjs</code>, which downloads the seven books of Table
+              A1 from Project Gutenberg [<a href="#ref-7">7</a>] (<code>https://www.gutenberg.org/cache/epub/&lt;id&gt;/pg&lt;id&gt;.txt</code>),
+              keeps the text between the <code>*** START OF</code> and <code>*** END OF</code> markers, normalises it as
+              described in §5.1 and writes the training statistics, the held-out text and a manifest to
+              <code>src/data/hw03/</code>; with <code>--offline</code> it reuses books already downloaded. Re-running it
+              on the same downloads reproduces the files byte for byte. The SHA-256 of the derived files are
+              <code>{{fig.corpus.trainingStatsSha}}</code> for <code>training-stats.json</code> and
+              <code>{{fig.corpus.heldoutSha}}</code> for <code>heldout.txt</code>.
+            </p>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The books of the corpus, by Project Gutenberg number, with
+                their role, the number of letters of the normalised text and the first 16 hexadecimal digits of its
+                SHA-256; the held-out text used by the study is the first {{fig.corpus.heldoutMaxChars}} characters of the
+                last one.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=corpus --></div>
+            </figure>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/caesar.js">src/lib/caesar.js</a>: the Caesar cipher and the five recovery methods of §5.2.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/toy-ecc-encryption.js">src/lib/toy-ecc-encryption.js</a>: the toy hashed EC-ElGamal scheme of §2.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/restricted-key-attack.js">src/lib/restricted-key-attack.js</a>: brute force, baby-step giant-step and Pollard's kangaroo on the restricted key space, and the decryption without the key.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/caesar-study.js">src/lib/caesar-study.js</a>: the length study of §5 and the comparison of §4.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/ecc-attack-study.js">src/lib/ecc-attack-study.js</a>: the cost of the attacks of §6 and its extrapolation.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/secp256k1.js">src/lib/secp256k1.js</a> and <a href="{{site.repoUrl}}/blob/main/src/lib/keccak.js">src/lib/keccak.js</a>: secp256k1 and Keccak-256 from their specifications, shared with Exercise 1.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/scripts/hw03-corpus.mjs">scripts/hw03-corpus.mjs</a>: the derivation of the corpus.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/03/figures.js">homework/03/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the section or
+              chapter in which the cited statement is found. Documents read online, the SEC standards and the Project
+              Gutenberg collection, carry the date on which they were read.
+            </p>
+            <ol>
+              <li id="ref-1">Certicom Research (2009). <cite>SEC 1: Elliptic Curve Cryptography</cite>. Standards for Efficient Cryptography, version 2.0, 21 May 2009. <a class="ref-link" href="https://www.secg.org/sec1-v2.pdf">https://www.secg.org/sec1-v2.pdf</a> (accessed 19 October 2026)</li>
+              <li id="ref-2">Certicom Research (2010). <cite>SEC 2: Recommended Elliptic Curve Domain Parameters</cite>. Standards for Efficient Cryptography, version 2.0, 27 January 2010. <a class="ref-link" href="https://www.secg.org/sec2-v2.pdf">https://www.secg.org/sec2-v2.pdf</a> (accessed 19 October 2026)</li>
+              <li id="ref-3">ElGamal, T. (1985). <cite>A public key cryptosystem and a signature scheme based on discrete logarithms</cite>. IEEE Transactions on Information Theory, 31(4), pp. 469–472. <a class="ref-link" href="https://doi.org/10.1109/TIT.1985.1057074">https://doi.org/10.1109/TIT.1985.1057074</a></li>
+              <li id="ref-4">Friedman, W. F. (1922). <cite>The Index of Coincidence and Its Applications in Cryptography</cite>. Riverbank Publication No. 22, Riverbank Laboratories, Geneva, IL; printed by L. Fournier, Paris.</li>
+              <li id="ref-5">Hankerson, D., Menezes, A. and Vanstone, S. (2004). <cite>Guide to Elliptic Curve Cryptography</cite>. Springer Professional Computing, Springer, New York. <a class="ref-link" href="https://doi.org/10.1007/b97644">https://doi.org/10.1007/b97644</a></li>
+              <li id="ref-6">Pollard, J. M. (1978). <cite>Monte Carlo methods for index computation (mod p)</cite>. Mathematics of Computation, 32(143), pp. 918–924. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1978-0491431-9">https://doi.org/10.1090/S0025-5718-1978-0491431-9</a></li>
+              <li id="ref-7">Project Gutenberg Literary Archive Foundation (n.d.). <cite>Project Gutenberg</cite>. Online collection of public-domain electronic books. <a class="ref-link" href="https://www.gutenberg.org/">https://www.gutenberg.org/</a> (accessed 19 October 2026)</li>
+              <li id="ref-8">Shoup, V. (1997). <cite>Lower bounds for discrete logarithms and related problems</cite>. Advances in Cryptology — EUROCRYPT '97, LNCS 1233, Springer, pp. 256–266. <a class="ref-link" href="https://doi.org/10.1007/3-540-69053-0_18">https://doi.org/10.1007/3-540-69053-0_18</a></li>
+              <li id="ref-9">Sinkov, A. (2009). <cite>Elementary Cryptanalysis: A Mathematical Approach</cite>. 2nd edn, revised and updated by T. Feil, Anneli Lax New Mathematical Library 22, Mathematical Association of America, Washington, DC. <a class="ref-link" href="https://doi.org/10.5948/UPO9780883859377">https://doi.org/10.5948/UPO9780883859377</a></li>
+              <li id="ref-10">Wilson, E. B. (1927). <cite>Probable inference, the law of succession, and statistical inference</cite>. Journal of the American Statistical Association, 22(158), pp. 209–212. <a class="ref-link" href="https://doi.org/10.1080/01621459.1927.10502953">https://doi.org/10.1080/01621459.1927.10502953</a></li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
