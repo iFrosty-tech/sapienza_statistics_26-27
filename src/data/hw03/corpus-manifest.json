@@ -1,0 +1,97 @@
+{
+  "description": "Public-domain English texts from Project Gutenberg used by homework 03. Each text was stripped of the Project Gutenberg header and footer (between the \"*** START OF\" and \"*** END OF\" markers) and normalised by scripts/hw03-corpus.mjs.",
+  "source": "https://www.gutenberg.org/cache/epub/<id>/pg<id>.txt",
+  "normalisation": "NFD with diacritics removed; apostrophes inside words dropped; every other run of non-letters replaced by one space; letters folded to upper case.",
+  "books": [
+    {
+      "id": 1342,
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "year": 1813,
+      "role": "training",
+      "strippedChars": 728713,
+      "strippedSha256": "cb7c0d9af2041d31e655fafe79becb0877c3fc775690c7a558eb8707035e5138",
+      "normalisedLetters": 563939,
+      "normalisedSha256": "9121fb72e20a58dd0289f5c7ad602dfcac2448abcc1d19471ccaf2f89314d6fd"
+    },
+    {
+      "id": 98,
+      "title": "A Tale of Two Cities",
+      "author": "Charles Dickens",
+      "year": 1859,
+      "role": "training",
+      "strippedChars": 757604,
+      "strippedSha256": "68f9a91b64b42adee3282d918cdcca8a37310e17c76b597a2a5fcc7724d9db02",
+      "normalisedLetters": 584912,
+      "normalisedSha256": "da4c187af8cc412efd7c108a411bcaeb2d6b9a1ed41239aa6855f2826518eb07"
+    },
+    {
+      "id": 2701,
+      "title": "Moby-Dick; or, The Whale",
+      "author": "Herman Melville",
+      "year": 1851,
+      "role": "training",
+      "strippedChars": 1218973,
+      "strippedSha256": "6b74a36cf4b629ac137c8832b2ba2be071a02c348f3accde0c026a893a2f30eb",
+      "normalisedLetters": 955178,
+      "normalisedSha256": "6c2ef7df1c35e27b6990be84533a0d79a4a1c22435f54aa13cf2d13f738900b4"
+    },
+    {
+      "id": 1661,
+      "title": "The Adventures of Sherlock Holmes",
+      "author": "Arthur Conan Doyle",
+      "year": 1892,
+      "role": "training",
+      "strippedChars": 562202,
+      "strippedSha256": "f9544c4c28388b5e38ab4fffcf9aa719eeda1ba46ee3bb426815e978825bdc13",
+      "normalisedLetters": 431477,
+      "normalisedSha256": "f529996a4ddd848a913b4a6be18c341e05155642b6cc0b4d1c7caa93a4ca606a"
+    },
+    {
+      "id": 84,
+      "title": "Frankenstein; or, The Modern Prometheus",
+      "author": "Mary Wollstonecraft Shelley",
+      "year": 1818,
+      "role": "training",
+      "strippedChars": 419336,
+      "strippedSha256": "3839fa35c116713f811903545470041a86079268307ae9fd3ed4d04c88788bc0",
+      "normalisedLetters": 332402,
+      "normalisedSha256": "d41e45ef85db7465ba04b005967579d07f7975114555a7afe1872a99cd0c75d7"
+    },
+    {
+      "id": 74,
+      "title": "The Adventures of Tom Sawyer",
+      "author": "Mark Twain",
+      "year": 1876,
+      "role": "training",
+      "strippedChars": 392732,
+      "strippedSha256": "02cf604599664a5fb5853d144b3488ff8df4953bf66f63b1aa8bf948ad07528a",
+      "normalisedLetters": 301098,
+      "normalisedSha256": "3270c51d456a23c9bf2012e5ecab6e7cc410baaf77a0bee00c76be34d0bea1a0"
+    },
+    {
+      "id": 174,
+      "title": "The Picture of Dorian Gray",
+      "author": "Oscar Wilde",
+      "year": 1890,
+      "role": "heldout",
+      "strippedChars": 429312,
+      "strippedSha256": "1311e14e3576ced84f2760043afc85194eabdd2db55d2c59b957299eb65075a6",
+      "normalisedLetters": 331509,
+      "normalisedSha256": "7c168f18a72dffa9dd8514d0b0d0d08101f03c16f702fd2a7ea4c7aef6728b6b"
+    }
+  ],
+  "outputs": {
+    "training-stats.json": {
+      "bytes": 66434,
+      "sha256": "829ef1d7b42075b7b156269f9671e0c3bd6860a8f99c08323d5203eefa958f5d"
+    },
+    "heldout.txt": {
+      "bytes": 399995,
+      "sha256": "8392cf1806225d9c3031710af78a66e9ea3182bd260ca483854166b73100d22b",
+      "letters": 322463,
+      "truncated": true,
+      "maxChars": 400000
+    }
+  }
+}
