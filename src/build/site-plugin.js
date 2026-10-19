@@ -15,6 +15,8 @@
  *   <span data-tex>…</span>                  inline TeX rendered with KaTeX
  *   <div data-tex-display>…</div>            display TeX rendered with KaTeX
  *   {{site.author}}, {{hw.title}}, {{base}}  tokens from src/config/site.js and the register
+ *                                            ({{hw.label}} and {{hw.shortLabel}} name the entry;
+ *                                            {{hw.no}} is its two-digit folder number)
  *
  * Figure provider: when homework/NN/figures.js exists next to the page, its
  * default export is called once per build of that page,
@@ -39,6 +41,8 @@ import { MAJOR_P, MINOR_P, formatNumber, renderProbabilityPlotSVG } from '../lib
 const HOMEWORK_DIR = 'homework';
 const TEMPLATE_PLACEHOLDERS = {
   number: 0,
+  label: 'Homework 00',
+  shortLabel: '00',
   title: 'Homework title',
   abstract:
     'Abstract placeholder: state the question addressed, the method used and the main conclusion in two or three sentences.',
@@ -104,7 +108,23 @@ async function importFresh(file) {
   return (await import(url.href)).default;
 }
 
-function validateRegistry(registry, pages) {
+/**
+ * Display labels of a register entry. The address of the page always follows
+ * the number (homework/NN/); the labels only change how the entry is named:
+ * `label` in full (breadcrumb, page title, accessible names) and `shortLabel`
+ * in the boxed number of the page head, the sheet code and the register.
+ * @param {{ number: number, label?: string, shortLabel?: string }} entry
+ */
+export function entryLabels(entry) {
+  return {
+    label: entry.label ?? `Homework ${entry.number}`,
+    shortLabel: entry.shortLabel ?? pad2(entry.number),
+  };
+}
+
+const isOptionalText = (value) => value === undefined || (typeof value === 'string' && value.trim() !== '');
+
+export function validateRegistry(registry, pages) {
   if (!Array.isArray(registry)) throw new Error('[site] src/data/homeworks.js must export an array.');
   const seen = new Set();
   for (const e of registry) {
@@ -113,6 +133,8 @@ function validateRegistry(registry, pages) {
     if (seen.has(e.number)) throw new Error(`${where}: duplicate number.`);
     seen.add(e.number);
     if (typeof e.title !== 'string' || !e.title.trim()) throw new Error(`${where}: title is required.`);
+    if (!isOptionalText(e.label)) throw new Error(`${where}: label must be a non-empty string when present.`);
+    if (!isOptionalText(e.shortLabel)) throw new Error(`${where}: shortLabel must be a non-empty string when present.`);
     if (!['published', 'upcoming'].includes(e.status)) throw new Error(`${where}: status must be 'published' or 'upcoming'.`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(e.published ?? '')) throw new Error(`${where}: published must be an ISO date (YYYY-MM-DD).`);
     if (e.topics && !Array.isArray(e.topics)) throw new Error(`${where}: topics must be an array of strings.`);
@@ -132,13 +154,18 @@ function statusMark(status) {
   return `<span class="status" data-status="${status}"><svg class="status__mark" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="4.25"/></svg><span class="status__text">${label}</span></span>`;
 }
 
-function renderRegister(registry, base) {
+export function renderRegister(registry, base) {
   const entries = [...registry].sort((a, b) => a.number - b.number);
   const blankLines = Math.max(entries.length === 0 ? 3 : 1, 4 - entries.length);
   const rows = [];
 
   entries.forEach((e, k) => {
+    // The folder follows the number; the visible cell shows the short label.
     const no = pad2(e.number);
+    const { label, shortLabel } = entryLabels(e);
+    const noCell =
+      `<span class="visually-hidden">${escapeHtml(label)}</span>` +
+      `<span aria-hidden="true" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>`;
     const title =
       e.status === 'published'
         ? `<a class="register__link" href="${base}${HOMEWORK_DIR}/${no}/">${escapeHtml(e.title)}</a>`
@@ -148,7 +175,7 @@ function renderRegister(registry, base) {
     rows.push(
       `<tr class="register__row" data-status="${e.status}">` +
         `<td class="register__line" aria-hidden="true">${k + 1}</td>` +
-        `<th scope="row" class="register__no" data-label="No.">${no}</th>` +
+        `<th scope="row" class="register__no" data-label="No.">${noCell}</th>` +
         `<td class="register__title" data-label="Title">${title}${abstract}</td>` +
         `<td class="register__topics" data-label="Topics"><ul class="topic-list">${topics}</ul></td>` +
         `<td class="register__date" data-label="Date"><time datetime="${e.published}">${e.published}</time></td>` +
@@ -396,6 +423,8 @@ export function sitePlugin({ root }) {
         if (entry) {
           Object.assign(tokens, providedTokens, {
             'hw.no': pad2(entry.number),
+            'hw.label': entryLabels(entry).label,
+            'hw.shortLabel': entryLabels(entry).shortLabel,
             'hw.title': entry.title,
             'hw.abstract': entry.abstract ?? '',
             'hw.published': entry.published,

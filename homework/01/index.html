@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <!-- @include partials/head-meta.html -->
-    <title>Homework {{hw.no}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
     <meta name="description" content="{{hw.abstract}}" />
     <script type="module" src="/src/hw01.js"></script>
   </head>
@@ -249,7 +249,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               different kinds. The first, <span data-tex>k \mapsto kG</span>, is algebraic: it is a homomorphism, and it
               is hard to invert only because the ECDLP is hard. The second, Keccak-256, is a hash: it compresses its
               input and is designed so that no exploitable algebraic relation between its inputs and outputs is known.
-              <a href="{{base}}homework/02/">Homework 2</a>
+              <a href="{{base}}homework/02/">Exercise 2</a>
               follows the whole wallet pipeline, from a mnemonic sentence to the address; this page studies the first
               map, with the second as the baseline against which its statistics are compared.
             </p>
@@ -1529,7 +1529,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               same structure is not a defect but the point. It is the homomorphism <span data-tex>(a + b)G = aG + bG</span>,
               which ECDSA verification uses when it computes the combination <span data-tex>u_1 G + u_2 Q</span> of public
               points [<a href="#ref-3">3</a>, §4.1.4], and which the non-hardened key derivation examined in
-              <a href="{{base}}homework/02/">Homework 2</a> uses to compute a child public key from the parent public key
+              <a href="{{base}}homework/02/">Exercise 2</a> uses to compute a child public key from the parent public key
               alone.
             </p>
             <p>

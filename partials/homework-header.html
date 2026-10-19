@@ -1,7 +1,7 @@
 <div class="sheet-head sheet-head--compact">
         <div class="sheet-strip">
           <!-- @phi-strip -->
-          <p class="sheet-strip__no">Sheet <span class="field__figure">HW-{{hw.no}}</span></p>
+          <p class="sheet-strip__no">Sheet <span class="field__figure">HW-{{hw.shortLabel}}</span></p>
         </div>
         <!-- @include partials/identity-block.html -->
       </div>
@@ -9,13 +9,13 @@
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <ol>
           <li><a href="{{base}}#register">Homework register</a></li>
-          <li><span aria-current="page">Homework&nbsp;<span class="field__figure">{{hw.no}}</span></span></li>
+          <li><span aria-current="page">{{hw.label}}</span></li>
         </ol>
       </nav>
 
       <header class="hw-head">
         <h1 class="hw-head__title">
-          <span class="hw-head__no"><span class="visually-hidden">Homework </span><span class="field__figure">{{hw.no}}</span></span>
+          <span class="hw-head__no"><span class="visually-hidden">{{hw.label}}: </span><span class="field__figure" aria-hidden="true">{{hw.shortLabel}}</span></span>
           <span class="hw-head__text">{{hw.title}}</span>
         </h1>
         <dl class="hw-head__meta">
