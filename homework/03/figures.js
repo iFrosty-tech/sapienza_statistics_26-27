@@ -25,12 +25,14 @@
  *   caesarSummary  Table 4, success at selected lengths and the lengths reaching 95% and 99%
  *   attack         Fig. 4, group operations of the three attacks against the key size
  *   attackCost     Table 5, the fitted cost extrapolated to 128- and 256-bit keys
+ *   corpus         Table A1, the books of the corpus with the SHA-256 of each normalised text
  *
  * Tokens ({{fig.<key>}}); every value is a display string.
  *   params.{seed, windows, compareChars, toyBits, keysPerBits, smoothing, computeSeconds, computedAt, cacheKey,
  *     bruteMaxBits, bsgsMaxBits, kangarooMaxBits}
  *   corpus.{books, trainingBooks, trainingLetters, trainingWords, heldoutTitle, heldoutAuthor, heldoutLetters,
- *     bigrams, trigrams, dictionaryWords, dictionaryCoverage}
+ *     bigrams, trigrams, dictionaryWords, dictionaryCoverage, heldoutYear, heldoutMaxChars, trainingStatsSha,
+ *     heldoutSha}
  *   caesar.baseline, caesar.<method>.{l95, l99, label} and caesar.<method>.L<L>.{rate, low, high, rank}
  *     (methods chiSquare, logLikelihood, bigram, trigram, exhaustive; L in the grid of the study)
  *   caesar.exhaustiveRate (candidate decryptions per second), caesar.exhaustiveMicroseconds (one search)
@@ -41,7 +43,8 @@
  *   repeat.{message, privateKey, publicKey, caesarKey, caesarCiphertext, eccR1, eccR2, eccC1, eccC2, eccTag1,
  *     differingBits, totalBits, ephemeral, sharedX, keystream}
  *   attack.<method>.{slope, intercept, r, rate, seconds, maxBits, at128, at256} (brute, bsgs, kangaroo; at… are
- *     base-2 exponents of the extrapolated operations), attack.rho.log2, attack.fastRate
+ *     base-2 exponents of the extrapolated operations), attack.rho.log2, attack.fastRate,
+ *   attack.brute.{meanSecondsToy, worstSecondsToy}, attack.rho.{yearsMeasured, yearsFast, universeAges}
  *   demo.{k, bsgsOperations, bruteOperations, kangarooOperations, message, ephemeralBits, ephemeral,
  *     ephemeralOperations, ephemeralMessage}
  *   keySpace.<caesar|toy|secp256k1>.log2
@@ -68,10 +71,13 @@ import { encrypt as caesarEncrypt } from '../../src/lib/caesar.js';
 import { attackCostTable, keySpaces, measureAttackCost } from '../../src/lib/ecc-attack-study.js';
 import { encrypt as eccEncrypt, generateKeyPair } from '../../src/lib/toy-ecc-encryption.js';
 import { decryptWithoutKey, recoverEphemeral } from '../../src/lib/restricted-key-attack.js';
+import { escapeXml } from '../../src/lib/charts.js';
 import {
   FIGURE_KINDS,
+  durationFromLog2Seconds,
   figureData,
   fmt,
+  sciFromLog2,
   formatP,
   int,
   methodLabel,
@@ -228,6 +234,25 @@ function loadOrCompute(root) {
   return value;
 }
 
+/* The age of the universe in years (about 13.8 billion), the yardstick of the infeasibility argument of §6. */
+const AGE_OF_UNIVERSE_YEARS = 1.38e10;
+
+/* Table: the books of the corpus, with their role and the SHA-256 of each normalised text (the manifest). */
+function renderCorpus(manifest) {
+  const rows = manifest.books.map(
+    (b) =>
+      `<tr><td class="is-number">${b.id}</td><th scope="row"><cite>${escapeXml(b.title)}</cite></th><td>${escapeXml(b.author)}</td>` +
+      `<td class="is-number">${b.year}</td><td>${b.role === 'heldout' ? 'Held out' : 'Training'}</td>` +
+      `<td class="is-number">${int(b.normalisedLetters)}</td><td><code>${escapeXml(b.normalisedSha256.slice(0, 16))}…</code></td></tr>`,
+  );
+  const head = ['Gutenberg no.', 'Title', 'Author', 'Year', 'Role', 'Letters', 'SHA-256, normalised text'];
+  const cls = (i) => ([0, 3, 5].includes(i) ? ' class="is-number"' : '');
+  return (
+    `<table class="data-table data-table--compact data-table--hw03"><thead><tr>${head.map((h, i) => `<th scope="col"${cls(i)}>${h}</th>`).join('')}</tr></thead>` +
+    `<tbody>${rows.join('')}</tbody></table>`
+  );
+}
+
 /* Token-safe names of the methods and solvers. */
 const METHOD_TOKEN = { 'chi-square': 'chiSquare', 'log-likelihood': 'logLikelihood', bigram: 'bigram', trigram: 'trigram', exhaustive: 'exhaustive' };
 const SOLVER_TOKEN = { 'brute-force': 'brute', bsgs: 'bsgs', kangaroo: 'kangaroo' };
@@ -258,6 +283,7 @@ export default async function provide({ root }) {
   html.statistics = renderStatisticsTable(results.compare);
   html.caesarSummary = renderCaesarSummary(results.caesar);
   html.attackCost = renderAttackTable(costTable);
+  html.corpus = renderCorpus(manifest);
 
   /* Parameters and provenance (Appendix). */
   token('params.seed', PARAMS.seed);
@@ -287,6 +313,10 @@ export default async function provide({ root }) {
   token('corpus.trigrams', int(stats.trigrams.distinct));
   token('corpus.dictionaryWords', int(stats.words.list.length));
   token('corpus.dictionaryCoverage', percent(stats.words.coverage));
+  token('corpus.heldoutYear', heldout.year);
+  token('corpus.heldoutMaxChars', int(manifest.outputs['heldout.txt'].maxChars));
+  token('corpus.trainingStatsSha', manifest.outputs['training-stats.json'].sha256);
+  token('corpus.heldoutSha', manifest.outputs['heldout.txt'].sha256);
 
   /* §5: the Caesar study. */
   const caesar = results.caesar;
@@ -355,6 +385,15 @@ export default async function provide({ root }) {
   }
   token('attack.rho.log2', fmt(costTable.rho.log2Operations, 1));
   token('attack.fastRate', '10¹²');
+  /* The toy key by brute force at the measured rate, on average (2^(b−1) additions) and at worst (2^b). */
+  const bruteRate = results.attack.methods['brute-force'].rate;
+  token('attack.brute.meanSecondsToy', fmt(2 ** (PARAMS.toyBits - 1) / bruteRate, 1));
+  token('attack.brute.worstSecondsToy', fmt(2 ** PARAMS.toyBits / bruteRate, 1));
+  /* Pollard's rho on the full group: at the measured brute-force rate, at 10¹² op/s, and against the age of the universe. */
+  const rhoLog2SecondsMeasured = costTable.rho.log2Operations - Math.log2(bruteRate);
+  token('attack.rho.yearsMeasured', durationFromLog2Seconds(rhoLog2SecondsMeasured));
+  token('attack.rho.yearsFast', durationFromLog2Seconds(costTable.rho.log2SecondsFast));
+  token('attack.rho.universeAges', sciFromLog2(costTable.rho.log2SecondsFast - Math.log2(365.25 * 86400) - Math.log2(AGE_OF_UNIVERSE_YEARS), 1));
   const d = results.demo;
   token('demo.k', d.k);
   token('demo.message', d.message);
@@ -366,6 +405,20 @@ export default async function provide({ root }) {
   token('demo.ephemeralOperations', int(d.ephemeralOperations));
   token('demo.ephemeralMessage', d.ephemeralMessage);
   for (const s of spaces) token(`keySpace.${s.key}.log2`, fmt(s.log2, 2));
+  /* §4 and §7: the general substitution cipher, the birthday bound and a full table of the toy key space. */
+  let log2Factorial26 = 0;
+  for (let i = 2; i <= 26; i += 1) log2Factorial26 += Math.log2(i);
+  token('keySpace.substitution.log2', fmt(log2Factorial26, 1));
+  token('keySpace.toy.birthday', int(Math.sqrt(2 * Math.LN2 * 2 ** PARAMS.toyBits)));
+  token('keySpace.toy.tableMB', fmt((2 ** PARAMS.toyBits * 33) / 1e6, 1));
+
+  /* §5: the information a letter carries about the key, under the unigram model of the training corpus. */
+  const letterTotal = stats.letters.counts.reduce((s, x) => s + x, 0);
+  const entropy = -stats.letters.counts.reduce((s, x) => (x > 0 ? s + (x / letterTotal) * Math.log2(x / letterTotal) : s), 0);
+  const redundancy = Math.log2(26) - entropy;
+  token('corpus.letterEntropy', fmt(entropy, 2));
+  token('corpus.redundancy', fmt(redundancy, 2));
+  token('corpus.unicity', fmt(Math.log2(26) / redundancy, 1));
 
   return { html, tokens };
 }

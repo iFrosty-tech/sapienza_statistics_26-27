@@ -3,14 +3,6 @@
    values and the chart primitives come from hw01.css; this file adds what
    homework 03 needs. */
 
-/* ---------- Placeholders awaiting the written argument ---------- */
-.prose .placeholder {
-  padding: var(--space-2) var(--space-3);
-  outline: var(--hair) dashed var(--ruling);
-  outline-offset: -1px;
-  color: var(--ink-faint);
-}
-
 .data-table--scroll:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
