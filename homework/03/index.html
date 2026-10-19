@@ -269,9 +269,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               The panel below lets the reader generate a key pair with a restricted private key, encrypt a message of
               their own, and follow each step of encryption and decryption with its intermediate values.
             </p>
-            <div class="demo" data-demo="ecc">
+            <div class="demo" data-demo="ecc" data-message="{{fig.repeat.message}}">
               <p class="demo__fallback">
-                The interactive encryption panel requires JavaScript; the worked example above lists the same steps for
+                The interactive encryption panel runs in the online version of this page; the worked example above lists the same steps for
                 the message of Table 2.
               </p>
             </div>
@@ -333,9 +333,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               repeated letters of <code>MEET</code> remain repeated in <code>PHHW</code>: this is the whole weakness of the
               cipher in miniature. The panel below encrypts and decrypts any text under a chosen shift.
             </p>
-            <div class="demo" data-demo="caesar">
+            <div class="demo" data-demo="caesar" data-message="{{fig.repeat.message}}" data-key="{{fig.repeat.caesarKey}}">
               <p class="demo__fallback">
-                The interactive Caesar panel requires JavaScript; the example above shows the encryption and decryption of
+                The interactive Caesar panel runs in the online version of this page; the example above shows the encryption and decryption of
                 the message of §2.
               </p>
             </div>
@@ -684,7 +684,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             </p>
             <div class="demo" data-demo="cryptanalysis">
               <p class="demo__fallback">
-                The interactive cryptanalysis panel requires JavaScript; Figures 2 and 3 and Table 4 report the same
+                The interactive cryptanalysis panel runs in the online version of this page; Figures 2 and 3 and Table 4 report the same
                 methods on {{fig.params.windows}} ciphertexts per length.
               </p>
             </div>
@@ -966,9 +966,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               scheme has no forward secrecy. The panel below runs the three attacks in a background thread on a
               freshly generated key and decrypts the message when the key is found.
             </p>
-            <div class="demo" data-demo="key-recovery">
+            <div class="demo" data-demo="key-recovery" data-message="{{fig.repeat.message}}" data-rate-brute="{{fig.attack.brute.rate}}" data-rate-bsgs="{{fig.attack.bsgs.rate}}" data-rate-kangaroo="{{fig.attack.kangaroo.rate}}">
               <p class="demo__fallback">
-                The interactive key-recovery panel requires JavaScript; the recovery of the key of §2 is reported above
+                The interactive key-recovery panel runs in the online version of this page; the recovery of the key of §2 is reported above
                 and the cost of the three attacks in Figure 4.
               </p>
             </div>
