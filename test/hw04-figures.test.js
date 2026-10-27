@@ -117,3 +117,44 @@ test('every citation resolves to a reference and every reference is cited, with 
   assert.match(page, /Consider two possible models for the score:/);
   assert.match(page, /Normalized total score: Sₙ\/√n/);
 });
+
+/* ------------------------------------------------------------ legibility (T5) */
+
+test('Figure 10 carries a narrow drawing for small screens beside the printed one, each with its own ids', () => {
+  const best = html.best;
+  assert.match(best, /class="chart-swap"/);
+  const wide = /<div class="chart-swap__wide">([\s\S]*?)<\/div><div class="chart-swap__narrow">/.exec(best);
+  const narrow = /<div class="chart-swap__narrow">([\s\S]*)<\/div><\/div>$/.exec(best);
+  assert.ok(wide && narrow, 'both drawings are present');
+  const width = (svg) => Number(/<svg[^>]*\swidth="(\d+)"/.exec(svg)[1]);
+  assert.equal(width(wide[1]), PARAMS.buildWidth);
+  assert.ok(width(narrow[1]) <= 360, `narrow drawing ${width(narrow[1])} px`);
+  assert.match(narrow[1], /id="fig-best-narrow-title"/);
+});
+
+test('every centred tick label of every chart stays inside its SVG', () => {
+  // Libre Franklin at 10.5 px: tabular digits are about 0.6 em wide.
+  const DIGIT = 6.3;
+  const escapes = [];
+  for (const [id, figure] of Object.entries(html)) {
+    for (const svg of figure.match(/<svg[\s\S]*?<\/svg>/g) ?? []) {
+      const width = Number(/<svg[^>]*\swidth="([\d.]+)"/.exec(svg)?.[1]);
+      for (const m of svg.matchAll(/<text class="chart__xlabel" x="([\d.]+)"[^>]*text-anchor="middle">([\s\S]*?)<\/text>/g)) {
+        const label = m[2].replace(/<[^>]+>/g, '');
+        const half = (label.length * DIGIT) / 2;
+        const x = Number(m[1]);
+        if (x - half < 0 || x + half > width) escapes.push(`${id}: "${label}" at ${x} of ${width}`);
+      }
+    }
+  }
+  assert.deepEqual(escapes, []);
+});
+
+test('every inline formula followed by punctuation is tied to it, so that the punctuation never starts a line', () => {
+  const loose = [...page.matchAll(/(<span class="math-tie">)?<span data-tex>[^<]*<\/span>[,;:.!?)\]]/g)].filter((m) => !m[1]);
+  assert.deepEqual(loose.map((m) => m[0]), []);
+});
+
+test('the figure statistics write n with thousands separators, as the text does', () => {
+  assert.doesNotMatch(page, /<dt>[^<]*\bn = \d{4,}/);
+});

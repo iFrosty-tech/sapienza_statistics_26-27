@@ -154,3 +154,58 @@
 .chart-panel .pplot__point {
   stroke-width: 0.5;
 }
+
+/* Table 4 has nine numeric columns: a narrower gutter between them keeps it within the measure. */
+.data-table.data-table--ks :is(td, th) {
+  padding-inline: 0.3125rem;
+}
+
+/* ---------- Single-panel figures (Fig. 10): a narrow drawing on phones ---------- */
+
+/* The wide drawing would shrink to half its type size on a phone; the narrow one is drawn at that width.
+   Only one is displayed, so assistive technology reads one; print keeps the wide drawing. */
+.chart-swap__narrow {
+  display: none;
+}
+
+@media (max-width: 36rem) {
+  .chart-swap__wide {
+    display: none;
+  }
+
+  .chart-swap__narrow {
+    display: block;
+  }
+}
+
+@media print {
+  .chart-swap__wide {
+    display: block !important;
+  }
+
+  .chart-swap__narrow {
+    display: none !important;
+  }
+}
+
+/* ---------- Statistics under the figures ---------- */
+
+/* Four cells sized by their values, so that a long value such as −0.000019180 is never cut in two;
+   two cells per row on narrow sheets, where four would break every number. */
+.chart-figure .pplot__stats:not(.pplot__stats--3) {
+  grid-template-columns: repeat(4, auto);
+}
+
+.chart-figure .pplot__stats:not(.pplot__stats--3) dd {
+  overflow-wrap: normal;
+}
+
+@media (max-width: 40rem) {
+  .chart-figure .pplot__stats:not(.pplot__stats--3) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-figure .pplot__stats:not(.pplot__stats--3) dd {
+    overflow-wrap: anywhere;
+  }
+}

@@ -2,6 +2,14 @@
    probability paper. Figure frames, data tables, worked values and the chart
    primitives come from hw01.css; this file adds what homework 04 needs. */
 
+/* ---------- Typography of the page ---------- */
+
+/* An inline formula and the punctuation after it are tied (homework/04/index.html wraps them):
+   a KaTeX formula ends in an inline block, after which a line may otherwise break before ",", ";" or ".". */
+.math-tie {
+  white-space: nowrap;
+}
+
 /* ====================================================================== */
 /* Interactive panels (src/hw04/*-demo.js)                                 */
 /* A panel is a form printed on the sheet: opened by an ink rule, closed by */

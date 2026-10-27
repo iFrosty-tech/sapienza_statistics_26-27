@@ -101,7 +101,8 @@ const lin = (d0, d1, r0, r1) => (v) => r0 + ((v - d0) / (d1 - d0 || 1)) * (r1 - 
 
 function layout(width, height, margin = {}) {
   const narrow = width < 420;
-  const m = { top: 12, right: narrow ? 10 : 16, bottom: 44, left: narrow ? 48 : 56, ...margin };
+  // The right margin holds half of the last tick label ("1000" is about 25 px at 10.5 px).
+  const m = { top: 12, right: narrow ? 14 : 16, bottom: 44, left: narrow ? 48 : 56, ...margin };
   const plotW = Math.max(40, width - m.left - m.right);
   const plotH = Math.max(40, height - m.top - m.bottom);
   return { width, height, narrow, margin: m, plotW, plotH, left: m.left, right: m.left + plotW, top: m.top, bottom: m.top + plotH };
@@ -390,7 +391,8 @@ export function renderTrajectories(tr, { id, width = 640, p }) {
             desc: `Thin lines are the ${QUANTITY_DESC[q]} of ${tr.m} simulated attackers against the number of systems attacked, from 1 to ${tr.n}${model === 'bernoulli' ? `, with Bernoulli increments of success probability ${p}` : ', with Rademacher increments'}. The shaded band is the theoretical mean plus or minus two standard deviations, the dashed line the theoretical mean; red points mark the value of each attacker after the last system.`,
             width: w,
             height: h,
-            x: { log: false, domain: [0, tr.n], ticks: linearTicks(0, tr.n, 4) },
+            // three labels (0, 500, 1000): six do not fit side by side in a third of the measure
+            x: { log: false, domain: [0, tr.n], ticks: linearTicks(0, tr.n, 2) },
             y: { log: false, domain: [lo, hi], ticks: linearTicks(lo, hi, 4) },
             xLabel: 'Systems attacked n',
             yLabel: label,
@@ -750,8 +752,19 @@ export function renderPrecision(precision, { id, width = 640 }) {
 /* ------------------------------------------------------------ Fig. 10, best attacker */
 
 /** P(at least one of m attackers penetrates at least a share μ + δ of the n systems) against m. */
+/** Width of the drawing of a single-panel figure on narrow sheets, where the printed one would shrink below legibility. */
+export const NARROW_WIDTH = 340;
+
 export function renderBestAttacker(best, { id, width = 640, p }) {
-  const h = Math.round(Math.min(340, Math.max(260, width * 0.5)));
+  // One wide panel would shrink to half its type size on a phone, so a narrow drawing is
+  // printed beside it and the stylesheet shows one or the other (print keeps the wide one).
+  const wide = bestAttackerPanel(best, { id, width, p });
+  const narrow = bestAttackerPanel(best, { id: `${id}-narrow`, width: NARROW_WIDTH, p });
+  return `<div class="chart-swap"><div class="chart-swap__wide">${wide}</div><div class="chart-swap__narrow">${narrow}</div></div>`;
+}
+
+function bestAttackerPanel(best, { id, width, p }) {
+  const h = Math.round(Math.min(340, Math.max(width < 420 ? 300 : 260, width * 0.5)));
   const decades = Math.round(Math.log10(best.mMax));
   const share = p + best.excess;
   return panel({
@@ -760,7 +773,7 @@ export function renderBestAttacker(best, { id, width = 640, p }) {
     desc: `Bernoulli increments with p = ${p}. Lines are the exact probabilities 1 − P(Sₙ < ⌈${fmt(share, 2)}n⌉)^m for n = ${best.curves.map((c) => int(c.n)).join(', ')} on a logarithmic axis of m; red points are the proportions of disjoint groups of m simulated attackers whose best member reaches the threshold, with Wilson 95% intervals. The dashed line marks one half: the number of attackers it takes grows exponentially with n.`,
     width,
     height: h,
-    x: logAxis(0.7, best.mMax * 1.45, decades > 8 ? 2 : 1),
+    x: logAxis(0.7, best.mMax * 1.45, decades > 8 ? (width < 420 ? 3 : 2) : 1),
     y: { log: false, domain: [0, 1.02], ticks: [0, 0.25, 0.5, 0.75, 1].map((v) => ({ value: v, label: v === 0 ? '0' : fmt(v, 2) })) },
     xLabel: 'Attackers m',
     yLabel: 'P(best attacker reaches the share)',
