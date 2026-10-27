@@ -56,4 +56,15 @@ export default [
     published: '2026-10-19',
     status: 'published',
   },
+  {
+    number: 4,
+    label: 'Homework 3',
+    shortLabel: '3',
+    title: 'Random walks of penetration scores: the law of large numbers and the central limit theorem',
+    abstract:
+      'The penetration of n systems by each of m attackers is modelled as a random walk with independent Bernoulli or Rademacher increments. Simulated trajectories of the total, average and normalised scores are set against their exact laws to show the convergence in probability of the average, the three regimes of the variance under the different normalisations and the convergence of the normalised Rademacher score to the standard normal law.',
+    topics: ['Random walks', 'Law of large numbers', 'Central limit theorem', 'Monte Carlo simulation'],
+    published: '2026-10-27',
+    status: 'upcoming',
+  },
 ];
