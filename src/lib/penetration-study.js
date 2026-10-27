@@ -464,7 +464,11 @@ function bestAttackerStudy(params, laws, runs) {
       });
     }
   }
-  return { model: 'bernoulli', excess, rows, curves, empirical, mMax: 10 ** decades };
+  // The large-deviation (Cramér–Chernoff) rate of P(Sₙ/n ≥ p + δ): the Kullback–Leibler divergence of
+  // Bernoulli(p + δ) from Bernoulli(p), the limit of −ln P/n, against which Hoeffding's 2δ² is a lower bound.
+  const a = law.mean + excess;
+  const klRate = a * Math.log(a / law.mean) + (1 - a) * Math.log((1 - a) / (1 - law.mean));
+  return { model: 'bernoulli', excess, rows, curves, empirical, mMax: 10 ** decades, klRate };
 }
 
 /* ------------------------------------------------------------------ the study */

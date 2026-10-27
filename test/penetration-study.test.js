@@ -234,6 +234,11 @@ test('E9: the aggregate of a group depends on m·n, and the best attacker improv
     close(row.pAtM, probabilityAnyAttackerReaches(law, row.n, SMALL.m, row.threshold), 1e-15);
   }
   for (let i = 1; i < best.rows.length; i += 1) assert.ok(best.rows[i].m50 > best.rows[i - 1].m50, 'm₅₀ grows with n');
+  // The large-deviation rate D(p + δ ‖ p) of one attacker: above Hoeffding's 2δ², below every finite-n rate.
+  const a = SMALL.p + SMALL.best.excess;
+  close(best.klRate, a * Math.log(a / SMALL.p) + (1 - a) * Math.log((1 - a) / (1 - SMALL.p)), 1e-15);
+  assert.ok(best.klRate > 2 * SMALL.best.excess ** 2);
+  for (const row of best.rows) assert.ok(row.rate > best.klRate, `rate at n = ${row.n}`);
   for (const curve of best.curves) {
     for (let i = 1; i < curve.points.length; i += 1) assert.ok(curve.points[i].p >= curve.points[i - 1].p, 'P(any) grows with m');
   }

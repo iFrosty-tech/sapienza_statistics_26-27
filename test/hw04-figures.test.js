@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PARAMS, buildFigures } from '../homework/04/figures.js';
 import { runPenetrationStudy } from '../src/lib/penetration-study.js';
+import { sci, sig } from '../src/lib/penetration-charts.js';
 
 const params = { ...PARAMS, m: 1000 };
 const results = runPenetrationStudy(params);
@@ -41,6 +42,30 @@ test('provider output carries no undefined values and keeps every SVG id unique'
   const ids = [...all.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
   const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
   assert.deepEqual(dupes, []);
+});
+
+test('the aggregate and large-deviation tokens follow from the study', () => {
+  const t = results.aggregate.total.bernoulli;
+  const perSystem = t.value / (params.m * t.n);
+  assert.equal(tokens['aggregate.total.bernoulli.perSystem'], perSystem.toFixed(5));
+  assert.equal(tokens['aggregate.total.bernoulli.relSd'], sci(t.sd / t.mean, 2));
+  assert.equal(tokens['aggregate.total.rademacher.perSystemSd'], sci(1 / Math.sqrt(params.m * results.aggregate.total.rademacher.n), 2));
+  assert.equal(tokens['best.klRate'], results.best.klRate.toFixed(4));
+  // Group means of the aggregate carry thousands separators, like their theoretical values.
+  assert.match(tokens['aggregate.bernoulli.m1.mean'], /^\d{1,3}(,\d{3})*\.\d$/);
+  // The largest |z| of Table 1 over models, n, quantities, means and variances.
+  const zs = ['bernoulli', 'rademacher'].flatMap((model) =>
+    results.moments[model].flatMap((row) =>
+      ['total', 'average', 'normalized'].flatMap((q) => [
+        (row[q].mean - row[q].theoryMean) / row[q].seMean,
+        (row[q].variance - row[q].theoryVariance) / row[q].seVariance,
+      ]),
+    ),
+  );
+  assert.equal(tokens['moments.maxAbsZ'], Math.max(...zs.map(Math.abs)).toFixed(2));
+  assert.equal(tokens['moments.count'], String(zs.length));
+  // Each further hundred systems multiplies the attackers needed by about e^(100·D).
+  assert.equal(tokens['best.mGrowth'], sig(Math.exp(100 * results.best.klRate), 3));
 });
 
 test('the provider is deterministic for the same results', () => {
@@ -77,4 +102,18 @@ test('the page has the sections of the assignment and at most ten references', (
   const refs = page.match(/<li id="ref-\d+">/g) ?? [];
   assert.ok(refs.length <= 10, `${refs.length} references`);
   assert.match(page, /Consider n systems and m attackers\./);
+});
+
+test('every citation resolves to a reference and every reference is cited, with no drafting notes left', () => {
+  const ids = [...page.matchAll(/<li id="(ref-\d+)">/g)].map((m) => m[1]);
+  assert.ok(ids.length >= 1);
+  const cited = new Set([...page.matchAll(/href="#(ref-\d+)"/g)].map((m) => m[1]));
+  assert.deepEqual([...cited].filter((id) => !ids.includes(id)), [], 'citations without an entry');
+  assert.deepEqual(ids.filter((id) => !cited.has(id)), [], 'entries never cited');
+  assert.doesNotMatch(page, /T4:/);
+  // The assignment is quoted as given (without its "HMWK ==>" marker), with the professor's spelling.
+  assert.doesNotMatch(page, /HMWK/);
+  assert.match(page, /<p>\s*Consider n systems and m attackers\./);
+  assert.match(page, /Consider two possible models for the score:/);
+  assert.match(page, /Normalized total score: Sₙ\/√n/);
 });

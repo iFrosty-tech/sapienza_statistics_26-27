@@ -42,7 +42,8 @@
  *   params.seeds.{bernoulli, rademacher, trajectoriesBernoulli, trajectoriesRademacher}
  *   theory.<model|bernoulliSmall>.{mean, variance, sd, absThird, rho}, theory.latticeConstant
  *   traj.<model>.<q>.{min, max, mean, sd}, traj.<model>.inside (attackers ending inside the ±2 sd band)
- *   moments.<model>.nN.<q>.{mean, seMean, variance, seVariance, theoryMean, theoryVariance, zMean, zVariance}
+ *   moments.<model>.nN.<q>.{mean, seMean, variance, seVariance, theoryMean, theoryVariance, zMean, zVariance},
+ *   moments.{maxAbsZ, count} (the largest |z| of Table 1 and the number of its estimates)
  *   variance.<model>.<q>.{slope, constant, r}
  *   lln.<model>.<eps>.nN.{count, empirical, low, high, exact, chebyshev, hoeffding} (N in curveN),
  *   lln.<model>.<eps>.{nExact, nChebyshev, nHoeffding}
@@ -52,8 +53,8 @@
  *     (N in 1, 10, 100, 1000, 10000), clt.bernoulliSmall.slopeExact
  *   precision.n, precision.<model>.mM.{groups, rms, se, ratio, medianD, shareAbove, dkw}
  *   aggregate.budget, aggregate.<model>.mM.{n, groups, mean, variance, theoryMean, theoryVariance},
- *   aggregate.total.<model>.{n, value, mean, sd, z}
- *   best.{excess, share, hoeffdingRate, mMax}, best.nN.{threshold, p1, rate, m50, pAtM},
+ *   aggregate.total.<model>.{n, value, mean, sd, z, perSystem, perSystemSd}, aggregate.total.bernoulli.relSd
+ *   best.{excess, share, hoeffdingRate, klRate, mGrowth, mMax}, best.nN.{threshold, p1, rate, m50, pAtM},
  *   best.empirical.nN.mM.{groups, hits, rate, low, high, exact}
  */
 
@@ -66,6 +67,7 @@ import { BERRY_ESSEEN_CONSTANT, NORMALIZATIONS } from '../../src/lib/penetration
 import { runPenetrationStudy } from '../../src/lib/penetration-study.js';
 import {
   count,
+  dec,
   fmt,
   int,
   plotCorrelation,
@@ -291,11 +293,13 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
     token(`traj.${model}.inside`, data.paths.filter((path) => Math.abs(path[last] - mu) <= 2 * sd).length);
   }
 
-  /* §4: moments. */
+  /* §4: moments, and the largest |z| of Table 1 over all its estimates. */
+  const zs = [];
   for (const model of MODELS) {
     for (const row of results.moments[model]) {
       for (const q of QUANTITIES) {
         const v = row[q];
+        zs.push((v.mean - v.theoryMean) / v.seMean, (v.variance - v.theoryVariance) / v.seVariance);
         const k = `moments.${model}.n${row.n}.${q}`;
         token(`${k}.mean`, sig(v.mean, 5));
         token(`${k}.seMean`, sig(v.seMean, 2));
@@ -308,6 +312,8 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
       }
     }
   }
+  token('moments.maxAbsZ', fmt(Math.max(...zs.map(Math.abs)), 2));
+  token('moments.count', zs.length);
 
   /* §5: variance slopes. */
   for (const model of MODELS) {
@@ -391,7 +397,7 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
       const k = `aggregate.${model}.m${r.size}`;
       token(`${k}.n`, int(r.n));
       token(`${k}.groups`, int(r.groups));
-      token(`${k}.mean`, fmt(r.mean, 1));
+      token(`${k}.mean`, dec(r.mean, 1));
       token(`${k}.variance`, int(r.variance));
       token(`${k}.theoryMean`, int(r.theoryMean));
       token(`${k}.theoryVariance`, int(r.theoryVariance));
@@ -402,11 +408,20 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
     token(`aggregate.total.${model}.mean`, int(t.mean));
     token(`aggregate.total.${model}.sd`, int(t.sd));
     token(`aggregate.total.${model}.z`, fmt(t.z, 2));
+    // The aggregate per attacker and system, T/(mn), and its standard deviation σ/√(mn).
+    token(`aggregate.total.${model}.perSystem`, fmt(t.value / (m * t.n), 5));
+    token(`aggregate.total.${model}.perSystemSd`, sci(t.sd / (m * t.n), 2));
   }
+  // The relative spread σ√(mn)/(mnμ) of the Bernoulli aggregate (the Rademacher mean is zero).
+  const tb = results.aggregate.total.bernoulli;
+  token('aggregate.total.bernoulli.relSd', sci(tb.sd / tb.mean, 2));
   const best = results.best;
   token('best.excess', best.excess);
   token('best.share', `${fmt(100 * (p + best.excess), 0)}%`);
   token('best.hoeffdingRate', fmt(2 * best.excess ** 2, 4));
+  token('best.klRate', fmt(best.klRate, 4));
+  // Each further hundred systems multiplies the attackers needed for an even chance by about e^(100·D).
+  token('best.mGrowth', sig(Math.exp(100 * best.klRate), 3));
   token('best.mMax', count(best.mMax));
   for (const r of best.rows) {
     const k = `best.n${r.n}`;

@@ -38,6 +38,13 @@ export function fmt(v, digits = 2) {
 /** An integer with thousands separators (en-GB). */
 export const int = (v) => (finite(v) ? Math.round(v).toLocaleString('en-GB').replace(/^-/, '−') : DASH);
 
+/** A number with thousands separators and a fixed number of decimals; a rounded zero carries no sign. */
+export function dec(v, digits = 1) {
+  if (!finite(v)) return DASH;
+  const r = Math.abs(v) < 0.5 * 10 ** -digits ? 0 : v;
+  return r.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits }).replace(/^-/, '−');
+}
+
 /** A number with s significant digits in fixed-point notation. */
 export function sig(v, s = 3) {
   if (!finite(v)) return DASH;
@@ -934,9 +941,9 @@ export function renderAggregateTable(aggregate) {
     const rr = r[i];
     return (
       `<tr><th scope="row" class="is-number">${int(rb.size)}</th>${td(int(rb.n))}${td(int(rb.groups))}` +
-      td(`${fmt(rb.mean, 1)}${sub(`theory ${int(rb.theoryMean)}`)}`) +
+      td(`${dec(rb.mean, 1)}${sub(`theory ${int(rb.theoryMean)}`)}`) +
       td(`${int(rb.variance)}${sub(`theory ${int(rb.theoryVariance)}`)}`) +
-      td(`${fmt(rr.mean, 1)}${sub(`theory ${int(rr.theoryMean)}`)}`) +
+      td(`${dec(rr.mean, 1)}${sub(`theory ${int(rr.theoryMean)}`)}`) +
       td(`${int(rr.variance)}${sub(`theory ${int(rr.theoryVariance)}`)}`) +
       `</tr>`
     );
