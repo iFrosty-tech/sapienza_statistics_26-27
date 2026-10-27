@@ -1,0 +1,156 @@
+/* Homework 04: styles of the build-time figures and tables of homework/04/figures.js.
+   The interactive panels are styled in hw04.css. The figure frame, the chart primitives
+   (rulings, frame, bars, points, curves, references, labels) and the data tables come from
+   hw01.css; this adds what the random-walk figures need, in the same vocabulary: green for
+   the paper, ink for theory, plot red for simulated values only. */
+
+/* ---------- Bands and sample paths ---------- */
+
+/* The theoretical mean ± 2 sd (Fig. 1): a fill of the minor ruling, printed under the data. */
+.chart__band-area {
+  fill: var(--ruling-minor);
+  stroke: none;
+}
+
+/* One attacker's trajectory: a hairline of soft ink, so twenty of them read as a texture. */
+.chart__path {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+  opacity: 0.72;
+}
+
+/* The theoretical mean over the paths. */
+.chart__curve--mean {
+  stroke-width: 1.25;
+}
+
+/* Bounds are drawn lighter than the exact law they bound. */
+.chart__curve--bound {
+  stroke: var(--ink-soft);
+  stroke-width: 1.25;
+}
+
+/* Simulated points over twenty paths: smaller, with a paper ring that separates them. */
+.chart--paths .chart__point {
+  stroke-width: 0.75;
+}
+
+/* Wilson intervals of simulated proportions (Figs. 5 and 10): a thin ink-soft range. */
+.chart--panel .chart__range {
+  stroke: var(--ink-soft);
+  stroke-width: 1.25;
+  stroke-linecap: butt;
+}
+
+/* ---------- Ridgelines (Figs. 2, 3 and 8) ---------- */
+
+.chart--ridges .chart__bar {
+  stroke: none;
+}
+
+.chart--ridges .chart__expected {
+  stroke-width: 1.1;
+}
+
+/* The standard normal density, the reference the normalised rows settle on. */
+.chart__normal {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.chart__baseline {
+  stroke: var(--ruling-ink);
+  stroke-width: 1;
+}
+
+.chart__row-rule {
+  stroke: var(--ruling-minor);
+  stroke-width: 1;
+}
+
+.chart__row-label {
+  fill: var(--ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/* Probability plots drawn as small multiples (Fig. 6): the paper's labels at the size of the strip
+   labels (0.625rem) and the axis titles at the size of the chart axis titles (10.5px, hw01.css). */
+.chart-panel .pplot__plabel,
+.chart-panel .pplot__xlabel {
+  font-size: 0.625rem;
+}
+
+.chart-panel .pplot__axis-title {
+  font-size: 10.5px;
+}
+
+/* ---------- Tables ---------- */
+
+.data-table--hw04 tbody th {
+  font-weight: 600;
+}
+
+.data-table--hw04 tbody th[scope='rowgroup'] {
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+/* Rows of a group are separated by hairlines of the minor ruling; groups by the ruling. */
+.data-table--hw04 tbody tr:has(> th[scope='rowgroup']) > :is(th, td) {
+  border-top: var(--hair) solid var(--ruling);
+}
+
+.data-table--hw04 td.is-number,
+.data-table--hw04 th.is-number {
+  white-space: nowrap;
+}
+
+/* Long-text column of the parameter table wraps at the reading measure. */
+.data-table--parameters td:last-child {
+  white-space: normal;
+  color: var(--ink-soft);
+}
+
+@media print {
+  .chart__path {
+    opacity: 1;
+    stroke-width: 0.6;
+  }
+}
+
+/* ---------- Formulas keep their case ---------- */
+
+/* Axis titles are formulas (Sₙ/n, (Sₙ − nμ)/(σ√n)) or name n and m: uppercase would turn n into N. */
+.chart-figure--formulas .pplot__axis-title {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+/* Two series of points share a panel (Figs. 7 and 9): open rings let the filled points show through. */
+.chart--panel .chart__point--ring {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.1;
+}
+
+/* Table heads wrap, so that the many numeric columns of Tables 4 and 5 fit the reading measure
+   (the selector outweighs the no-wrap rule of hw01.css for numeric cells). */
+.table-figure .data-table.data-table--hw04 thead th {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+/* Probability plots as small multiples: a thinner paper ring keeps eighty points from paling to pink. */
+.chart-panel .pplot__point {
+  stroke-width: 0.5;
+}

@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw04.js"></script>
+  </head>
+  <body class="page page--homework"><!--
+THESIS: The homepage is a sheet of normal probability paper, the one grid on which normal data falls on a straight line; it refuses the student-portfolio card grid.
+OWN-WORLD: cool white paper #f7faf8, green rulings #9cc3ae spaced by the inverse normal CDF (dense at the tails, open near 50%), ink #1b2420, plot red #d0462f reserved for data marks. Printed-form title blocks, hairline rules, tabular figures, plotted points.
+STORY: The professor sees whose work and which course, finds homework N in the register, opens it, and trusts its rigor.
+FIRST VIEWPORT: a printed form title block (author, student ID, degree, course, academic year) above a large probability-paper plot where a simulated sample settles onto its reference line; the homework register visibly begins at the fold.
+FORM: Normal Probability Paper, grounded candidate 1 of 7, seed key 79388813.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> The model</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Simulated trajectories</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Distributions as n grows</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Variance under the three normalisations</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Law of large numbers</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Central limit theorem</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Systems and attackers</a></li>
+            <li><a href="#s9"><span class="toc__sec">§9</span> Discussion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>
+                Consider n systems and m attackers. Model the penetration process using a stochastic process with
+                independent and identically distributed increments X₁, X₂, …, representing the penetration score at
+                each step.
+              </p>
+              <p>Bernoulli model: Xᵢ ∈ {0,1}, with P(Xᵢ = 1) = p.</p>
+              <p>
+                Rademacher model: Xᵢ ∈ {−1,+1}, with P(Xᵢ = +1) = P(Xᵢ = −1) = 1/2. This second model is introduced
+                to study the symmetric, zero-mean case.
+              </p>
+              <p>
+                For increasing values of n and suitable choices of m, simulate multiple sample trajectories and study
+                the distributions of the following three quantities:
+              </p>
+              <ul>
+                <li>Total score: Sₙ = ∑ᵢ₌₁ⁿ Xᵢ</li>
+                <li>Average score: Sₙ/n = (1/n)∑ᵢ₌₁ⁿ Xᵢ</li>
+                <li>Normalized total score: Sₙ/√n = (1/√n)∑ᵢ₌₁ⁿ Xᵢ</li>
+              </ul>
+              <p>
+                Compare the behavior of these quantities as n increases. In particular, investigate the convergence in
+                probability of Sₙ/n according to the Law of Large Numbers, the behavior of the variance under the
+                different normalizations, and the convergence in distribution of Sₙ/√n to a standard normal
+                distribution in the Rademacher case, according to the Central Limit Theorem.
+              </p>
+              <p>
+                Interpret the simulated trajectories in the context of the n systems and m attackers, discussing how
+                the system size and number of attackers affect the aggregate penetration score.
+              </p>
+            </blockquote>
+            <!-- T4: check the connectives between the three "investigate" items of the quotation against the professor's original text. -->
+            <p>
+              Each attacker is modelled as one sample trajectory: attacker <span data-tex>j</span> attacks the
+              <span data-tex>n</span> systems in sequence and <span data-tex>X_i^{(j)}</span> is its score on system
+              <span data-tex>i</span>, so that <span data-tex>S_n^{(j)} = \sum_{i=1}^{n} X_i^{(j)}</span> is its
+              penetration score after <span data-tex>n</span> systems. The number of systems <span data-tex>n</span> is
+              therefore the length of a trajectory and the number of attackers <span data-tex>m</span> the number of
+              independent trajectories, the Monte Carlo sample from which the law of <span data-tex>S_n</span> is
+              estimated. The study runs {{fig.params.m}} attackers over up to {{fig.params.nMax}} systems in each model.
+            </p>
+            <!-- T4: road map of the page (§2–§9) and the main conclusions in two or three sentences. -->
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> The model</h2>
+            <h3 id="s2-1">2.1 Increments</h3>
+            <p>
+              Both increments take one of two values and can be written as an affine image of a Bernoulli variable:
+            </p>
+            <div class="equation" id="eq-increment">
+              <div data-tex-display>
+                X_i = a + (b - a)\,B_i, \qquad B_i \sim \mathrm{Bernoulli}(q), \qquad
+                \mu = \mathbb{E}[X_i] = a + (b - a)\,q, \qquad \sigma^2 = \mathrm{Var}(X_i) = (b - a)^2\,q\,(1 - q),
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              with <span data-tex>a = 0</span>, <span data-tex>b = 1</span>, <span data-tex>q = p</span> in the
+              Bernoulli model, so that <span data-tex>\mu = p</span> and <span data-tex>\sigma^2 = p(1 - p)</span>, and
+              <span data-tex>a = -1</span>, <span data-tex>b = 1</span>, <span data-tex>q = 1/2</span> in the Rademacher
+              model, so that <span data-tex>\mu = 0</span> and <span data-tex>\sigma^2 = 1</span>. The study takes
+              <span data-tex>p</span> = {{fig.params.p}}: <span data-tex>\mu</span> = {{fig.theory.bernoulli.mean}} and
+              <span data-tex>\sigma^2</span> = {{fig.theory.bernoulli.variance}}.
+            </p>
+            <!-- T4: interpret the two models as penetration scores (a system breached or not; a step forward or back) and justify the choice of p. -->
+
+            <h3 id="s2-2">2.2 The exact law of the total score</h3>
+            <p>
+              Summing (1) over the <span data-tex>n</span> systems gives the total score as an affine image of a
+              binomial count, whose law is therefore known exactly:
+            </p>
+            <div class="equation" id="eq-law">
+              <div data-tex-display>
+                S_n = n a + (b - a)\,K_n, \quad K_n \sim \mathrm{Bin}(n, q), \qquad
+                \Pr\{S_n = n a + (b - a)k\} = \binom{n}{k} q^k (1 - q)^{n - k}, \quad k = 0, \dots, n .
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              Every simulated distribution on this page is set against (2), so the study separates what the simulation
+              shows from what it can only estimate.
+            </p>
+
+            <h3 id="s2-3">2.3 Moments of the three quantities</h3>
+            <p>By linearity and independence,</p>
+            <div class="equation" id="eq-moments">
+              <div data-tex-display>
+                \begin{aligned}
+                \mathbb{E}[S_n] &amp;= n\mu, &amp; \mathrm{Var}(S_n) &amp;= n\sigma^2, \\
+                \mathbb{E}[S_n/n] &amp;= \mu, &amp; \mathrm{Var}(S_n/n) &amp;= \sigma^2/n, \\
+                \mathbb{E}[S_n/\sqrt{n}] &amp;= \sqrt{n}\,\mu, &amp; \mathrm{Var}(S_n/\sqrt{n}) &amp;= \sigma^2 .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <!-- T4: comment on (3): the three normalisations Sₙ/n^α with α = 0, 1, 1/2 give a variance n^(1−2α)σ²; only α = 1/2 keeps a non-degenerate spread. -->
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Simulated trajectories</h2>
+            <p>
+              Figure 1 follows {{fig.params.trajM}} attackers over {{fig.params.trajN}} systems in each model. The total
+              score spreads out like <span data-tex>\sqrt{n}</span> around its mean <span data-tex>n\mu</span>, the
+              average score closes in on <span data-tex>\mu</span>, and the normalised score keeps a spread of the same
+              size at every <span data-tex>n</span>.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=trajectories --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>Sample trajectories of the total, average and normalised scores
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Each thin line is one attacker; the shaded band is the theoretical mean plus or minus two standard
+                  deviations of (3) at every <span data-tex>n</span>, the dashed line the mean, and the red points the
+                  scores after the last system. Top row Bernoulli with <span data-tex>p</span> = {{fig.params.p}},
+                  bottom row Rademacher.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Attackers</dt><dd>{{fig.params.trajM}}</dd></div>
+                  <div><dt>Systems</dt><dd>{{fig.params.trajN}}</dd></div>
+                  <div><dt>In band, Bernoulli</dt><dd>{{fig.traj.bernoulli.inside}}</dd></div>
+                  <div><dt>In band, Rademacher</dt><dd>{{fig.traj.rademacher.inside}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Streams derived from seed {{fig.params.seed}}: {{fig.params.seeds.trajectoriesBernoulli}} (Bernoulli) and {{fig.params.seeds.trajectoriesRademacher}} (Rademacher).</p>
+              </figcaption>
+            </figure>
+            <!-- T4: read Figure 1 attacker by attacker (final Sₙ/n between {{fig.traj.bernoulli.average.min}} and {{fig.traj.bernoulli.average.max}} for Bernoulli; Rademacher paths crossing zero) and relate it to S9. -->
+            <p>
+              The panel below simulates the same process live, for any number of systems and attackers.
+            </p>
+            <div class="demo" data-demo="simulator" data-seed="{{fig.params.seed}}" data-p="{{fig.params.p}}">
+              <p class="demo__fallback">
+                The interactive simulator of the penetration process runs in the online version of this page: it draws
+                the trajectories of m attackers over n systems for the three quantities, in either model, with their
+                histograms against the exact law. Figure 1 shows the same trajectories for {{fig.params.trajM}} attackers.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Distributions as n grows</h2>
+            <p>
+              Figures 2 and 3 show the law of the three quantities after n = {{fig.params.distributionN}} systems, for the
+              same {{fig.params.m}} attackers continuing on more systems. Within each column the horizontal axis is
+              common to all rows, so that the spread of each quantity can be compared across <span data-tex>n</span>.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=distBernoulli --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Laws of Sₙ, Sₙ/n and Sₙ/√n at increasing n, Bernoulli model
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Bars are the simulated densities of {{fig.params.m}} attackers, the ink steps the exact law (2) over the
+                  same bins, and the dashed curve under <span data-tex>S_n/\sqrt{n}</span> the standard normal density; each
+                  row is scaled to its own maximum. The total score spreads out, the average score concentrates at
+                  <span data-tex>p</span>, and the normalised score keeps its width while its centre
+                  <span data-tex>p\sqrt{n}</span> moves away from zero.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Attackers m</dt><dd>{{fig.params.m}}</dd></div>
+                  <div><dt>Mean of Sₙ/n, n = 10⁴</dt><dd>{{fig.moments.bernoulli.n10000.average.mean}}</dd></div>
+                  <div><dt>Var(Sₙ/n), n = 10⁴</dt><dd>{{fig.moments.bernoulli.n10000.average.variance}}</dd></div>
+                  <div><dt>Var(Sₙ/√n), n = 10⁴</dt><dd>{{fig.moments.bernoulli.n10000.normalized.variance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, Bernoulli stream {{fig.params.seeds.bernoulli}}; p = {{fig.params.p}}.</p>
+              </figcaption>
+            </figure>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas"><!-- @figure id=distRademacher --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Laws of Sₙ, Sₙ/n and Sₙ/√n at increasing n, Rademacher model
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  As in Figure 2, for the symmetric increment. The total score takes only values of the parity of
+                  <span data-tex>n</span>, two units apart; the normalised score settles on the standard normal density.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Attackers m</dt><dd>{{fig.params.m}}</dd></div>
+                  <div><dt>Mean of Sₙ/n, n = 10⁴</dt><dd>{{fig.moments.rademacher.n10000.average.mean}}</dd></div>
+                  <div><dt>Var(Sₙ/n), n = 10⁴</dt><dd>{{fig.moments.rademacher.n10000.average.variance}}</dd></div>
+                  <div><dt>Var(Sₙ/√n), n = 10⁴</dt><dd>{{fig.moments.rademacher.n10000.normalized.variance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, Rademacher stream {{fig.params.seeds.rademacher}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              Table 1 sets the sample moments against (3). Each estimate is given with its standard error,
+              <span data-tex>s/\sqrt{m}</span> for the mean and <span data-tex>\sqrt{(\hat\mu_4 - s^4)/m}</span> for the
+              variance, where <span data-tex>\hat\mu_4</span> is the sample fourth central moment.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>Sample mean and variance of the three quantities over
+                {{fig.params.m}} simulated attackers, with standard errors, and their theoretical values (3) beneath.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=moments --></div>
+            </figure>
+            <!-- T4: compare the behaviour of the three quantities as n increases (S5): location, spread and shape, with values from Table 1 (e.g. Var(Sₙ) = {{fig.moments.bernoulli.n10000.total.variance}} against {{fig.moments.bernoulli.n10000.total.theoryVariance}}). -->
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Variance under the three normalisations</h2>
+            <p>
+              Dividing <span data-tex>S_n</span> by <span data-tex>n^{\alpha}</span> multiplies its variance by
+              <span data-tex>n^{-2\alpha}</span>:
+            </p>
+            <div class="equation" id="eq-variance">
+              <div data-tex-display>
+                \mathrm{Var}\!\left(\frac{S_n}{n^{\alpha}}\right) = \sigma^2\, n^{1 - 2\alpha}, \qquad
+                \log_{10} \mathrm{Var}\!\left(\frac{S_n}{n^{\alpha}}\right) = \log_{10}\sigma^2 + (1 - 2\alpha)\log_{10} n ,
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              a straight line of slope <span data-tex>+1</span>, <span data-tex>-1</span> and <span data-tex>0</span> on
+              log–log axes for <span data-tex>\alpha = 0</span>, <span data-tex>1</span> and <span data-tex>1/2</span>.
+              Figure 4 plots the sample variances of the {{fig.params.m}} attackers at the {{fig.params.curveCount}}
+              values n = {{fig.params.curveN}}; Table 2 gives the least-squares slopes and constants.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas"><!-- @figure id=variance --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>Variance of Sₙ, Sₙ/n and Sₙ/√n against n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Red points are the sample variances, lines the theoretical laws (4), labelled with the least-squares
+                  slope of the logarithm of the sample variance on the logarithm of <span data-tex>n</span>.
+                </p>
+                <dl class="pplot__stats pplot__stats--3 pplot__stats--math">
+                  <div><dt>Slope of Var(Sₙ)</dt><dd>{{fig.variance.bernoulli.total.slope}} · {{fig.variance.rademacher.total.slope}}</dd></div>
+                  <div><dt>Slope of Var(Sₙ/n)</dt><dd>{{fig.variance.bernoulli.average.slope}} · {{fig.variance.rademacher.average.slope}}</dd></div>
+                  <div><dt>Slope of Var(Sₙ/√n)</dt><dd>{{fig.variance.bernoulli.normalized.slope}} · {{fig.variance.rademacher.normalized.slope}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Bernoulli · Rademacher; {{fig.params.m}} attackers, seed {{fig.params.seed}}.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>Least-squares fit of <span data-tex>\log_{10}</span> of the
+                sample variance on <span data-tex>\log_{10} n</span> over the {{fig.params.curveCount}} values of
+                <span data-tex>n</span>: the slope against its theoretical value <span data-tex>1 - 2\alpha</span>, and the
+                fitted constant <span data-tex>10^{\text{intercept}}</span> against <span data-tex>\sigma^2</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=varianceFits --></div>
+            </figure>
+            <!-- T4: interpret the three regimes (S7): the variance of Sₙ diverges, that of Sₙ/n vanishes (the LLN of §6), that of Sₙ/√n is constant (the scale of the CLT of §7). Note that the three slopes are estimated from the same attackers, so their errors are not independent. -->
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Law of large numbers</h2>
+            <p>
+              The weak law of large numbers states that <span data-tex>S_n/n</span> converges in probability to
+              <span data-tex>\mu</span>: for every <span data-tex>\varepsilon &gt; 0</span>,
+              <span data-tex>\Pr\{|S_n/n - \mu| \ge \varepsilon\} \to 0</span> as <span data-tex>n \to \infty</span>.
+              Two inequalities bound this probability at finite <span data-tex>n</span>:
+            </p>
+            <div class="equation" id="eq-bounds">
+              <div data-tex-display>
+                \Pr\left\{\left|\frac{S_n}{n} - \mu\right| \ge \varepsilon\right\} \le \frac{\sigma^2}{n\varepsilon^2}
+                \quad\text{(Chebyshev)}, \qquad
+                \Pr\left\{\left|\frac{S_n}{n} - \mu\right| \ge \varepsilon\right\} \le 2\exp\!\left(-\frac{2n\varepsilon^2}{(b - a)^2}\right)
+                \quad\text{(Hoeffding)} .
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              Figure 5 compares them with the exact probability, computed from (2), and with the proportion of the
+              {{fig.params.m}} attackers whose average deviates by at least <span data-tex>\varepsilon</span>, for
+              <span data-tex>\varepsilon</span> = {{fig.params.eps1}} and {{fig.params.eps2}}.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas"><!-- @figure id=lln --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>Probability of a deviation of the average score of at least ε
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Exact probability (solid), Chebyshev's bound (long dashes) and Hoeffding's bound (short dashes) on
+                  logarithmic axes cut at <span data-tex>10^{-6}</span>; red points are the simulated proportions with
+                  Wilson 95% intervals, the interval alone where no attacker deviated. The dashed level is
+                  {{fig.params.llnLevel}}.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>n for 5%, exact</dt><dd>{{fig.lln.bernoulli.eps10.nExact}}</dd></div>
+                  <div><dt>n for 5%, Hoeffding</dt><dd>{{fig.lln.bernoulli.eps10.nHoeffding}}</dd></div>
+                  <div><dt>n for 5%, Chebyshev</dt><dd>{{fig.lln.bernoulli.eps10.nChebyshev}}</dd></div>
+                  <div><dt>Exact, n = 10⁴</dt><dd>{{fig.lln.bernoulli.eps10.n10000.exact}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Statistics for the Bernoulli model with ε = {{fig.params.eps1}}; {{fig.params.m}} attackers, seed {{fig.params.seed}}.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>The probability
+                <span data-tex>\Pr\{|S_n/n - \mu| \ge \varepsilon\}</span> at n = {{fig.params.distributionN}}: the
+                simulated proportion over {{fig.params.m}} attackers with its Wilson 95% interval, the exact value from
+                (2), and the bounds (5).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=llnTable --></div>
+            </figure>
+            <!-- T4: discuss convergence in probability (S6): the exact curve falls exponentially (large deviations), Hoeffding captures the exponential rate, Chebyshev only 1/n; Rademacher needs about four times as many systems as Bernoulli p = 0.3 because σ² is 1 against 0.21 (nExact {{fig.lln.rademacher.eps10.nExact}} vs {{fig.lln.bernoulli.eps10.nExact}}); the lattice effects at small n. -->
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Central limit theorem</h2>
+            <h3 id="s7-1">7.1 The Rademacher case</h3>
+            <p>
+              In the Rademacher model <span data-tex>\mu = 0</span> and <span data-tex>\sigma = 1</span>, so the
+              normalised score is the standardised sum and the central limit theorem states that
+              <span data-tex>S_n/\sqrt{n} \to N(0, 1)</span> in distribution. Its rate is measured by the Kolmogorov
+              distance, bounded by the Berry–Esseen inequality:
+            </p>
+            <div class="equation" id="eq-be">
+              <div data-tex-display>
+                D_n = \sup_{x}\left|\Pr\left\{\frac{S_n - n\mu}{\sigma\sqrt{n}} \le x\right\} - \Phi(x)\right|
+                \le \frac{C\,\rho}{\sigma^3\sqrt{n}}, \qquad \rho = \mathbb{E}|X_1 - \mu|^3, \quad C \le 0.4748 .
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              For a sample of <span data-tex>m</span> attackers the empirical distribution function lies within
+              <span data-tex>\sqrt{\ln(2/\alpha)/(2m)}</span> of the true one with probability at least
+              <span data-tex>1 - \alpha</span> (the Dvoretzky–Kiefer–Wolfowitz inequality with Massart's constant):
+              {{fig.clt.dkw}} for <span data-tex>m</span> = {{fig.params.m}} at the {{fig.params.dkwLevel}} level. Below
+              this floor the simulation cannot resolve <span data-tex>D_n</span>, and the exact law (2) takes over.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig6-title">
+              <div class="chart-figure__canvas"><!-- @figure id=cltPlots --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>Normal probability plots of the Rademacher Sₙ/√n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  {{fig.params.quantiles}} quantiles of the normalised score of {{fig.params.m}} attackers at Blom's
+                  plotting positions, on normal probability paper, after n = {{fig.params.cltPlotN}} systems. A
+                  standard normal sample lies on a straight line; the steps at small <span data-tex>n</span> are the
+                  lattice of <span data-tex>S_n</span>.
+                </p>
+                <dl class="pplot__stats pplot__stats--3 pplot__stats--math">
+                  <div><dt>r, n = 10</dt><dd>{{fig.clt.plot.n10.r}}</dd></div>
+                  <div><dt>r, n = 100</dt><dd>{{fig.clt.plot.n100.r}}</dd></div>
+                  <div><dt>r, n = 1000</dt><dd>{{fig.clt.plot.n1000.r}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, Rademacher stream {{fig.params.seeds.rademacher}}.</p>
+              </figcaption>
+            </figure>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas"><!-- @figure id=kolmogorov --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>Kolmogorov distance to N(0, 1) against n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Left, the Rademacher <span data-tex>S_n/\sqrt{n}</span>: exact distance, Berry–Esseen bound (6) and the
+                  distance of the simulated sample, with the DKW radius as the Monte Carlo floor. Right, the Bernoulli
+                  model: the standardised score for <span data-tex>p</span> = {{fig.params.p}} and {{fig.params.pSmall}}, and
+                  <span data-tex>S_n/\sqrt{n}</span> itself for <span data-tex>p</span> = {{fig.params.p}}, whose distance
+                  tends to 1 (open points: simulated).
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Slope, exact</dt><dd>{{fig.clt.rademacher.slopeExact}}</dd></div>
+                  <div><dt>Slope, simulated</dt><dd>{{fig.clt.rademacher.slopeEmpirical}}</dd></div>
+                  <div><dt>√n·Dₙ, n = 10⁴</dt><dd>{{fig.clt.rademacher.n10000.scaled}}</dd></div>
+                  <div><dt>DKW radius</dt><dd>{{fig.clt.dkw}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; simulated slope fitted for 10 ≤ n ≤ 100, exact slope from n = 10.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>Kolmogorov distances to N(0, 1): exact from (2) and simulated
+                over {{fig.params.m}} attackers, with the Berry–Esseen bound and <span data-tex>\sqrt{n}\,D_n</span> for the
+                Rademacher model, the standardised Bernoulli score for <span data-tex>p</span> = {{fig.params.p}} and
+                {{fig.params.pSmall}}, and the Bernoulli <span data-tex>S_n/\sqrt{n}</span> without centring.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=kolmogorovTable --></div>
+            </figure>
+            <!-- T4: discuss S8: Dₙ falls as n^(−1/2) with √n·Dₙ → 1/√(2π) ≈ {{fig.theory.latticeConstant}} (the atom of the lattice at 0); the simulated distance reaches the DKW floor from about n = {{fig.clt.rademacher.floorN}}. -->
+
+            <h3 id="s7-2">7.2 The Bernoulli case</h3>
+            <p>
+              In the Bernoulli model <span data-tex>S_n/\sqrt{n}</span> has mean <span data-tex>p\sqrt{n}</span>, which
+              grows without bound, so it has no limit law; it is the standardised score
+              <span data-tex>(S_n - np)/\sqrt{np(1 - p)}</span> that converges to <span data-tex>N(0, 1)</span>, more
+              slowly the more skewed the increment. Figure 8 shows both.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig8-title">
+              <div class="chart-figure__canvas"><!-- @figure id=contrast --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig8-title">
+                  <span class="pplot__fig-no">Figure 8.</span>The Bernoulli Sₙ/√n against its standardised form
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The same attackers and bins as Figure 2, on two scales: <span data-tex>S_n/\sqrt{n}</span>, which drifts
+                  to the right with mean <span data-tex>p\sqrt{n}</span> while its width stays
+                  <span data-tex>\sqrt{p(1 - p)}</span>, and the standardised score, which settles on the standard normal
+                  density (dashed).
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Mean p√n, n = 10⁴</dt><dd>{{fig.clt.bernoulli.n10000.drift}}</dd></div>
+                  <div><dt>Dₙ of Sₙ/√n, n = 10⁴</dt><dd>{{fig.clt.bernoulli.n10000.raw}}</dd></div>
+                  <div><dt>Dₙ standardised, n = 10⁴</dt><dd>{{fig.clt.bernoulli.n10000.exact}}</dd></div>
+                  <div><dt>Berry–Esseen, n = 10⁴</dt><dd>{{fig.clt.bernoulli.n10000.berryEsseen}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, Bernoulli stream {{fig.params.seeds.bernoulli}}; p = {{fig.params.p}}.</p>
+              </figcaption>
+            </figure>
+            <!-- T4: discuss the rate for p = {{fig.params.pSmall}} ({{fig.clt.bernoulliSmall.n100.exact}} at n = 100 against {{fig.clt.bernoulli.n100.exact}} for p = 0.3): the Berry–Esseen ratio ρ/σ³ is {{fig.theory.bernoulliSmall.rho}} against {{fig.theory.bernoulli.rho}}. -->
+            <p>
+              The panel below draws the law of the normalised score at any <span data-tex>n</span> against the standard
+              normal density.
+            </p>
+            <div class="demo" data-demo="clt">
+              <p class="demo__fallback">
+                The interactive panel of the central limit theorem runs in the online version of this page: it shows the
+                exact law of the normalised score at a chosen n against the standard normal law. Figures 6 to 8 and
+                Table 4 report the same comparison at fixed n.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Systems and attackers</h2>
+            <h3 id="s8-1">8.1 The number of attackers as the size of the sample</h3>
+            <p>
+              Under the reading of §1 the number of attackers <span data-tex>m</span> does not change the law of
+              <span data-tex>S_n</span>; it sets how precisely the simulation estimates it. To show this at
+              <span data-tex>n</span> = {{fig.params.precisionN}}, the attackers are split into disjoint groups of
+              <span data-tex>m</span> = {{fig.params.groupSizes}}, and each group estimates the mean average score and the
+              distribution function of <span data-tex>S_n</span>.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig9-title">
+              <div class="chart-figure__canvas"><!-- @figure id=precision --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig9-title">
+                  <span class="pplot__fig-no">Figure 9.</span>Precision of the estimates against the number of attackers
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Left, the root-mean-square error of the group mean of <span data-tex>S_n/n</span> against the standard
+                  error <span data-tex>\sigma/\sqrt{nm}</span>; right, the median supremum distance between the empirical
+                  and the exact distribution function of <span data-tex>S_n</span> against the 95% DKW radius. Filled
+                  points Bernoulli, open points Rademacher; both fall as <span data-tex>1/\sqrt{m}</span>.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>RMS / SE, m = 10</dt><dd>{{fig.precision.bernoulli.m10.ratio}}</dd></div>
+                  <div><dt>RMS / SE, m = 100</dt><dd>{{fig.precision.bernoulli.m100.ratio}}</dd></div>
+                  <div><dt>Median distance, m = 100</dt><dd>{{fig.precision.bernoulli.m100.medianD}}</dd></div>
+                  <div><dt>DKW radius, m = 100</dt><dd>{{fig.precision.bernoulli.m100.dkw}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; n = {{fig.params.precisionN}}; statistics for the Bernoulli model.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>Precision of the estimates of a group of
+                <span data-tex>m</span> attackers at <span data-tex>n</span> = {{fig.params.precisionN}}: the
+                root-mean-square error of the group mean of <span data-tex>S_n/n</span> with the standard error beneath,
+                the median supremum distance between the empirical and the exact distribution function, the 95% DKW
+                radius and the share of groups beyond it (Bernoulli / Rademacher).
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=precisionTable --></div>
+            </figure>
+
+            <h3 id="s8-2">8.2 The aggregate penetration score</h3>
+            <p>
+              The aggregate score of <span data-tex>m</span> attackers over <span data-tex>n</span> systems,
+              <span data-tex>T = \sum_{j=1}^{m} S_n^{(j)}</span>, is a sum of <span data-tex>mn</span> independent
+              increments, so its law depends on <span data-tex>m</span> and <span data-tex>n</span> only through their
+              product:
+            </p>
+            <div class="equation" id="eq-aggregate">
+              <div data-tex-display>
+                \mathbb{E}[T] = mn\mu, \qquad \mathrm{Var}(T) = mn\sigma^2, \qquad T = mna + (b - a)\,K, \quad K \sim \mathrm{Bin}(mn, q) .
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <figure class="table-figure" aria-labelledby="table6-caption">
+              <figcaption id="table6-caption">
+                <span class="table-figure__no">Table 6.</span>The aggregate score <span data-tex>T</span> of a group of
+                <span data-tex>m</span> attackers over <span data-tex>n</span> systems at a fixed budget
+                <span data-tex>mn</span> = {{fig.aggregate.budget}}: sample mean and variance over the disjoint groups of the
+                simulation, with the theoretical values (7) beneath.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table6-caption"><!-- @figure id=aggregateTable --></div>
+            </figure>
+            <!-- T4: interpret Table 6 and the total over all {{fig.params.m}} attackers at n = {{fig.aggregate.total.bernoulli.n}} ({{fig.aggregate.total.bernoulli.value}} against {{fig.aggregate.total.bernoulli.mean}} ± {{fig.aggregate.total.bernoulli.sd}}, z = {{fig.aggregate.total.bernoulli.z}}): the aggregate grows linearly in m and in n, its relative spread falls as 1/√(mn). -->
+
+            <h3 id="s8-3">8.3 The best attacker</h3>
+            <p>
+              The aggregate hides the extremes. In the Bernoulli model <span data-tex>S_n</span> counts the systems an
+              attacker penetrates, and the chance that at least one of <span data-tex>m</span> independent attackers
+              penetrates at least a share <span data-tex>p + \delta</span> of them is
+            </p>
+            <div class="equation" id="eq-best">
+              <div data-tex-display>
+                \Pr\left\{\max_{1 \le j \le m} S_n^{(j)} \ge \lceil (p + \delta)\,n \rceil\right\}
+                = 1 - \Pr\{S_n &lt; \lceil (p + \delta)\,n \rceil\}^{m} ,
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              with <span data-tex>\delta</span> = {{fig.best.excess}}, a share of {{fig.best.share}}. Figure 10 plots (8)
+              against <span data-tex>m</span> and Table 7 gives the number of attackers for an even chance.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig10-title">
+              <div class="chart-figure__canvas"><!-- @figure id=best --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig10-title">
+                  <span class="pplot__fig-no">Figure 10.</span>Chance that the best of m attackers penetrates {{fig.best.share}} of n systems
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Lines are the exact probabilities (8) for each <span data-tex>n</span>; red points the proportion of
+                  disjoint groups of <span data-tex>m</span> simulated attackers whose best member reaches the share, with
+                  Wilson 95% intervals. The dashed line marks one half.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>m for 1/2, n = 100</dt><dd>{{fig.best.n100.m50}}</dd></div>
+                  <div><dt>m for 1/2, n = 200</dt><dd>{{fig.best.n200.m50}}</dd></div>
+                  <div><dt>m for 1/2, n = 500</dt><dd>{{fig.best.n500.m50}}</dd></div>
+                  <div><dt>m for 1/2, n = 1000</dt><dd>{{fig.best.n1000.m50}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, Bernoulli stream {{fig.params.seeds.bernoulli}}; p = {{fig.params.p}}, δ = {{fig.best.excess}}.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table7-caption">
+              <figcaption id="table7-caption">
+                <span class="table-figure__no">Table 7.</span>The threshold <span data-tex>\lceil (p + \delta)n \rceil</span>,
+                the probability that one attacker reaches it, its exponential rate <span data-tex>-\ln P/n</span>, the number
+                of attackers for an even chance that one of them reaches it,
+                <span data-tex>m_{1/2} = \ln 2 / (-\ln(1 - P))</span>, and the probability (8) for
+                <span data-tex>m</span> = {{fig.params.m}}.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table7-caption"><!-- @figure id=bestTable --></div>
+            </figure>
+            <!-- T4: S9 discussion: system size against number of attackers. P(one attacker) decays like exp(−n·I) with rate → {{fig.best.n1000.rate}} at n = 1000 (Hoeffding's exponent 2δ² = {{fig.best.hoeffdingRate}}), so m must grow exponentially with n to keep the best attacker's chance; the aggregate grows linearly. -->
+          </section>
+
+          <!-- ===================================================== §9 -->
+          <section class="hw-section" id="s9" aria-labelledby="s9-title">
+            <h2 id="s9-title"><a class="section-anchor" href="#s9" aria-label="Section 9, link to this section">§9</a> Discussion</h2>
+            <p>
+              The three quantities answer three different questions about the same attackers. The total score measures
+              how much an attacker has achieved, the average score its rate of success per system, and the normalised
+              score the size of its luck relative to the typical fluctuation.
+            </p>
+            <!-- T4: full discussion: summary of §3–§8 against S4–S9; limits of the model (independence across systems and attackers, identical systems, no learning); what changes with a different p; the role of m as Monte Carlo precision versus the role of n as the horizon of the process. -->
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure, table and statistic on this page is computed when the page is built, from the parameters and
+              seeds of Table A1: <code>npm test</code> runs the test suite, which covers the exact laws, the bounds, the
+              simulation and the study, and <code>npm run build</code> rebuilds the page. The study draws
+              {{fig.params.draws}} pseudo-random numbers and takes about {{fig.params.computeSeconds}} seconds (last
+              computed {{fig.params.computedAt}}); its results are cached under <code>node_modules/.cache/hw04/</code> with
+              the key <code>{{fig.params.cacheKey}}</code>, a hash of the parameters, of the source of every module involved
+              and of the figure provider itself, so that a change to any of them recomputes everything.
+            </p>
+            <p>
+              Each model has its own stream, derived from the master seed {{fig.params.seed}} by a 32-bit hash of a label:
+              {{fig.params.seeds.bernoulli}} for the Bernoulli run and {{fig.params.seeds.rademacher}} for the Rademacher
+              run. Within a run the attackers draw from one Mulberry32 stream one after another, attacker
+              <span data-tex>j</span> taking draws <span data-tex>jN + 1, \dots, (j + 1)N</span> for the largest
+              <span data-tex>n = N</span>, so the scores at every smaller <span data-tex>n</span> are those of the same
+              attackers and no two attackers share a draw.
+            </p>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the study.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/penetration.js">src/lib/penetration.js</a>: the two increment models, the simulation, the exact laws (2), the bounds (5) and (6), the Kolmogorov distances and (8).</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/penetration-study.js">src/lib/penetration-study.js</a>: the experiments of §3–§8.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/penetration-charts.js">src/lib/penetration-charts.js</a>: the figures and tables.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/04/figures.js">homework/04/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the section or
+              chapter in which the cited statement is found.
+            </p>
+            <!-- T4: at most 10 entries as <li id="ref-N">, in the format of homework 03. Candidates: Berry (1941) and Esseen (1942) for (6); Shevtsova (2011) for C ≤ 0.4748; Hoeffding (1963) for (5); Dvoretzky, Kiefer and Wolfowitz (1956) and Massart (1990) for the DKW radius; Wilson (1927) for the intervals; Kolmogorov (1933) for Dₙ; Feller (1968) or Billingsley (1995) for the LLN, the CLT and the binomial law; Blom (1958) for the plotting positions. -->
+            <ol></ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

@@ -34,7 +34,7 @@ export const MODELS = {
 export const NORMALIZATIONS = {
   total: { id: 'total', label: 'Sₙ', name: 'Total score', exponent: 0, divisor: () => 1 },
   average: { id: 'average', label: 'Sₙ/n', name: 'Average score', exponent: 1, divisor: (n) => n },
-  normalized: { id: 'normalized', label: 'Sₙ/√n', name: 'Normalized total score', exponent: 0.5, divisor: (n) => Math.sqrt(n) },
+  normalized: { id: 'normalized', label: 'Sₙ/√n', name: 'Normalised total score', exponent: 0.5, divisor: (n) => Math.sqrt(n) },
 };
 
 /** Shevtsova's (2011) constant of the Berry–Esseen inequality for i.i.d. summands. */
