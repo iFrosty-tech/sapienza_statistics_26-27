@@ -62,9 +62,9 @@ export default [
     shortLabel: '3',
     title: 'Random walks of penetration scores: the law of large numbers and the central limit theorem',
     abstract:
-      'The penetration of n systems by each of m attackers is modelled as a random walk with independent Bernoulli or Rademacher increments. Simulated trajectories of the total, average and normalised scores are set against their exact laws to show the convergence in probability of the average, the three regimes of the variance under the different normalisations and the convergence of the normalised Rademacher score to the standard normal law.',
+      'The penetration of n systems by each of m attackers is modelled as a random walk with independent Bernoulli or Rademacher increments. Simulated trajectories of the total, average and normalised scores are set against their exact binomial laws to show the convergence in probability of the average, the three regimes of the variance under the different normalisations and the convergence of the normalised Rademacher score to the standard normal law at the Berry–Esseen rate. The number of attackers sets the precision of the simulation and the aggregate score, while the number needed for one of them to penetrate an unusually large share of the systems grows exponentially with n.',
     topics: ['Random walks', 'Law of large numbers', 'Central limit theorem', 'Monte Carlo simulation'],
     published: '2026-10-27',
-    status: 'upcoming',
+    status: 'published',
   },
 ];
