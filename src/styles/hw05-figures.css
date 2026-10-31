@@ -1,0 +1,161 @@
+/* Homework 05: styles of the drawings of the recurrence (src/hw05/scene.js), shared by Figure 1 and
+   Panel 1, and of the error chart of src/lib/welford-charts.js. The chart primitives come from hw01.css.
+   The new observation is a value, so it is plot red; the means are ink, and the rectangle takes the
+   minor ruling, because red never fills a surface. */
+
+/* ---------- The plane ---------- */
+
+.stepper-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-form);
+}
+
+.stepper-diagonal {
+  stroke: var(--ruling-ink);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.stepper-rect {
+  fill: var(--ruling-minor);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.stepper-guide {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.stepper-observation {
+  fill: var(--plot);
+  stroke: var(--paper);
+  stroke-width: 1.25;
+}
+
+.stepper-new-mean {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 1;
+}
+
+.stepper-old-mean {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.stepper-area {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.stepper-axis-title {
+  fill: var(--ruling-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Figure 1: one plane per step, as many to a row as fit, on any width. */
+.stepper-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-4);
+}
+
+.stepper-ledger-frame {
+  margin-top: var(--space-4);
+}
+
+/* ---------- The ledger ---------- */
+
+.stepper-ledger__track {
+  fill: none;
+  stroke: var(--ruling);
+  stroke-width: 1;
+}
+
+.stepper-ledger__segment {
+  fill: var(--ruling-minor);
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.stepper-ledger__segment--alt {
+  fill: var(--paper-deep);
+}
+
+.stepper-ledger__segment[data-current='true'] {
+  stroke-width: 1.75;
+}
+
+.stepper-ledger__label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.stepper-ledger__total {
+  fill: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- The error chart (Fig. 2) ---------- */
+
+/* The worst sample of a point: a thin bar in the ruling, under the medians. */
+.chart--errors .chart__range {
+  stroke: var(--ruling);
+  stroke-width: 2.5;
+  stroke-linecap: butt;
+}
+
+.chart--errors .chart__curve--measured {
+  stroke-width: 1.25;
+}
+
+.chart--errors .chart__curve--published {
+  stroke-dasharray: 6 4;
+  stroke-width: 1;
+}
+
+.chart--errors .chart__point--ring {
+  fill: var(--paper);
+}
+
+/* ---------- Tables ---------- */
+
+/* Formulas in a table cell are read, not compared: they keep the text face and may wrap. */
+.table-figure .data-table .data-table__form {
+  white-space: normal;
+  min-width: 13rem;
+  font-variant-numeric: lining-nums;
+}
+
+/* Table 3 has eight numeric columns: a narrower gutter keeps it within the measure. */
+.data-table.data-table--errors :is(td, th) {
+  padding-inline: 0.3125rem;
+}
+
+.data-table.data-table--errors tbody th {
+  white-space: nowrap;
+}
+
+.data-table.data-table--slopes .data-table__form {
+  min-width: 7rem;
+  white-space: nowrap;
+}
+
+@media print {
+  .stepper-panels {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

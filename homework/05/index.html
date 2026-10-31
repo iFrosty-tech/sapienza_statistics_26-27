@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw05.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Knuth's recurrence for the mean</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Welford's recurrence for SS</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> The variance</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> The code</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> A geometric reading</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Numerical behaviour</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Discussion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>Ex. 1 – Welford’s Recurrence Formulas</p>
+              <p>
+                Derive Welford’s recurrence formulas for the sum of squares (SS) and the variance, following the same
+                approach as Knuth’s recurrence formula for the mean.
+              </p>
+              <p>Write the corresponding code. The core logic should require only about 3 lines.</p>
+            </blockquote>
+            <p>
+              Throughout, <span data-tex>x_1, x_2, \dots</span> is a sequence of observations read one at a time, and after
+              <span data-tex>k</span> of them
+            </p>
+            <div class="equation" id="eq-defs">
+              <div data-tex-display>
+                \bar{x}_k = \frac{1}{k}\sum_{i=1}^{k} x_i, \qquad SS_k = \sum_{i=1}^{k} (x_i - \bar{x}_k)^2
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              are the sample mean and the corrected sum of squares. Evaluated directly, each definition stores every
+              observation, and <span data-tex>SS_k</span> must be recomputed from scratch at every <span data-tex>k</span>
+              because each new observation moves the mean around which all the earlier deviations are measured. A
+              recurrence replaces this with a rule that turns the summary of <span data-tex>k - 1</span> observations and
+              one new value into the summary of <span data-tex>k</span> observations, and forgets the data.
+            </p>
+            <p>
+              §2 derives the recurrence for the mean. §3 applies the same approach to the sum of squares, with every
+              algebraic step shown, and §4 deduces the forms for the variance. §5 gives the code, whose core is three
+              lines, and traces it on a small data set. §6 reads the increment of the sum of squares as the area of a
+              rectangle. §7 measures what the recurrence is worth numerically: against the exact value of the sum of
+              squares, computed in rational arithmetic, the textbook formula loses every digit at a condition number of
+              about {{fig.textbook.lostKappa}}, while the error of the recurrence grows only in proportion to that number,
+              with a fitted log–log slope of {{fig.slope.welford}} against {{fig.slope.textbook}}. §8 discusses cost,
+              memory and streaming, and links to the second exercise, which uses these recurrences. Every number on the
+              page is computed when the page is built, from the parameters and seeds listed in the appendix.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Knuth's recurrence for the mean</h2>
+            <p>
+              The approach has three moves: write the quantity after <span data-tex>k</span> observations as a sum, separate
+              the last term, and recognise in what remains the same quantity after <span data-tex>k - 1</span> observations.
+              For the mean, multiplying (1) by <span data-tex>k</span> and separating the last term gives
+            </p>
+            <div class="equation" id="eq-sum">
+              <div data-tex-display>
+                k\,\bar{x}_k = \sum_{i=1}^{k} x_i = \sum_{i=1}^{k-1} x_i + x_k = (k - 1)\,\bar{x}_{k-1} + x_k .
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              Dividing by <span data-tex>k</span> and writing <span data-tex>(k - 1)/k = 1 - 1/k</span> yields the recurrence
+              presented by Knuth [<a href="#ref-4">4</a>, §4.2.2]:
+            </p>
+            <div class="equation" id="eq-knuth">
+              <div data-tex-display>
+                \bar{x}_k = \frac{k - 1}{k}\,\bar{x}_{k-1} + \frac{x_k}{k}
+                = \bar{x}_{k-1} + \frac{x_k - \bar{x}_{k-1}}{k}, \qquad k \ge 1 .
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              The initial condition is <span class="math-tie"><span data-tex>\bar{x}_1 = x_1</span>,</span> which is what (3)
+              returns at <span data-tex>k = 1</span> from any starting value, because the old estimate then has weight zero;
+              taking <span data-tex>\bar{x}_0 = 0</span> merely lets the same line of code handle the first observation.
+            </p>
+            <p>
+              The second form of (3) reads as <em>old estimate + innovation/k</em>. The innovation
+              <span data-tex>x_k - \bar{x}_{k-1}</span> is the part of the new observation that the current estimate did not
+              predict, and <span data-tex>1/k</span> is the share of it that the estimate absorbs. The role of
+              <span data-tex>k</span> is exactly this gain: the first observation is taken whole, the second moves the
+              estimate halfway towards it, and the hundredth by one hundredth. The gain falls as <span data-tex>1/k</span>
+              because every observation must end with the same weight in the mean; a constant gain would give an
+              exponentially weighted average instead, a different estimator.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Welford's recurrence for the sum of squares</h2>
+            <h3 id="s3-1">3.1 Derivation</h3>
+            <p>
+              The same three moves apply, once <span data-tex>SS_k</span> is written as a sum over which the last term can
+              be separated. The definition (1) itself is not such a sum, because every one of its terms contains
+              <span class="math-tie"><span data-tex>\bar{x}_k</span>.</span> Expanding the square and using
+              <span data-tex>\sum_{i=1}^{k} x_i = k\,\bar{x}_k</span> removes the difficulty:
+            </p>
+            <div class="equation" id="eq-identity">
+              <div data-tex-display>
+                SS_k = \sum_{i=1}^{k} x_i^2 - 2\bar{x}_k \sum_{i=1}^{k} x_i + k\,\bar{x}_k^2
+                = \sum_{i=1}^{k} x_i^2 - k\,\bar{x}_k^2 .
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>Separating the last term of the sum in (4) gives</p>
+            <div class="equation" id="eq-separate">
+              <div data-tex-display>
+                SS_k = \sum_{i=1}^{k-1} x_i^2 + x_k^2 - k\,\bar{x}_k^2 .
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              The identity (4) at <span data-tex>k - 1</span> reads
+              <span class="math-tie"><span data-tex>\sum_{i=1}^{k-1} x_i^2 = SS_{k-1} + (k - 1)\,\bar{x}_{k-1}^2</span>,</span>
+              which brings the previous sum of squares into (5). The increment we are after is therefore
+            </p>
+            <div class="equation" id="eq-increment">
+              <div data-tex-display>
+                SS_k - SS_{k-1} = (k - 1)\,\bar{x}_{k-1}^2 + x_k^2 - k\,\bar{x}_k^2 .
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              Now the recurrence for the mean enters. By (2), <span class="math-tie"><span data-tex>(k - 1)\,\bar{x}_{k-1} = k\,\bar{x}_k - x_k</span>.</span>
+              Replacing one of the two factors <span data-tex>\bar{x}_{k-1}</span> of the first term of (6) with this
+              expression gives
+            </p>
+            <div class="equation" id="eq-replace">
+              <div data-tex-display>
+                SS_k - SS_{k-1} = \bar{x}_{k-1}\,(k\,\bar{x}_k - x_k) + x_k^2 - k\,\bar{x}_k^2 .
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <p>
+              Multiplying out and collecting the two terms in <span data-tex>x_k</span> and the two terms in
+              <span data-tex>k\,\bar{x}_k</span> gives
+            </p>
+            <div class="equation" id="eq-collect">
+              <div data-tex-display>
+                \begin{aligned}
+                SS_k - SS_{k-1} &amp;= x_k^2 - x_k\,\bar{x}_{k-1} - k\,\bar{x}_k^2 + k\,\bar{x}_k\,\bar{x}_{k-1} \\
+                &amp;= x_k\,(x_k - \bar{x}_{k-1}) - \bar{x}_k \cdot k\,(\bar{x}_k - \bar{x}_{k-1}) .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              The last bracket is the recurrence (3) again, in the form
+              <span class="math-tie"><span data-tex>k\,(\bar{x}_k - \bar{x}_{k-1}) = x_k - \bar{x}_{k-1}</span>.</span>
+              Substituting it leaves the common factor <span data-tex>x_k - \bar{x}_{k-1}</span> in both terms:
+            </p>
+            <div class="equation" id="eq-factor">
+              <div data-tex-display>
+                \begin{aligned}
+                SS_k - SS_{k-1} &amp;= x_k\,(x_k - \bar{x}_{k-1}) - \bar{x}_k\,(x_k - \bar{x}_{k-1}) \\
+                &amp;= (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>This is the recurrence for the sum of squares:</p>
+            <div class="equation equation--key" id="eq-welford">
+              <div data-tex-display>
+                SS_k = SS_{k-1} + (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k), \qquad SS_1 = 0 .
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              Both factors are deviations of the new observation: one from the mean before it arrived and one from the mean
+              after. Starting from <span data-tex>SS_0 = 0</span> and <span data-tex>\bar{x}_0 = 0</span> also gives
+              <span class="math-tie"><span data-tex>SS_1 = 0</span>,</span> because at <span data-tex>k = 1</span> the second
+              factor vanishes.
+            </p>
+
+            <h3 id="s3-2">3.2 An equivalent form, and a consequence</h3>
+            <p>The two factors of (10) are proportional. From (3),</p>
+            <div class="equation" id="eq-ratio">
+              <div data-tex-display>
+                x_k - \bar{x}_k = x_k - \bar{x}_{k-1} - \frac{x_k - \bar{x}_{k-1}}{k}
+                = \frac{k - 1}{k}\,(x_k - \bar{x}_{k-1}) ,
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>and substituting (11) into (10) gives a form that uses the old mean alone:</p>
+            <div class="equation" id="eq-square">
+              <div data-tex-display>
+                SS_k = SS_{k-1} + \frac{k - 1}{k}\,(x_k - \bar{x}_{k-1})^2 .
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              The increment in (12) is a square times a non-negative factor, so the sum of squares never decreases: a new
+              observation can only add to the total spread, and it leaves it unchanged exactly when
+              <span data-tex>x_k = \bar{x}_{k-1}</span> or <span class="math-tie"><span data-tex>k = 1</span>.</span> The
+              definition (1) does not show this, since each new observation changes every deviation in the sum. By (11) the
+              same holds for the product in (10), whose two factors always share their sign. The property also matters in
+              floating point, as §7 shows: the sum is built from non-negative terms.
+            </p>
+
+            <h3 id="s3-3">3.3 Who gave which form</h3>
+            <p>
+              The recurrence is known by Welford's name, from a note of 1962 [<a href="#ref-6">6</a>] on computing corrected
+              sums of squares and products. Chan, Golub and LeVeque state that, for an unweighted sum of squares, the
+              algorithms of Welford, of West [<a href="#ref-7">7</a>] and of Hanson are virtually identical, and that those
+              of Youngs and Cramer [<a href="#ref-8">8</a>], which update the running sum rather than the running mean, are
+              similar [<a href="#ref-2">2</a>, pp. 242–243]. The product form (10) is the one usually quoted from Knuth, who
+              credits the method to Welford [<a href="#ref-4">4</a>, §4.2.2]; Ling compares several such algorithms
+              [<a href="#ref-5">5</a>]. The full texts of the note of 1962 and of Knuth's section were not available to the
+              author, so this paragraph reports them through the sources just named and does not claim which algebraic form
+              Welford's note prints. The derivation above is independent of those texts, and each of its results is
+              checked numerically in the test suite of the repository.
+            </p>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> The variance</h2>
+            <p>
+              The sample variance of <span data-tex>k \ge 2</span> observations, the estimator that is unbiased for the
+              variance of the population, is
+            </p>
+            <div class="equation" id="eq-variance">
+              <div data-tex-display>
+                s_k^2 = \frac{SS_k}{k - 1}, \qquad k \ge 2 .
+              </div>
+              <span class="equation__no">(13)</span>
+            </div>
+            <p>
+              Dividing (12) by <span data-tex>k - 1</span> and writing <span data-tex>SS_{k-1} = (k - 2)\,s_{k-1}^2</span>
+              gives a recurrence in the variance alone:
+            </p>
+            <div class="equation" id="eq-variance-scaled">
+              <div data-tex-display>
+                s_k^2 = \frac{k - 2}{k - 1}\,s_{k-1}^2 + \frac{(x_k - \bar{x}_{k-1})^2}{k}, \qquad k \ge 2 .
+              </div>
+              <span class="equation__no">(14)</span>
+            </div>
+            <p>
+              At <span data-tex>k = 2</span> the coefficient of <span data-tex>s_1^2</span> is zero, so the undefined
+              <span data-tex>s_1^2</span> is never needed and (14) gives
+              <span class="math-tie"><span data-tex>s_2^2 = (x_2 - x_1)^2/2</span>.</span> The form that mirrors Knuth's
+              recurrence starts from (10) instead. Dividing
+              <span data-tex>SS_k = (k - 2)\,s_{k-1}^2 + (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k)</span> by
+              <span data-tex>k - 1</span> and writing <span data-tex>(k - 2)/(k - 1) = 1 - 1/(k - 1)</span> gives
+            </p>
+            <div class="equation" id="eq-variance-mirror">
+              <div data-tex-display>
+                s_k^2 = s_{k-1}^2 + \frac{(x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) - s_{k-1}^2}{k - 1}, \qquad k \ge 2,
+              </div>
+              <span class="equation__no">(15)</span>
+            </div>
+            <p>
+              with the convention <span data-tex>s_1^2 = 0</span> at <span class="math-tie"><span data-tex>k = 2</span>.</span>
+              This is again <em>old estimate + innovation/step</em>: the product of the two deviations plays the part of one
+              new squared deviation, the innovation is its distance from the current variance, and the gain is
+              <span data-tex>1/(k - 1)</span> because the variance has <span data-tex>k - 1</span> degrees of freedom. The
+              estimate rises when the new observation is more surprising than the variance predicts and falls when it is
+              less so, even though <span data-tex>SS_k</span> itself never falls. The same steps with the divisor
+              <span data-tex>k</span> give the variance of the data themselves,
+              <span class="math-tie"><span data-tex>\hat{\sigma}_k^2 = SS_k/k</span>:</span>
+            </p>
+            <div class="equation" id="eq-population">
+              <div data-tex-display>
+                \hat{\sigma}_k^2 = \hat{\sigma}_{k-1}^2 + \frac{(x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) - \hat{\sigma}_{k-1}^2}{k},
+                \qquad \hat{\sigma}_0^2 = 0 .
+              </div>
+              <span class="equation__no">(16)</span>
+            </div>
+            <p>
+              Table 2 runs each form on the data set of §5. All of them reach the value of the definition: the largest difference between a form and the definition is
+              {{fig.forms.maxDifference}}.
+            </p>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>Each form of the recurrence, run from its initial condition on
+                the {{fig.trace.n}} values of Table 1, against the value given by the definition.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=forms --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> The code</h2>
+            <p>
+              Listing 1 is cut from the file that runs, <code>src/lib/welford.js</code>, when the page is built, so the code
+              printed here cannot drift from the code that the second exercise calls. The state is three numbers: the count
+              <span class="math-tie"><span data-tex>k</span>,</span> the mean and the sum of squares. The marked lines are the
+              core logic: the innovation, the recurrence (3) and the recurrence (10). The variance (13) is one division
+              away.
+            </p>
+            <figure class="listing-figure" aria-labelledby="listing1-caption">
+              <figcaption id="listing1-caption">
+                <span class="table-figure__no">Listing 1.</span>The recurrences as code, with the line numbers of
+                <code>src/lib/welford.js</code>. The three lines of core logic are marked.
+              </figcaption>
+              <pre class="listing" tabindex="0" role="region" aria-labelledby="listing1-caption"><code><!-- @figure id=listing --></code></pre>
+            </figure>
+            <p>
+              The order of the lines is part of the algorithm. The innovation is saved before the mean moves, because it is
+              the deviation from the old mean; the last line then reads the updated mean, so that
+              <code>x - state.mean</code> is the deviation from the new one. Exchanging the last two lines would multiply the
+              innovation by itself and overstate every increment by the factor <span class="math-tie"><span data-tex>k/(k - 1)</span>.</span>
+            </p>
+            <p>
+              Table 1 traces the code on {{fig.trace.data}}. Each row holds the state after one call of
+              <code>push</code>. The run ends at <span data-tex>\bar{x}_8</span> = {{fig.trace.mean}},
+              <span data-tex>SS_8</span> = {{fig.trace.ss}} and <span data-tex>s_8^2</span> = {{fig.trace.variance}}, the
+              values given by the definitions, and the variance of the data themselves is {{fig.trace.population}}.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>The state of the recurrences after each observation. The
+                increment is the product of the two deviations printed in its row, and each
+                <span data-tex>SS_k</span> is the previous one plus that increment.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=trace --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> A geometric reading</h2>
+            <p>
+              The increment in (10) is a product of two lengths, so it can be drawn as an area. Take a square plane with the
+              data on both axes, at the same scale, and mark on its diagonal the point
+              <span class="math-tie"><span data-tex>(x_k, x_k)</span>.</span> The rectangle with opposite corners
+              <span data-tex>(\bar{x}_{k-1}, \bar{x}_k)</span> and <span data-tex>(x_k, x_k)</span> has sides
+              <span data-tex>x_k - \bar{x}_{k-1}</span> and <span class="math-tie"><span data-tex>x_k - \bar{x}_k</span>,</span>
+              and its area is what the observation adds to the sum of squares.
+            </p>
+            <p>
+              Three results of §3 can be read from this drawing. The two sides have the same sign, so the rectangle always
+              lies on one side of the diagonal and its area is never negative: the sum of squares never decreases. By (11)
+              the height is <span data-tex>(k - 1)/k</span> of the width, so the rectangle approaches a square as
+              <span data-tex>k</span> grows, and (12) states its area through the width alone. And the mean moves towards the
+              observation by <span data-tex>1/k</span> of the width, which is the difference between the two sides.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=geometry --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The increment of the sum of squares as an area
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Three steps of the data set of Table 1. The red point is the new observation on the diagonal; the open
+                  ring on the horizontal axis is the previous mean and the filled point on the vertical axis the new mean.
+                  The strip below lays all the areas end to end at one height, so that its length is
+                  <span data-tex>SS_8</span> = {{fig.trace.ss}}. The last observation alone contributes
+                  {{fig.trace.biggest.share}} of it, because it lies furthest from the mean of the observations before it.
+                </p>
+              </figcaption>
+            </figure>
+            <div class="demo" data-demo="stepper" data-seed="{{fig.params.seed}}">
+              <p class="demo__fallback">
+                Panel 1 is interactive and needs scripting. It steps through a sequence of up to sixteen values, editable or
+                drawn from a seed, and for each observation shows the previous mean, the new observation, the new mean, the
+                rectangle whose area is added and the running sum of squares as accumulated area. On the data of Table 1,
+                step 2 moves the mean from {{fig.trace.step2.old}} to {{fig.trace.step2.mean}} and adds an area of
+                {{fig.trace.step2.area}}, and step 8 moves it from {{fig.trace.step8.old}} to {{fig.trace.step8.mean}} and
+                brings the sum of squares to {{fig.trace.step8.ss}}; Figure 1 prints these steps.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Numerical behaviour</h2>
+            <h3 id="s7-1">7.1 Three algorithms for one quantity</h3>
+            <p>
+              In exact arithmetic the recurrence and the definition are the same number. In floating point they are not.
+              Three algorithms are compared here, in the terminology of Chan, Golub and LeVeque
+              [<a href="#ref-2">2</a>]: the <em>textbook</em> one-pass formula (4) evaluated as
+              <span class="math-tie"><span data-tex>\sum x_i^2 - (\sum x_i)^2/n</span>,</span> the <em>two-pass</em> algorithm,
+              which computes the mean and then sums the squared deviations of (1), and Welford's <em>updating</em> recurrence
+              (10), which is the code of Listing 1.
+            </p>
+            <p>
+              The textbook formula subtracts two large, nearly equal numbers. When the spread of the data is small compared
+              with their size, most of the digits of the two terms agree and cancel, and what is left is dominated by the
+              rounding errors made while accumulating them. The sensitivity of the problem is measured by the condition
+              number [<a href="#ref-2">2</a>, §2]
+            </p>
+            <div class="equation" id="eq-kappa">
+              <div data-tex-display>
+                \kappa = \frac{\lVert x \rVert_2}{\sqrt{SS}} = \sqrt{1 + \frac{n\,\bar{x}^2}{SS}} ,
+              </div>
+              <span class="equation__no">(17)</span>
+            </div>
+            <p>
+              the second equality being (4) divided by <span class="math-tie"><span data-tex>SS</span>.</span> It satisfies
+              <span class="math-tie"><span data-tex>\kappa \ge 1</span>,</span> equals one when the mean is zero, and for a
+              small spread is close to the absolute mean divided by the standard deviation.
+            </p>
+
+            <h3 id="s7-2">7.2 The exact value</h3>
+            <p>
+              A measurement of rounding error needs a reference free of rounding error, and a higher-precision run only
+              moves the problem. Here the reference is exact. Every finite double is a dyadic rational
+              <span class="math-tie"><span data-tex>m\,2^{e}</span>,</span> so a sample can be scaled to a common power of two
+              and written as integers <span class="math-tie"><span data-tex>M_i</span>,</span> with
+              <span class="math-tie"><span data-tex>x_i = M_i\,2^{e}</span>.</span> Then
+            </p>
+            <div class="equation" id="eq-exact">
+              <div data-tex-display>
+                SS = \frac{n \sum_i M_i^2 - \bigl(\sum_i M_i\bigr)^2}{n}\; 2^{2e}
+              </div>
+              <span class="equation__no">(18)</span>
+            </div>
+            <p>
+              is evaluated in arbitrary-precision integers, with no rounding at all. The relative error of a computed value
+              is itself a difference of rationals, evaluated exactly and rounded once at the end, to the nearest double, so
+              that nothing in the measurement is limited by the arithmetic being measured.
+            </p>
+
+            <h3 id="s7-3">7.3 The experiment</h3>
+            <p>
+              Each sample holds <span data-tex>n</span> = {{fig.params.n}} values <span class="math-tie"><span data-tex>x_i = c + z_i</span>,</span>
+              the <span data-tex>z_i</span> being seeded standard normal draws. The shift <span data-tex>c</span> leaves the
+              spread alone and raises the mean, so sweeping it sweeps the condition number:
+              <span data-tex>\kappa \approx c</span> for <span class="math-tie"><span data-tex>c \gg 1</span>.</span> The same
+              {{fig.params.replicates}} samples of <span data-tex>z</span> are used at each of the
+              {{fig.params.shiftCount}} shifts, and the rounding of <span data-tex>c + z_i</span> belongs to the data, since
+              the double that is stored is the observation. Figure 2 shows the median and the worst relative error of each
+              algorithm.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=errors --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Relative error of the sum of squares against the condition number
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Points are medians over {{fig.params.replicates}} samples, and the bar above each point reaches the worst
+                  sample. Open rings are the textbook (solid line) and two-pass (dotted line) algorithms; filled red points
+                  are Welford's recurrence. The dashed curves are the published bounds of Table 4, with
+                  <span data-tex>n</span> = {{fig.params.n}} and the unit roundoff <span data-tex>u</span> =
+                  {{fig.params.u}}.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Slope, textbook</dt><dd>{{fig.slope.textbook}}</dd></div>
+                  <div><dt>Slope, Welford</dt><dd>{{fig.slope.welford}}</dd></div>
+                  <div><dt>All digits lost at κ</dt><dd>{{fig.textbook.lostKappa}}</dd></div>
+                  <div><dt>Samples</dt><dd>{{fig.samples}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, stream {{fig.params.seedNoise}}; n = {{fig.params.n}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              On unshifted data the three algorithms are indistinguishable, near {{fig.at.k0.textbookMedian}}. With the
+              shift they separate at once. At <span data-tex>\kappa</span> = {{fig.at.k4.kappa}} the median error of the
+              textbook formula is {{fig.at.k4.textbookMedian}}, about {{fig.at.k4.digits}} correct digits, against
+              {{fig.at.k4.welfordMedian}} for the recurrence and {{fig.at.k4.twoPassMedian}} for the two-pass algorithm. At
+              {{fig.at.k7.kappa}} the textbook median is {{fig.at.k7.textbookMedian}}, and from
+              {{fig.textbook.lostKappa}} it exceeds one, so that no digit is correct. The formula also returns an impossible
+              value, a negative sum of squares, first at {{fig.textbook.firstNegativeKappa}}: {{fig.at.k8.negative}} of the
+              samples at {{fig.at.k8.kappa}} and {{fig.textbook.negative}} results in the whole sweep. The recurrence returned
+              {{fig.welford.negative}} negative values in {{fig.samples}} samples, as does the two-pass algorithm
+              ({{fig.twoPass.negative}}): both add only non-negative terms, the property noted in §3.2. At
+              {{fig.at.k8.kappa}} the median error of the recurrence is still {{fig.at.k8.welfordMedian}}.
+            </p>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>Median and worst relative error at selected condition numbers,
+                over {{fig.params.replicates}} samples of {{fig.params.n}} values, and the share of samples for which the
+                textbook formula returned a negative sum of squares.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=errorTable --></div>
+            </figure>
+
+            <h3 id="s7-4">7.4 Measured slopes and published bounds</h3>
+            <p>
+              Chan, Golub and LeVeque tabulate bounds on the relative error, keeping only the dominant terms and suppressing
+              small constant factors [<a href="#ref-2">2</a>, Table 1]: <span data-tex>n\kappa^2 u</span> for the textbook
+              algorithm, <span data-tex>n\kappa u</span> for updating, and <span data-tex>nu + n^2\kappa^2 u^2</span> for the
+              two-pass algorithm, whose second term, derived in their earlier report [<a href="#ref-1">1</a>], is the
+              reason the algorithm is not simply independent of <span class="math-tie"><span data-tex>\kappa</span>.</span>
+              Table 4 sets these exponents against the slopes of the medians on the logarithmic axes of Figure 2.
+            </p>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>The exponent of <span data-tex>\kappa</span> in the bounds of
+                [<a href="#ref-2">2</a>, Table 1], the least-squares slope of the median error on log–log axes over the stated
+                range, and the largest ratio of a worst error to its bound where the bound is below one.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=slopesTable --></div>
+            </figure>
+            <p>
+              The measured slopes agree with the exponents: {{fig.slope.textbook}} against two for the textbook formula, and
+              {{fig.slope.welford}} against one for the recurrence. The two-pass error is flat, with slope
+              {{fig.slope.twoPassFlat}}, until the second-order term takes over near the end of the sweep, where the slope is
+              {{fig.slope.twoPassTail}} over the last few points, too few to count as a measurement of the exponent. The
+              bounds are generous, as bounds should be: over the informative part of the sweep the worst error reached at most
+              {{fig.ratio.textbook}} of the textbook bound, {{fig.ratio.welford}} of the updating bound and
+              {{fig.ratio.twoPass}} of the two-pass bound. The same comparison explains the ranking in Figure 2 and adds a
+              qualification. The two-pass algorithm is the more accurate of the two stable ones, as its bound and Higham's
+              discussion of these formulae say [<a href="#ref-3">3</a>, Ch. 1], but it needs the data twice. The error of the
+              recurrence grows with <span data-tex>\kappa</span> where the first-order error of the two-pass algorithm does
+              not, and that is the price of a single pass.
+            </p>
+
+            <h3 id="s7-5">7.5 The limit of the argument</h3>
+            <p>
+              Stability is not the reason to use the recurrence in the second exercise. Its scores
+              <span data-tex>X = B\,Y</span> have mean <span data-tex>\mu</span> = {{fig.scores.mean}} and variance
+              <span data-tex>\sigma^2</span> = {{fig.scores.variance}}, so by (17) their condition number is close to
+              <span data-tex>\sqrt{1 + \mu^2/\sigma^2}</span> = {{fig.scores.kappaTheory}}, and the median over
+              {{fig.params.scoreReplicates}} simulated samples of {{fig.params.scoreN}} scores is {{fig.scores.kappa}}. On
+              such data every algorithm is accurate: the worst relative errors are {{fig.scores.textbook}} for the textbook
+              formula, {{fig.scores.twoPass}} for the two-pass algorithm and {{fig.scores.welford}} for the recurrence. The
+              measurable gap of §7.3 needs data whose spread is small compared with their mean, which scores between 0 and 10
+              with a mean near their standard deviation are not. There, the reasons to prefer the recurrence are that it makes
+              one pass, needs constant memory, and delivers the estimates at every step.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Discussion</h2>
+            <p>
+              <em>Cost.</em> One call of <code>push</code> performs a division, a multiplication and four additions or
+              subtractions, plus the increment of the counter, so <span data-tex>n</span> observations cost a time linear in
+              <span class="math-tie"><span data-tex>n</span>,</span> as the two other algorithms do. The textbook formula
+              performs fewer operations per observation, with one multiplication and two additions and no division in its
+              loop, and the recurrence pays for its stability with the division, as Chan, Golub and LeVeque note when they
+              compare operation counts [<a href="#ref-2">2</a>, p. 247]. A shift of the data by a rough estimate of the mean,
+              which they also analyse, reduces <span data-tex>\kappa</span> and is the classical alternative when the mean
+              can be guessed in advance.
+            </p>
+            <p>
+              <em>Memory.</em> The state is three numbers, whatever the length of the sequence. The two-pass algorithm stores
+              the data or reads them twice, which is impossible on a stream and costly on a file too large for main memory.
+              The textbook formula also needs only constant memory, which is what makes it tempting and why its numerical
+              failure matters.
+            </p>
+            <p>
+              <em>Streaming.</em> The recurrence holds a valid mean and variance after every observation, not only at the
+              end. A monitor can read them at any moment, an experiment can stop as soon as an estimate is precise enough,
+              and a whole trajectory of estimates comes at no extra cost, since each is an intermediate state of the same
+              computation. The price is that no observation can be revised or removed once absorbed without further
+              machinery.
+            </p>
+            <p>
+              The <a href="{{base}}homework/06/">second exercise</a> relies on exactly this property: each hacker's trajectory
+              of scores passes through these recurrences once, and the code of Listing 1 yields the sampling mean and variance
+              of the trajectory, and every intermediate estimate along it, with three numbers of state per hacker.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure, table and statistic on this page is computed when the page is built, from the parameters and
+              seeds of Table A1, and can be recomputed by anyone from the repository: <code>npm test</code> runs the test
+              suite, which checks each form of the recurrence against the definition, the exact sum of squares against hand
+              cases, the three algorithms, the stepper and the study, and <code>npm run build</code> rebuilds the page. The
+              study takes about {{fig.params.computeSeconds}} seconds (last computed {{fig.params.computedAt}}); its results
+              are cached under <code>node_modules/.cache/hw05/</code> with the key <code>{{fig.params.cacheKey}}</code>, a hash
+              of the parameters, of the source of every module involved and of the figure provider itself, so that a change
+              to any of them recomputes everything.
+            </p>
+            <p>
+              Each part of the study has its own stream of a seeded Mulberry32 generator, whose seed is the master seed
+              {{fig.params.seed}} combined by exclusive or with the 32-bit FNV-1a hash of a label:
+              {{fig.params.seedNoise}} (label <code>stability:noise</code>) for the {{fig.params.draws}} standard normal draws
+              of the sweep, obtained by the Box–Muller transform, and {{fig.params.seedScores}}
+              (<code>stability:scores</code>) for the scores of §7.5. The generator is statistical, not cryptographic. Panel 1
+              starts from the data of Table 1 and draws further sequences with the same generator, from a seed that can be
+              set. Its first draw uses the master seed.
+            </p>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the study, with the figures and tables that
+                use them.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/welford.js">src/lib/welford.js</a>: the recurrences (3) and (10), shared with the second exercise.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/welford-stability.js">src/lib/welford-stability.js</a>: the exact sum of squares (18), the correctly rounded conversion, the condition number (17), the three algorithms and the sweep of §7.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/welford-charts.js">src/lib/welford-charts.js</a>: the listing, the tables and Figure 2.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/hw05/model.js">src/hw05/model.js</a>, <a href="{{site.repoUrl}}/blob/main/src/hw05/scene.js">src/hw05/scene.js</a> and <a href="{{site.repoUrl}}/blob/main/src/hw05/stepper-demo.js">src/hw05/stepper-demo.js</a>: the steps, each form of the recurrence, the geometry of Figure 1 and Panel 1.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/05/figures.js">homework/05/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the section or table
+              in which the cited statement is found where it applies. Entries 1 and 2 were consulted directly. For entries 3 to 8
+              the metadata are verified, and what is said of their content is reported through entry 2 or through published
+              descriptions of them, not from a reading of the full text.
+            </p>
+            <ol>
+              <li id="ref-1">Chan, T. F., Golub, G. H. and LeVeque, R. J. (1979). <cite>Updating formulae and a pairwise algorithm for computing sample variances</cite>. Technical Report STAN-CS-79-773, Department of Computer Science, Stanford University.</li>
+              <li id="ref-2">Chan, T. F., Golub, G. H. and LeVeque, R. J. (1983). <cite>Algorithms for computing the sample variance: analysis and recommendations</cite>. The American Statistician, 37(3), pp. 242–247. <a class="ref-link" href="https://doi.org/10.1080/00031305.1983.10483115">https://doi.org/10.1080/00031305.1983.10483115</a></li>
+              <li id="ref-3">Higham, N. J. (2002). <cite>Accuracy and Stability of Numerical Algorithms</cite>. 2nd edn, Society for Industrial and Applied Mathematics, Philadelphia. <a class="ref-link" href="https://doi.org/10.1137/1.9780898718027">https://doi.org/10.1137/1.9780898718027</a></li>
+              <li id="ref-4">Knuth, D. E. (1998). <cite>The Art of Computer Programming, Volume 2: Seminumerical Algorithms</cite>. 3rd edn, Addison-Wesley, Reading, MA.</li>
+              <li id="ref-5">Ling, R. F. (1974). <cite>Comparison of several algorithms for computing sample means and variances</cite>. Journal of the American Statistical Association, 69(348), pp. 859–866. <a class="ref-link" href="https://doi.org/10.1080/01621459.1974.10480219">https://doi.org/10.1080/01621459.1974.10480219</a></li>
+              <li id="ref-6">Welford, B. P. (1962). <cite>Note on a method for calculating corrected sums of squares and products</cite>. Technometrics, 4(3), pp. 419–420. <a class="ref-link" href="https://doi.org/10.1080/00401706.1962.10490022">https://doi.org/10.1080/00401706.1962.10490022</a></li>
+              <li id="ref-7">West, D. H. D. (1979). <cite>Updating mean and variance estimates: an improved method</cite>. Communications of the ACM, 22(9), pp. 532–535. <a class="ref-link" href="https://doi.org/10.1145/359146.359153">https://doi.org/10.1145/359146.359153</a></li>
+              <li id="ref-8">Youngs, E. A. and Cramer, E. M. (1971). <cite>Some results relevant to choice of sum and sum-of-product algorithms</cite>. Technometrics, 13(3), pp. 657–665. <a class="ref-link" href="https://doi.org/10.1080/00401706.1971.10488826">https://doi.org/10.1080/00401706.1971.10488826</a></li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
