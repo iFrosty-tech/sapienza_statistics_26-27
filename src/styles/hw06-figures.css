@@ -1,0 +1,32 @@
+/* Homework 06: styles of the build-time figures and tables of homework/06/figures.js, in the
+   vocabulary of hw01.css and hw04-figures.css: green for the paper, ink for theory, plot red
+   for simulated values only. */
+
+/* A cloud of hundreds of hackers (Fig. 9): the paper ring of a point would pale it to pink. */
+.chart--cloud .chart__point {
+  stroke: none;
+  opacity: 0.55;
+}
+
+/* A theoretical value drawn through a cloud stays above it. */
+.chart--cloud .chart__curve {
+  stroke-width: 1.25;
+}
+
+/* Tables 1 to 3 are numeric columns of one size: the gutter is narrower than the compact default. */
+.data-table.data-table--sampling :is(td, th) {
+  padding-inline: 0.375rem;
+}
+
+/* Panels stack on phones: at two columns they would print at half their type size. */
+@media (max-width: 40rem) {
+  .chart-figure .chart-panels[data-columns] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media print {
+  .chart--cloud .chart__point {
+    opacity: 1;
+  }
+}
