@@ -14,8 +14,8 @@
  *
  * Figure ids (<!-- @figure id=… --> markers of homework/05/index.html)
  *   listing      Listing 1, the functions push and sampleVariance of src/lib/welford.js
- *   trace        Table 1, the recurrences on the data set, step by step
- *   forms        Table 2, every form of the recurrence at the last step
+ *   trace        Table 2, the recurrences on the data set, step by step
+ *   forms        Table 1, every form of the recurrence at the last step
  *   geometry     Fig. 1, the rectangle of three steps on the plane, and the ledger of areas
  *   errors       Fig. 2, the relative error of the three algorithms against κ
  *   errorTable   Table 3, the same at selected κ, with the negative results of the textbook formula

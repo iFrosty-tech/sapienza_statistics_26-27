@@ -39,7 +39,7 @@
  *   avg.{zCount, zAboveTwo, zExpected, zMax, zList}
  *   spread.nN.{sdMean, exactMean, sdVariance, exactVariance, ratio, relMean, relVariance},
  *   spread.{slopeMean, slopeExactMean, slopeVariance, slopeExactVariance, ratioLimit}
- *   dist.nN.{atomShare, atomExact, skewMean}
+ *   dist.nN.{atomShare, atomExact, skewMean, skewVariance}
  *   precision.{n, slopeMean, slopeVariance, exactSdMean, exactSdVariance}, precision.mM.{groups, rmsMean, seMean,
  *     spreadMean, rmsVariance, seVariance, spreadVariance}
  *   cover.nN.{tRate, tLow, tHigh, tBelow, tAbove, tBelowShare, chiRate, chiLow, chiHigh, chiBelow, chiAbove,
@@ -305,6 +305,7 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
     token(`dist.n${d.n}.atomShare`, fmt(d.atomShare, 4));
     token(`dist.n${d.n}.atomExact`, fmt(allZeroProbability(d.n), 4));
     token(`dist.n${d.n}.skewMean`, fmt(SKEWNESS / Math.sqrt(d.n), 3));
+    token(`dist.n${d.n}.skewVariance`, fmt(d.skewVariance, 3));
   }
 
   token('precision.n', int(precision.n));

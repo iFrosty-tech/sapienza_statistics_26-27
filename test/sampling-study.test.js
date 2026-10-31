@@ -14,6 +14,7 @@ import {
   KURTOSIS,
   MU,
   SIGMA2,
+  SKEWNESS,
   chiSquareCoverageLimit,
   correlationMeanVariance,
   drawScore,
@@ -210,6 +211,13 @@ test('E4 counts a hacker with every score 0 as a miss of both intervals, and sta
   assert.equal(t.t.hits, 1);
   assert.equal(t.chi.hits, 1);
   assert.equal(t.degenerate, 1);
+});
+
+test('E3 measures the skewness of s²ₙ across hackers, which for this law stays below that of x̄ₙ', () => {
+  for (const block of results.distributions) {
+    assert.ok(Number.isFinite(block.skewVariance));
+    assert.ok(Math.abs(block.skewVariance) < SKEWNESS / Math.sqrt(block.n), `n = ${block.n}: ${block.skewVariance}`);
+  }
 });
 
 test('E4 gives coverage with Wilson intervals, and the χ² coverage is far from 95 % at the largest n', () => {

@@ -56,7 +56,7 @@ test('the provider is deterministic for the same results', () => {
 
 test('the listing is cut from the source file, with its own line numbers and its three core lines marked', () => {
   const push = extractListing(source, 'push');
-  const lines = source.split('\n');
+  const lines = source.split(/\r?\n/);
   assert.equal(lines[push.first - 1], 'export function push(state, x) {');
   assert.equal(push.lines.join('\n'), lines.slice(push.first - 1, push.first - 1 + push.lines.length).join('\n'));
   assert.equal(push.lines.at(-1), '}');

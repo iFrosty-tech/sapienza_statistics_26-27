@@ -295,15 +295,15 @@
               <span class="equation__no">(16)</span>
             </div>
             <p>
-              Table 2 runs each form on the data set of §5. All of them reach the value of the definition: the largest difference between a form and the definition is
+              Table 1 runs each form on the data set of §5. All of them reach the value of the definition: the largest difference between a form and the definition is
               {{fig.forms.maxDifference}}.
             </p>
-            <figure class="table-figure" aria-labelledby="table2-caption">
-              <figcaption id="table2-caption">
-                <span class="table-figure__no">Table 2.</span>Each form of the recurrence, run from its initial condition on
-                the {{fig.trace.n}} values of Table 1, against the value given by the definition.
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>Each form of the recurrence, run from its initial condition on
+                the {{fig.trace.n}} values of Table 2, against the value given by the definition.
               </figcaption>
-              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=forms --></div>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=forms --></div>
             </figure>
           </section>
 
@@ -331,18 +331,18 @@
               innovation by itself and overstate every increment by the factor <span class="math-tie"><span data-tex>k/(k - 1)</span>.</span>
             </p>
             <p>
-              Table 1 traces the code on {{fig.trace.data}}. Each row holds the state after one call of
+              Table 2 traces the code on {{fig.trace.data}}. Each row holds the state after one call of
               <code>push</code>. The run ends at <span data-tex>\bar{x}_8</span> = {{fig.trace.mean}},
               <span data-tex>SS_8</span> = {{fig.trace.ss}} and <span data-tex>s_8^2</span> = {{fig.trace.variance}}, the
               values given by the definitions, and the variance of the data themselves is {{fig.trace.population}}.
             </p>
-            <figure class="table-figure" aria-labelledby="table1-caption">
-              <figcaption id="table1-caption">
-                <span class="table-figure__no">Table 1.</span>The state of the recurrences after each observation. The
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>The state of the recurrences after each observation. The
                 increment is the product of the two deviations printed in its row, and each
                 <span data-tex>SS_k</span> is the previous one plus that increment.
               </figcaption>
-              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=trace --></div>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=trace --></div>
             </figure>
           </section>
 
@@ -358,8 +358,8 @@
               and its area is what the observation adds to the sum of squares.
             </p>
             <p>
-              Three results of §3 can be read from this drawing. The two sides have the same sign, so the rectangle always
-              lies on one side of the diagonal and its area is never negative: the sum of squares never decreases. By (11)
+              Three results of §3 can be read from this drawing. The two sides have the same sign, because the new mean lies
+              between the old mean and the observation, so the area is never negative: the sum of squares never decreases. By (11)
               the height is <span data-tex>(k - 1)/k</span> of the width, so the rectangle approaches a square as
               <span data-tex>k</span> grows, and (12) states its area through the width alone. And the mean moves towards the
               observation by <span data-tex>1/k</span> of the width, which is the difference between the two sides.
@@ -372,7 +372,7 @@
                   <span class="pplot__provenance">Computed</span>
                 </p>
                 <p>
-                  Three steps of the data set of Table 1. The red point is the new observation on the diagonal; the open
+                  Three steps of the data set of Table 2. The red point is the new observation on the diagonal; the open
                   ring on the horizontal axis is the previous mean and the filled point on the vertical axis the new mean.
                   The strip below lays all the areas end to end at one height, so that its length is
                   <span data-tex>SS_8</span> = {{fig.trace.ss}}. The last observation alone contributes
@@ -384,7 +384,7 @@
               <p class="demo__fallback">
                 Panel 1 is interactive and needs scripting. It steps through a sequence of up to sixteen values, editable or
                 drawn from a seed, and for each observation shows the previous mean, the new observation, the new mean, the
-                rectangle whose area is added and the running sum of squares as accumulated area. On the data of Table 1,
+                rectangle whose area is added and the running sum of squares as accumulated area. On the data of Table 2,
                 step 2 moves the mean from {{fig.trace.step2.old}} to {{fig.trace.step2.mean}} and adds an area of
                 {{fig.trace.step2.area}}, and step 8 moves it from {{fig.trace.step8.old}} to {{fig.trace.step8.mean}} and
                 brings the sum of squares to {{fig.trace.step8.ss}}; Figure 1 prints these steps.
@@ -537,7 +537,9 @@
               <span data-tex>\sqrt{1 + \mu^2/\sigma^2}</span> = {{fig.scores.kappaTheory}}, and the median over
               {{fig.params.scoreReplicates}} simulated samples of {{fig.params.scoreN}} scores is {{fig.scores.kappa}}. On
               such data every algorithm is accurate: the worst relative errors are {{fig.scores.textbook}} for the textbook
-              formula, {{fig.scores.twoPass}} for the two-pass algorithm and {{fig.scores.welford}} for the recurrence. The
+              formula, {{fig.scores.twoPass}} for the two-pass algorithm and {{fig.scores.welford}} for the recurrence. The two-pass
+              figure is the largest because about 70% of the scores are exactly 0, and their identical terms round in the same
+              direction, so that the errors add up instead of cancelling; thirteen digits remain correct all the same. The
               measurable gap of §7.3 needs data whose spread is small compared with their mean, which scores between 0 and 10
               with a mean near their standard deviation are not. There, the reasons to prefer the recurrence are that it makes
               one pass, needs constant memory, and delivers the estimates at every step.
@@ -552,8 +554,8 @@
               subtractions, plus the increment of the counter, so <span data-tex>n</span> observations cost a time linear in
               <span class="math-tie"><span data-tex>n</span>,</span> as the two other algorithms do. The textbook formula
               performs fewer operations per observation, with one multiplication and two additions and no division in its
-              loop, and the recurrence pays for its stability with the division, as Chan, Golub and LeVeque note when they
-              compare operation counts [<a href="#ref-2">2</a>, p. 247]. A shift of the data by a rough estimate of the mean,
+              loop. The recurrence pays for its stability with the extra work, and Chan, Golub and LeVeque compare the two
+              operation counts [<a href="#ref-2">2</a>]. A shift of the data by a rough estimate of the mean,
               which they also analyse, reduces <span data-tex>\kappa</span> and is the classical alternative when the mean
               can be guessed in advance.
             </p>
@@ -596,7 +598,7 @@
               {{fig.params.seedNoise}} (label <code>stability:noise</code>) for the {{fig.params.draws}} standard normal draws
               of the sweep, obtained by the Box–Muller transform, and {{fig.params.seedScores}}
               (<code>stability:scores</code>) for the scores of §7.5. The generator is statistical, not cryptographic. Panel 1
-              starts from the data of Table 1 and draws further sequences with the same generator, from a seed that can be
+              starts from the data of Table 2 and draws further sequences with the same generator, from a seed that can be
               set. Its first draw uses the master seed.
             </p>
             <figure class="table-figure" aria-labelledby="tableA1-caption">

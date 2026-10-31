@@ -167,8 +167,8 @@ export function planeScale([low, high], { size, margin }) {
 
 /**
  * The rectangle of a step: opposite corners (x̄ₖ₋₁, x̄ₖ) and (xₖ, xₖ), the second on
- * the diagonal of the plane. Both sides have the sign of the innovation, so the
- * rectangle always lies on one side of the diagonal and its area is never negative.
+ * the diagonal of the plane. Both sides have the sign of the innovation, so its
+ * area is never negative.
  * @returns {{ x: number, y: number, width: number, height: number, corner: [number, number] } | null}
  */
 export function rectangleOf(step, scale) {

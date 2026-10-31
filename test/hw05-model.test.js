@@ -172,7 +172,10 @@ test('the rectangle runs from (x̄ₖ₋₁, x̄ₖ) to the point (xₖ, xₖ) o
   assert.equal(r.height, 1 * unit);
   near(r.width * r.height, steps[1].area * unit * unit);
   assert.deepEqual(r.corner, [scale.x(4), scale.y(4)]);
-  // An observation below the mean opens the rectangle on the other side of the diagonal.
+  // The diagonal runs through the rectangle, from (x̄ₖ, x̄ₖ) to the corner (xₖ, xₖ).
+  assert.ok(r.x < scale.x(3.5) && scale.x(3.5) < r.x + r.width);
+  assert.ok(r.y < scale.y(3.5) && scale.y(3.5) < r.y + r.height);
+  // An observation below the mean opens the rectangle from the lower end of the diagonal.
   const down = rectangleOf(stepsOf([4, 2])[1], scale); // old mean 4, new mean 3, x = 2
   assert.equal(down.x, scale.x(2));
   assert.equal(down.y, scale.y(3));

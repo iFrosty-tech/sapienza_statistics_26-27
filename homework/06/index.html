@@ -589,10 +589,13 @@
               system (the exact value is <span class="math-tie"><span data-tex>0.7^5</span>,</span> or {{fig.dist.n5.atomExact}}) and they
               pile up at <span data-tex>\bar{x}_n = 0</span> and <span class="math-tie"><span data-tex>s_n^2 = 0</span>,</span> the atom of
               the score law seen through the estimators. As <span data-tex>n</span> grows the central limit theorem takes over,
-              and by n = 500 both histograms sit close to their normal curves, the sampling mean sooner than the sampling
-              variance: the skewness of <span data-tex>\bar{x}_n</span> is the skewness of the score divided by
-              <span class="math-tie"><span data-tex>\sqrt{n}</span>,</span> {{fig.dist.n5.skewMean}} at n = 5 and
-              {{fig.dist.n500.skewMean}} at n = 500.
+              and by n = 500 both histograms sit close to their normal curves. The skewness of <span data-tex>\bar{x}_n</span> is the
+              skewness of the score divided by <span class="math-tie"><span data-tex>\sqrt{n}</span>,</span> {{fig.dist.n5.skewMean}} at
+              n = 5 and {{fig.dist.n500.skewMean}} at n = 500. The sampling variance turns out to be less skewed still, with
+              {{fig.dist.n5.skewVariance}} and {{fig.dist.n500.skewVariance}} measured across the hackers at the same n, the second within sampling
+              error of 0. That is a coincidence of this law, whose moments nearly cancel the leading term of the third cumulant of
+              <span class="math-tie"><span data-tex>s_n^2</span>,</span> and not a general rule: for normal scores
+              <span data-tex>\bar{x}_n</span> has no skewness at all and <span data-tex>s_n^2</span> has some.
             </p>
 
             <h3 id="s6-3">6.3 Hackers against systems</h3>
@@ -628,8 +631,8 @@
               {{fig.precision.m10.rmsMean}} at m = 10 to {{fig.precision.m1000.rmsMean}} at m = 1,000 for the sampling mean, with fitted
               slopes of {{fig.precision.slopeMean}} and {{fig.precision.slopeVariance}}. The fit runs a little steeper than
               <span data-tex>-1/2</span> because the largest groups are few ({{fig.precision.m10000.groups}} groups at m = 10,000),
-              and the last points are themselves noisy. The spread of one hacker's estimate does not change at all:
-              {{fig.precision.m10.spreadMean}} at m = 10, {{fig.precision.m1000.spreadMean}} at m = 1,000, on its exact value of
+              and the last points are themselves noisy. The spread of one hacker's estimate stays where it is:
+              {{fig.precision.m10.spreadMean}} at m = 10, {{fig.precision.m1000.spreadMean}} at m = 1,000, within 1% of its exact value of
               {{fig.precision.exactSdMean}}. More hackers tell us more exactly what a hacker with
               {{fig.precision.n}} scores can expect; they do not make that hacker any better informed. Only
               <span data-tex>n</span> does that.
@@ -667,15 +670,19 @@
               <span class="math-tie"><span data-tex>s_n^2</span>,</span> unbiased by (9) and consistent by (11), can stand in for
               <span class="math-tie"><span data-tex>\sigma^2</span>.</span> The sample therefore reports both a value and how far to trust
               it, <span class="math-tie"><span data-tex>\bar{x}_n \pm s_n/\sqrt{n}</span>,</span> and the two numbers come out of the same
-              three-line recurrence. This is why unbiasedness of <span data-tex>s_n^2</span> matters beyond itself: it is what
-              makes the standard error of a sample computable from that sample.
+              three-line recurrence. What licenses the substitution is the consistency of
+              <span class="math-tie"><span data-tex>s_n^2</span>,</span> not its unbiasedness: <span data-tex>s_n^2/n</span> is unbiased
+              for <span class="math-tie"><span data-tex>\mathrm{Var}(\bar{x}_n)</span>,</span> yet its square root underestimates
+              <span data-tex>\sigma/\sqrt{n}</span> on average, by Jensen's inequality, and the biased
+              <span data-tex>\mathrm{SS}_n/n</span> would serve as well for large <span class="math-tie"><span data-tex>n</span>.</span>
             </p>
 
             <h3 id="s7-2">7.2 The t-interval for the mean</h3>
             <p>
               The central limit theorem gives
               <span data-tex>\sqrt{n}(\bar{x}_n - \mu)/\sigma \to N(0, 1)</span> in distribution, and
-              <span data-tex>s_n \to \sigma</span> in probability by (11), so Slutsky's theorem
+              <span data-tex>s_n \to \sigma</span> in probability, by (11) here and by the law of large numbers for any law of
+              finite variance, so Slutsky's theorem
               [<a href="#ref-4">4</a>] gives the same limit with the estimated standard deviation:
             </p>
             <div class="equation" id="eq-t">
@@ -824,10 +831,11 @@
             </p>
             <p>
               <em>Why it matters for inference.</em> Unbiasedness and the exact variances describe the sampling distribution of an
-              estimator, which is the object that gives a statement drawn from one sample its meaning. They let one hacker report
-              an estimate and its own standard error, and through the central limit theorem and Slutsky's theorem they yield an
-              interval for <span data-tex>\mu</span> with the stated coverage for large <span class="math-tie"><span data-tex>n</span>,</span> whatever the law.
-              They also mark the limits of that argument: the coverage of the usual interval for
+              estimator, which is the object that gives a statement drawn from one sample its meaning. The consistency of
+              <span data-tex>s_n^2</span> lets one hacker report an estimate and its own standard error, and through the central
+              limit theorem and Slutsky's theorem it yields an interval for <span data-tex>\mu</span> with the stated coverage for
+              large <span class="math-tie"><span data-tex>n</span>,</span> for any law of finite variance.
+              The argument also has its limits: the coverage of the usual interval for
               <span data-tex>\sigma^2</span> settles near {{fig.cover.chiLimit}}, not 95%, because it rests on normality itself and
               not on a limit theorem (§7).
             </p>

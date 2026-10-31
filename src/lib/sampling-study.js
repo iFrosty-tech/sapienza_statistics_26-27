@@ -290,11 +290,22 @@ function distributionOf(values, mean, sd, target) {
   return { ...scoreHistogram(values, { ...roundBins(lo, hi, target), mean, sd }), observedLow, observedHigh };
 }
 
+/** Moment skewness of a sample. */
+function skewnessOf(values) {
+  const state = createAccumulator();
+  for (const v of values) push(state, v);
+  const sd = Math.sqrt(state.ss / state.k);
+  let sum = 0;
+  for (const v of values) sum += ((v - state.mean) / sd) ** 3;
+  return sum / state.k;
+}
+
 function distributionBlock({ row, means, variances }, target) {
   const { n, exactSdMean, exactSdVariance } = row;
   return {
     n,
     atomShare: row.coverage.degenerate / means.length,
+    skewVariance: skewnessOf(variances),
     mean: distributionOf(means, MU, exactSdMean, target),
     variance: distributionOf(variances, SIGMA2, exactSdVariance, target),
   };
