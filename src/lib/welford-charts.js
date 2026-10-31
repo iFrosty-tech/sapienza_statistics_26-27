@@ -98,7 +98,7 @@ export function renderTraceTable(steps) {
     th(tex('\\bar{x}_k'), 'is-number'),
     th(tex('x_k - \\bar{x}_k'), 'is-number'),
     th('Increment', 'is-number'),
-    th(tex('SS_k'), 'is-number'),
+    th(tex(String.raw`\mathrm{SS}_k`), 'is-number'),
     th(tex('s_k^2'), 'is-number'),
   ];
   const rows = steps.map((s) => {

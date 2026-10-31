@@ -1,9 +1,9 @@
 /**
- * The pure part of the live panel of homework 06: reading the mount point, the
+ * The pure part of Panel 2 of homework 4, exercise 2: reading the mount point, the
  * scales of the controls, a run of m hackers advanced one system at a time, the
  * fixed axes, the exact bands, the bars of the histograms, and the readout
  * against theory. Nothing here touches the DOM, so that every rule the panel
- * follows is tested in Node (test/hw06-panel.test.js).
+ * follows is tested in Node (test/hw05-sampling-panel.test.js).
  *
  * A run is a state of the recurrences of src/lib/welford.js for each hacker.
  * Every system, each hacker takes the next score of one seeded stream and

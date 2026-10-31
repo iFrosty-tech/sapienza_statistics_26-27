@@ -1,6 +1,82 @@
-/* Homework 05: Welford's recurrences, in the vocabulary of the probability paper. Figure frames, data
-   tables and the panel frame come from hw01.css and hw04.css; this file adds the listing, the marked
-   result and the layout of Panel 1. */
+/* Homework 4 (homework/05/), in the vocabulary of the probability paper. Figure frames, data tables and
+   the panel frame come from hw01.css and hw04.css; this file adds the heads of the two exercises and
+   their contents, the listing, the marked result and the layouts of Panels 1 and 2. */
+
+/* ---------- One page, two exercises ---------- */
+
+/* Each exercise opens as the page does, one step down: a heavy rule and a boxed label beside the title. */
+.exercise-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: var(--rule) solid var(--ink);
+  font-size: clamp(1.625rem, 1.3rem + 1.4vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  scroll-margin-top: var(--space-5);
+}
+
+.exercise-head__no {
+  flex: none;
+  padding: 0.2em 0.45em;
+  border: var(--rule) solid var(--ink);
+  font-size: 0.5em;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.exercise-head__text {
+  min-width: 0;
+}
+
+.hw-section + .exercise-head {
+  margin-top: var(--space-9);
+}
+
+.exercise-head + .hw-section {
+  margin-top: var(--space-6);
+}
+
+.toc--parts .toc__sec {
+  min-width: 2.9em;
+}
+
+.toc--parts ol ol {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.toc--parts .toc__part > a {
+  border-bottom-color: var(--ink);
+  font-weight: 700;
+}
+
+.toc--parts .toc__part + .toc__part {
+  margin-top: var(--space-4);
+}
+
+.toc--parts .toc__part + li {
+  margin-top: var(--space-4);
+  border-top: var(--hair) solid var(--ink);
+}
+
+/* Twenty rows beside the prose: tighter than the touch target of a phone, and scrolling on a short screen. */
+@media (min-width: 62.0625rem) {
+  .toc--parts {
+    max-height: calc(100dvh - 2 * var(--space-5));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--ruling) transparent;
+    scrollbar-width: thin;
+  }
+
+  .toc--parts a {
+    min-height: 0;
+    padding-block: 0.3125rem;
+  }
+}
 
 /* ---------- The result of §3 ---------- */
 
@@ -182,7 +258,40 @@
   }
 }
 
+/* ---------- Panel 2 ---------- */
+
+/* The controls, keys and readouts come from hw04.css; these are the two drawings, one per estimate. */
+.smp-figures {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The boxes have their height before anything is drawn: no layout shift when the panel mounts. */
+.smp-canvas {
+  position: relative;
+  min-width: 0;
+  height: clamp(14rem, 9.5rem + 12vw, 18rem);
+  background: var(--paper);
+}
+
+/* The heads of the readout wrap, so that its six numeric columns fit a phone. */
+.smp-readout thead th {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
 @media print {
+  .exercise-head {
+    break-after: avoid;
+  }
+
+  /* Exercise 2 starts a sheet of its own. */
+  .hw-section + .exercise-head {
+    margin-top: 0;
+    break-before: page;
+  }
+
   .listing {
     overflow: visible;
     font-size: 0.8125rem;

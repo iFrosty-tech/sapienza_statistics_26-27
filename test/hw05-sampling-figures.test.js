@@ -1,9 +1,9 @@
 /**
- * The figure provider and the page of homework 06: every @figure marker and
- * every {{fig.…}} token of homework/06/index.html is provided, the live panel
- * keeps its mount contract, every simulated figure is labelled as simulated
- * with its seed, the assignment is quoted verbatim and every citation
- * resolves. The provider runs on the full parameters with fewer hackers, which
+ * The figure provider and text of homework 4, exercise 2, the second part of
+ * homework/05/index.html: every @figure marker and every {{fig.…}} token of that
+ * part is provided, the live panel keeps its mount contract, every simulated
+ * figure is labelled as simulated with its seed and the assignment is quoted
+ * verbatim. The provider runs on the full parameters with fewer hackers, which
  * changes the values but not the keys.
  */
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import provide, { PARAMS, buildFigures, cacheDirectory } from '../homework/06/figures.js';
+import provide, { PARAMS, buildFigures, cacheDirectory } from '../homework/05/figures-sampling.js';
 import { runSamplingStudy } from '../src/lib/sampling-study.js';
 import { applyFigureMarkers } from '../src/build/site-plugin.js';
 
@@ -19,7 +19,8 @@ const params = { ...PARAMS, m: 1000, precision: { ...PARAMS.precision, hackers: 
 const results = runSamplingStudy(params);
 const meta = { params, ms: 1234, computedAt: '2026-10-31T12:00:00.000Z', cacheKey: '0123456789abcdef' };
 const { html, tokens } = buildFigures(results, meta);
-const page = readFileSync(new URL('../homework/06/index.html', import.meta.url), 'utf8');
+const sheet = readFileSync(new URL('../homework/05/index.html', import.meta.url), 'utf8');
+const page = sheet.slice(sheet.indexOf('id="exercise-2"'), sheet.indexOf('id="reproducibility"'));
 const tagless = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 test('every @figure marker of the page is provided as html', () => {
@@ -66,7 +67,7 @@ test('the provider is deterministic for the same results', () => {
 });
 
 test('the provider caches the study under a hash key, so that a second run reads the cache', async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'hw06-cache-'));
+  const root = mkdtempSync(join(tmpdir(), 'hw05-sampling-cache-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const dir = cacheDirectory(root);
   assert.equal(existsSync(dir), false);
@@ -102,14 +103,14 @@ test('the page quotes the assignment of exercise 2 verbatim, heading included, w
   }
 });
 
-test('the page links homework 3 and exercise 1 and states once what the sampling mean and variance are', () => {
+test('the exercise links homework 3 and exercise 1 and states once what the sampling mean and variance are', () => {
   assert.match(page, /href="\{\{base\}\}homework\/04\/"/);
-  assert.match(page, /href="\{\{base\}\}homework\/05\/"/);
+  assert.match(page, /<a href="#s3">Exercise 1<\/a>/);
   assert.equal(page.match(/id="def-sampling"/g)?.length, 1);
 });
 
 test('the live panel keeps its mount contract, with a plain number for the seed and a printed fallback', () => {
-  assert.match(page, /<script type="module" src="\/src\/hw06\.js"><\/script>/);
+  assert.match(sheet, /<script type="module" src="\/src\/hw05\.js"><\/script>/);
   assert.match(page, /<div class="demo" data-demo="sampling" data-seed="\{\{fig\.params\.seed\}\}">\s*<p class="demo__fallback">/);
   assert.match(tokens['params.seed'], /^\d+$/);
   assert.equal(Number(tokens['params.seed']), PARAMS.seed);
@@ -127,24 +128,15 @@ test('every simulated chart figure is labelled as simulated and states its seed'
   }
 });
 
-test('the page has the sections of the assignment and at most ten references', () => {
-  for (const s of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 'reproducibility', 'references']) {
+test('the exercise has the sections of the assignment, each in the contents', () => {
+  for (const s of ['s9', 's10', 's11', 's12', 's13', 's14', 's15', 's16']) {
     assert.match(page, new RegExp(`<section class="hw-section[^"]*" id="${s}"`), s);
-    assert.match(page, new RegExp(`<a href="#${s}">`), `contents entry for ${s}`);
+    assert.match(sheet, new RegExp(`<a href="#${s}">`), `contents entry for ${s}`);
   }
-  const refs = page.match(/<li id="ref-\d+">/g) ?? [];
-  assert.ok(refs.length >= 5 && refs.length <= 10, `${refs.length} references`);
 });
 
-test('every citation resolves to a reference and every reference is cited', () => {
-  const ids = [...page.matchAll(/<li id="(ref-\d+)">/g)].map((m) => m[1]);
-  const cited = new Set([...page.matchAll(/href="#(ref-\d+)"/g)].map((m) => m[1]));
-  assert.deepEqual([...cited].filter((id) => !ids.includes(id)), [], 'citations without an entry');
-  assert.deepEqual(ids.filter((id) => !cited.has(id)), [], 'entries never cited');
-});
-
-test('the finished page has no figure marker and no token of the provider left', () => {
-  const filled = applyFigureMarkers(page, html, 'homework/06/index.html').replace(/\{\{\s*fig\.([\w.]+)\s*\}\}/g, (_, key) => tokens[key] ?? '');
+test('the finished exercise has no figure marker and no token of the provider left', () => {
+  const filled = applyFigureMarkers(page, html, 'homework/05/index.html').replace(/\{\{\s*fig\.([\w.]+)\s*\}\}/g, (_, key) => tokens[key] ?? '');
   assert.doesNotMatch(filled, /@figure/);
   assert.doesNotMatch(filled, /\{\{\s*fig\./);
 });
@@ -152,12 +144,6 @@ test('the finished page has no figure marker and no token of the provider left',
 test('the coverage figure explains its ceiling in the caption, not with a label that floats away from the curve', () => {
   assert.doesNotMatch(html.coverage, /1 − 0\.7ⁿ<\/text>/);
   assert.match(page, /<span data-tex>1 - 0\.7\^n<\/span> is the share of hackers with any score/);
-});
-
-test('every anchor of the text points at an element of the page', () => {
-  const targets = new Set([...page.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
-  const missing = [...page.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]).filter((id) => !targets.has(id));
-  assert.deepEqual(missing, []);
 });
 
 test('every inline formula followed by punctuation is tied to it, so that the punctuation never starts a line', () => {

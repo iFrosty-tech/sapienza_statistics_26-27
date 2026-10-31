@@ -1,5 +1,5 @@
 /**
- * Panel 1 (§3): m hackers over n systems, live. The reader chooses n and m; the
+ * Panel 2 (§11): m hackers over n systems, live. The reader chooses n and m; the
  * law of the scores is fixed. For each of the two estimates the panel draws the
  * running paths of a few hackers against the exact band of two standard
  * deviations and, beside them, the histogram across all m hackers at the step
@@ -8,9 +8,9 @@
  *
  * The motion is the algorithm. Play starts every hacker from an empty state and
  * advances all of them through Welford's recurrences one system at a time
- * (src/hw06/model.js): the paths grow and the histograms tighten around the
+ * (src/hw05/sampling-model.js): the paths grow and the histograms tighten around the
  * theoretical value while the two averages stay on it, which is the argument of
- * the page in one view. Both vertical axes are fixed, so that the narrowing is
+ * the exercise in one view. Both vertical axes are fixed, so that the narrowing is
  * the spread itself and not a change of scale. A change of n or m finishes the
  * run at once and eases the bars of the histograms from the old shape to the
  * new one. Under reduced motion the final state is drawn at once and a blink
@@ -38,7 +38,7 @@ import {
   parseMountOptions,
   readRun,
   runSummary,
-} from './model.js';
+} from './sampling-model.js';
 
 const QUANTITIES = [
   { key: 'mean', caption: 'Running sampling mean', name: 'Sampling mean' },
@@ -95,7 +95,7 @@ export function mountSamplingDemo(mount) {
 
   const { panel, $ } = panelFrame({
     id: 'demo-smp',
-    number: 1,
+    number: 2,
     title: 'm hackers over n systems<span class="pplot__provenance">Simulated</span>',
     lede:
       'Each hacker’s scores go through Welford’s recurrences as they arrive. Press Play to advance every hacker one system at a time and watch the two histograms tighten around μ and σ² while the averages stay on them; move n and m to repeat the experiment.',

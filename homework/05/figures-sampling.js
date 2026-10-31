@@ -1,36 +1,38 @@
 /**
- * Build-time figure provider of homework 06 (called by src/build/site-plugin.js).
+ * Build-time figures of exercise 2 of homework 4, on the page of homework/05/
+ * (assembled by homework/05/figures.js, beside those of exercise 1).
  *
  * Runs the experiments of src/lib/sampling-study.js on the score law of
  * src/lib/score-law.js, every hacker's estimates coming from the recurrences of
- * src/lib/welford.js, renders every figure and table of the page with
+ * src/lib/welford.js, renders every figure and table of exercise 2 with
  * src/lib/sampling-charts.js and returns them with the values quoted in the
  * text as {{fig.…}} tokens.
  *
- * The results are cached under node_modules/.cache/hw06/<key>.json, the key
+ * The results are cached under node_modules/.cache/hw05/<key>.json, the key
  * being a hash of PARAMS, of the source of every module listed in DEPENDENCIES
  * and of this file, so that a dev reload is instant and any change to the study
  * recomputes everything; the rendering is redone on every build from the JSON.
  *
- * Figure ids (<!-- @figure id=… --> markers of homework/06/index.html)
- *   law            Fig. 1, the distribution function and a sample of the score law
- *   trajectories   Fig. 2, running x̄ₖ and s²ₖ of a few hackers against exact bands
- *   averages       Table 1, the averages against μ and σ², and the average of SSₙ/n
- *   zScores        Fig. 3, the z-scores of the averages against n
- *   bias           Fig. 4, the averages of s²ₙ and SSₙ/n against n
- *   spreads        Fig. 5, the spreads across hackers and the ratio to normal theory
- *   spreadTable    Table 2, the same against the exact values
- *   distributions  Fig. 6, the laws of x̄ₙ and s²ₙ against their normal approximations
- *   precision      Fig. 7, the role of m at fixed n
- *   coverage       Fig. 8, the coverage of the two intervals against n
- *   coverageTable  Table 3, the same, with the side of each miss and the all-zero hackers
- *   scatter        Fig. 9, (x̄ₙ, s²ₙ) across hackers
- *   parameters     Table A1, the parameters of the study
+ * Figure ids (<!-- @figure id=… --> markers of homework/05/index.html)
+ *   law            Fig. 3, the distribution function and a sample of the score law
+ *   trajectories   Fig. 4, running x̄ₖ and s²ₖ of a few hackers against exact bands
+ *   averages       Table 5, the averages against μ and σ², and the average of SSₙ/n
+ *   zScores        Fig. 5, the z-scores of the averages against n
+ *   bias           Fig. 6, the averages of s²ₙ and SSₙ/n against n
+ *   spreads        Fig. 7, the spreads across hackers and the ratio to normal theory
+ *   spreadTable    Table 6, the same against the exact values
+ *   distributions  Fig. 8, the laws of x̄ₙ and s²ₙ against their normal approximations
+ *   precision      Fig. 9, the role of m at fixed n
+ *   coverage       Fig. 10, the coverage of the two intervals against n
+ *   coverageTable  Table 7, the same, with the side of each miss and the all-zero hackers
+ *   scatter        Fig. 11, (x̄ₙ, s²ₙ) across hackers
+ *   samplingParameters  Table A2, the parameters of the study
  *
  * Tokens ({{fig.<key>}}); every value is a display string, N an n of the grid and M a group size.
  *   params.{seed, m, nGrid, nCount, nMax, lawSample, trajN, trajM, trajPoints, distributionN, bins, scatterN,
- *     scatterPoints, level, precisionN, precisionHackers, draws, computeSeconds, computedAt, cacheKey}
- *     (params.seed is a plain number, read by the live panel)
+ *     scatterPoints, level, precisionN, precisionHackers, samplingDraws, samplingSeconds, samplingComputedAt,
+ *     samplingCacheKey}
+ *     (params.seed is a plain number, read by the live panel and shared with exercise 1)
  *   params.seeds.{law, trajectories, precision}, params.seeds.nN
  *   law.{p, atom, mu, sigma2, sd, mu3, mu4, skewness, kurtosis, excess, slope, normalShare, sdConstant}
  *   sample.{size, zeros, atomShare, mean, variance}
@@ -79,14 +81,14 @@ export const PARAMS = Object.freeze({
   seed: 20261031, // the master seed; every stream of the study is derived from it (deriveSeed)
   m: 10000, // hackers per n
   nGrid: Object.freeze([2, 3, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]), // the experiments
-  lawSample: 10000, // scores in the empirical sample of Fig. 1
-  trajectories: Object.freeze({ n: 1000, m: 12, points: 70 }), // Fig. 2: systems, hackers, points per path
-  distributionN: Object.freeze([5, 50, 500]), // the n of the sampling distributions (Fig. 6)
+  lawSample: 10000, // scores in the empirical sample of Fig. 3
+  trajectories: Object.freeze({ n: 1000, m: 12, points: 70 }), // Fig. 4: systems, hackers, points per path
+  distributionN: Object.freeze([5, 50, 500]), // the n of the sampling distributions (Fig. 8)
   bins: 36, // bins per histogram, about
-  scatterN: Object.freeze([10, 200]), // the n of the scatter (Fig. 9)
+  scatterN: Object.freeze([10, 200]), // the n of the scatter (Fig. 11)
   scatterPoints: 700, // hackers drawn per scatter; the correlation uses all of them
   level: 0.95, // of the two intervals
-  precision: Object.freeze({ n: 100, hackers: 200000, groupSizes: Object.freeze([10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]) }), // Fig. 7
+  precision: Object.freeze({ n: 100, hackers: 200000, groupSizes: Object.freeze([10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]) }), // Fig. 9
   buildWidth: 640, // pixel width of the printed charts
 });
 
@@ -104,7 +106,7 @@ const DEPENDENCIES = [
 ];
 
 /** Where the study of a project is cached. */
-export const cacheDirectory = (root) => resolve(root, 'node_modules/.cache/hw06');
+export const cacheDirectory = (root) => resolve(root, 'node_modules/.cache/hw05');
 
 let memo = null;
 
@@ -136,7 +138,7 @@ function loadOrCompute(root, source, run) {
     writeFileSync(tmp, json);
     renameSync(tmp, file);
     value = JSON.parse(json);
-    console.log(`[hw06] study computed in ${(ms / 1000).toFixed(1)} s, cached in node_modules/.cache/hw06/${key}.json`);
+    console.log(`[hw05] sampling study computed in ${(ms / 1000).toFixed(1)} s, cached in node_modules/.cache/hw05/${key}.json`);
   }
   memo = { file, value };
   return value;
@@ -151,7 +153,7 @@ const list = (values) => {
 const words = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
 
 /**
- * Every figure, table and token of the page, from the results of the study.
+ * Every figure, table and token of exercise 2, from the results of the study.
  * @param {object} results the output of runSamplingStudy
  * @param {{ params?: object, ms: number, computedAt: string, cacheKey: string }} meta
  * @returns {{ html: Record<string, string>, tokens: Record<string, string> }}
@@ -180,18 +182,18 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
   html.coverage = renderCoverage(experiments, summary, { id: 'fig-cover', width, m });
   html.coverageTable = renderCoverageTable(experiments);
   html.scatter = renderScatter(results.scatter, law, { id: 'fig-scatter', width });
-  html.parameters = renderParametersTable([
+  html.samplingParameters = renderParametersTable([
     ['Master seed', String(params.seed), 'Every stream of the study is derived from it'],
     ['p', String(law.p), 'Probability of a successful attempt, the p of homework 3'],
     ['Largest score', String(law.max), 'Y is uniform on (0, 10]'],
     ['m', int(m), 'Hackers at each n'],
     ['n', list(params.nGrid), 'One independent experiment for each value'],
-    ['Law sample', int(params.lawSample), 'Scores in Fig. 1'],
-    ['Trajectories', `${params.trajectories.m} hackers × ${int(params.trajectories.n)} systems`, 'Fig. 2'],
-    ['n, distributions', list(params.distributionN), 'Fig. 6'],
-    ['n, scatter', list(params.scatterN), `Fig. 9, ${int(params.scatterPoints)} hackers drawn per panel`],
-    ['Level', `${fmt(100 * params.level, 0)}%`, 'The two intervals of Fig. 8 and Table 3'],
-    ['Run of Fig. 7', `${int(params.precision.hackers)} hackers × ${int(params.precision.n)} systems`, `Cut into groups of ${list(params.precision.groupSizes)}`],
+    ['Law sample', int(params.lawSample), 'Scores in Fig. 3'],
+    ['Trajectories', `${params.trajectories.m} hackers × ${int(params.trajectories.n)} systems`, 'Fig. 4'],
+    ['n, distributions', list(params.distributionN), 'Fig. 8'],
+    ['n, scatter', list(params.scatterN), `Fig. 11, ${int(params.scatterPoints)} hackers drawn per panel`],
+    ['Level', `${fmt(100 * params.level, 0)}%`, 'The two intervals of Fig. 10 and Table 7'],
+    ['Run of Fig. 9', `${int(params.precision.hackers)} hackers × ${int(params.precision.n)} systems`, `Cut into groups of ${list(params.precision.groupSizes)}`],
     ['Random draws', count(results.meta.draws), 'One uniform per score'],
   ]);
 
@@ -210,17 +212,17 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
   token('params.level', `${fmt(100 * params.level, 0)}%`);
   token('params.precisionN', int(params.precision.n));
   token('params.precisionHackers', int(params.precision.hackers));
-  token('params.draws', count(results.meta.draws));
-  token('params.computeSeconds', fmt(ms / 1000, 1));
-  token('params.computedAt', computedAt.slice(0, 10));
-  token('params.cacheKey', cacheKey);
+  token('params.samplingDraws', count(results.meta.draws));
+  token('params.samplingSeconds', fmt(ms / 1000, 1));
+  token('params.samplingComputedAt', computedAt.slice(0, 10));
+  token('params.samplingCacheKey', cacheKey);
   const seeds = results.meta.seeds;
   token('params.seeds.law', seeds.law);
   token('params.seeds.trajectories', seeds.trajectories);
   token('params.seeds.precision', seeds.precision);
   for (const [n, seed] of Object.entries(seeds.n)) token(`params.seeds.n${n}`, seed);
 
-  /* §2: the law. */
+  /* §10: the law. */
   token('law.p', law.p);
   token('law.atom', fmt(law.atom, 1));
   token('law.mu', sig(law.mu, 2));
@@ -241,13 +243,13 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
   token('sample.mean', fmt(s.mean, 3));
   token('sample.variance', fmt(s.variance, 3));
 
-  /* §3: the trajectories at the last system. */
+  /* §11: the trajectories at the last system. */
   const last = trajectories.k.length - 1;
   const inside = (key, centre, sd) => trajectories.paths.filter((path) => Math.abs(path[key][last] - centre) <= 2 * sd).length;
   token('traj.insideMean', inside('mean', law.mu, trajectories.band.sdMean[last]));
   token('traj.insideVariance', inside('variance', law.sigma2, trajectories.band.sdVariance[last]));
 
-  /* §4 and §6: the experiments. */
+  /* §12 and §14: the experiments. */
   for (const e of experiments) {
     const a = `avg.n${e.n}`;
     token(`${a}.mean`, fmt(e.meanOfMeans, 4));
@@ -324,7 +326,7 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
     token(`${k}.spreadVariance`, fmt(r.spreadVariance, 3));
   }
 
-  /* §7: the intervals and the dependence of the two estimators. */
+  /* §15: the intervals and the dependence of the two estimators. */
   const limit = summary.chiLimit;
   const seLimit = Math.sqrt((limit * (1 - limit)) / m);
   const tail = experiments.filter((e) => e.n >= 100);

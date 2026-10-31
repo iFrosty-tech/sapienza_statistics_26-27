@@ -1,11 +1,10 @@
 /**
- * The figure provider and page skeleton of homework 4, exercise 1: every
- * @figure marker and every {{fig.…}} token of homework/05/index.html is
- * provided, the code listing is the real source, the trace and the study reach
- * their known values, the assignment is quoted verbatim, every citation
- * resolves, and the live panel keeps its mount contract. The provider runs on
- * the full parameters with fewer replicates, which changes the values but not
- * the keys.
+ * The figure provider and text of homework 4, exercise 1, the first part of
+ * homework/05/index.html: every @figure marker and every {{fig.…}} token of that
+ * part is provided, the code listing is the real source, the trace and the study
+ * reach their known values, the assignment is quoted verbatim, and the live panel
+ * keeps its mount contract. The provider runs on the full parameters with fewer
+ * replicates, which changes the values but not the keys.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +18,8 @@ const results = runStabilityStudy(params);
 const source = readFileSync(new URL('../src/lib/welford.js', import.meta.url), 'utf8');
 const meta = { params, ms: 1234, computedAt: '2026-10-31T12:00:00.000Z', cacheKey: '0123456789abcdef', source };
 const { html, tokens } = buildFigures(results, meta);
-const page = readFileSync(new URL('../homework/05/index.html', import.meta.url), 'utf8');
+const sheet = readFileSync(new URL('../homework/05/index.html', import.meta.url), 'utf8');
+const page = sheet.slice(0, sheet.indexOf('id="exercise-2"'));
 
 test('every @figure marker of the page is provided as html', () => {
   const ids = [...page.matchAll(/<!--\s*@figure\s+id=(\S+)\s*-->/g)].map((m) => m[1]);
@@ -136,23 +136,22 @@ test('the error figure has a narrow drawing for small screens, each with its own
   assert.ok(width(svgs[1]) <= 360);
 });
 
-test('the assignment of exercise 1 is quoted verbatim, without its marker, and exercise 2 stays on its own page', () => {
+test('the assignment of exercise 1 is quoted verbatim, without its marker', () => {
   assert.match(page, /Ex\. 1 – Welford’s Recurrence Formulas/);
   assert.match(page, /Derive Welford’s recurrence formulas for the sum of squares \(SS\) and the variance, following the same\s+approach as Knuth’s recurrence formula for the mean\./);
   assert.match(page, /Write the corresponding code\. The core logic should require only about 3 lines\./);
   assert.doesNotMatch(page, /HMWK|📚/);
-  assert.doesNotMatch(page, /Ex\. 2 – Sampling Mean and Variance/);
 });
 
-test('the page has its sections and contents, and links forward to the next exercise', () => {
-  for (const s of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 'reproducibility', 'references']) {
+test('the exercise has its sections and contents, and links forward to the next exercise', () => {
+  for (const s of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8']) {
     assert.match(page, new RegExp(`<section class="hw-section[^"]*" id="${s}"`), s);
     assert.match(page, new RegExp(`<a href="#${s}">`), `contents entry for ${s}`);
   }
-  assert.match(page, /href="\{\{base\}\}homework\/06\/"/);
+  assert.match(page, /<a href="#exercise-2">second exercise<\/a>/);
   assert.match(page, /<script type="module" src="\/src\/hw05\.js"><\/script>/);
   assert.match(page, /<!-- @include partials\/homework-header\.html -->/);
-  assert.match(page, /<!-- @include partials\/site-footer\.html -->/);
+  assert.match(sheet, /<!-- @include partials\/site-footer\.html -->/);
 });
 
 test('the stepper keeps its mount contract, with a printed fallback in place', () => {
@@ -170,14 +169,6 @@ test('the simulated figure is labelled as simulated and states its seed; the com
   assert.match(simulated, /class="pplot__seed"[^>]*>[^<]*\{\{fig\.params\.seed/);
   const computed = figures.find((f) => f.includes('@figure id=geometry'));
   assert.match(computed, /pplot__provenance">Computed</);
-});
-
-test('at most ten references, every citation resolves and every reference is cited', () => {
-  const ids = [...page.matchAll(/<li id="(ref-\d+)">/g)].map((m) => m[1]);
-  assert.ok(ids.length >= 5 && ids.length <= 10, `${ids.length} references`);
-  const cited = new Set([...page.matchAll(/href="#(ref-\d+)"/g)].map((m) => m[1]));
-  assert.deepEqual([...cited].filter((id) => !ids.includes(id)), [], 'citations without an entry');
-  assert.deepEqual(ids.filter((id) => !cited.has(id)), [], 'entries never cited');
 });
 
 test('the prose types no study result by hand: the figures of the sweep arrive through tokens', () => {

@@ -1,5 +1,5 @@
 /**
- * The pure part of the live panel of homework 06 (src/hw06/model.js): reading
+ * The pure part of the live panel of homework 4, exercise 2 (src/hw05/sampling-model.js): reading
  * the mount point, the run of m hackers advanced one system at a time through
  * Welford's recurrences, the fixed axes, the bars of the histograms, the
  * bands, and the readout against theory. Nothing here touches the DOM.
@@ -27,7 +27,7 @@ import {
   parseMountOptions,
   readRun,
   runSummary,
-} from '../src/hw06/model.js';
+} from '../src/hw05/sampling-model.js';
 
 test('the mount point names a seed; an absent or unusable one falls back to the default', () => {
   assert.equal(parseMountOptions({ seed: '123' }).seed, 123);

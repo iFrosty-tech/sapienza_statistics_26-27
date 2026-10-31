@@ -66,7 +66,7 @@ function body(values, seed) {
     `<label class="text-field"><span class="caption">Sequence</span>` +
     `<input type="text" data-step-values value="${values.join(', ')}" autocomplete="off" spellcheck="false" aria-describedby="step-values-note" /></label>` +
     `<button type="submit" class="form-button">Apply</button>` +
-    `<button type="button" class="form-button" data-step-worked>Table 1 data</button>` +
+    `<button type="button" class="form-button" data-step-worked>Table 2 data</button>` +
     `<span class="text-field__note sim-seed__note" id="step-values-note" data-step-values-note>Up to ${MAX_VALUES} values, separated by commas or spaces.</span>` +
     `</form>` +
     `<div class="sim-seed sim-controls__wide">` +

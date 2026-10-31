@@ -1,20 +1,20 @@
 /**
- * Figures and tables of homework 06, rendered from the summary of
+ * Figures and tables of homework 4, exercise 2, rendered from the summary of
  * src/lib/sampling-study.js as static, printable SVG and HTML.
  *
- *   renderLaw            Fig. 1, the distribution function and a sample of the score law
- *   renderTrajectories   Fig. 2, running x̄ₖ and s²ₖ of a few hackers against exact bands
- *   renderZScores        Fig. 3, the z-scores of the two averages against n
- *   renderBias           Fig. 4, the averages of s²ₙ and SSₙ/n against σ² and σ²(n − 1)/n
- *   renderSpreads        Fig. 5, the spreads across hackers and the ratio to normal theory
- *   renderDistributions  Fig. 6, the laws of x̄ₙ and s²ₙ against their normal approximations
- *   renderPrecision      Fig. 7, the role of m: error of the averages, spread of one hacker
- *   renderCoverage       Fig. 8, the coverage of the two intervals against n
- *   renderScatter        Fig. 9, (x̄ₙ, s²ₙ) across hackers
+ *   renderLaw            Fig. 3, the distribution function and a sample of the score law
+ *   renderTrajectories   Fig. 4, running x̄ₖ and s²ₖ of a few hackers against exact bands
+ *   renderZScores        Fig. 5, the z-scores of the two averages against n
+ *   renderBias           Fig. 6, the averages of s²ₙ and SSₙ/n against σ² and σ²(n − 1)/n
+ *   renderSpreads        Fig. 7, the spreads across hackers and the ratio to normal theory
+ *   renderDistributions  Fig. 8, the laws of x̄ₙ and s²ₙ against their normal approximations
+ *   renderPrecision      Fig. 9, the role of m: error of the averages, spread of one hacker
+ *   renderCoverage       Fig. 10, the coverage of the two intervals against n
+ *   renderScatter        Fig. 11, (x̄ₙ, s²ₙ) across hackers
  *   render…Table         the tables
  *
  * Everything is drawn with the classes of src/styles/hw01.css, hw04-figures.css
- * and hw06-figures.css: green rulings, a green-ink frame, ink for theory and
+ * and hw05-figures.css: green rulings, a green-ink frame, ink for theory and
  * references, plot red only for simulated values. Histograms come from
  * renderHistogram of charts.js; the other panels share a small renderer here,
  * on linear or logarithmic axes.
@@ -198,7 +198,7 @@ function panel({ id, title, desc, width, height, x, y, xLabel = '', yLabel = '',
   return out.join('');
 }
 
-/* Panels side by side at the printed width; the sheet stacks them on phones (hw06-figures.css). */
+/* Panels side by side at the printed width; the sheet stacks them on phones (hw05-figures.css). */
 const GAP = 16;
 function panels(parts, width, columns = 2) {
   const w = Math.floor((width - GAP * (columns - 1)) / columns);
@@ -217,7 +217,7 @@ const panelHeight = (w) => Math.round(Math.min(290, Math.max(230, w * 0.8)));
 const swap = (draw, id, width) =>
   `<div class="chart-swap"><div class="chart-swap__wide">${draw(id, width)}</div><div class="chart-swap__narrow">${draw(`${id}-narrow`, NARROW_WIDTH)}</div></div>`;
 
-/* ------------------------------------------------------------ Fig. 1, the law */
+/* ------------------------------------------------------------ Fig. 3, the law */
 
 /** The distribution function with its atom at 0, and the sample above 0 against the flat density. */
 export function renderLaw(sample, { id, width = 640 }) {
@@ -267,7 +267,7 @@ export function renderLaw(sample, { id, width = 640 }) {
   return panels([cdf, histogram], width);
 }
 
-/* ------------------------------------------------------------ Fig. 2, trajectories */
+/* ------------------------------------------------------------ Fig. 4, trajectories */
 
 /** Running x̄ₖ and s²ₖ of a few hackers, against the exact mean ± 2 sd. */
 export function renderTrajectories(tr, { id, width = 640 }) {
@@ -300,7 +300,7 @@ export function renderTrajectories(tr, { id, width = 640 }) {
   );
 }
 
-/* ------------------------------------------------------------ Fig. 3, z-scores */
+/* ------------------------------------------------------------ Fig. 5, z-scores */
 
 /** The standardised deviation of each average from its theoretical value, against n. */
 export function renderZScores(experiments, { id, width = 640 }) {
@@ -332,7 +332,7 @@ export function renderZScores(experiments, { id, width = 640 }) {
   );
 }
 
-/* ------------------------------------------------------------ Fig. 4, bias */
+/* ------------------------------------------------------------ Fig. 6, bias */
 
 /** The average of s²ₙ stays on σ²; the average of SSₙ/n follows σ²(n − 1)/n. */
 export function renderBias(experiments, { id, width = 640 }) {
@@ -365,7 +365,7 @@ export function renderBias(experiments, { id, width = 640 }) {
   return swap(draw, id, width);
 }
 
-/* ------------------------------------------------------------ Fig. 5, spreads */
+/* ------------------------------------------------------------ Fig. 7, spreads */
 
 /** The spreads across hackers on log–log axes, and the true Var(s²ₙ) against the normal-theory value. */
 export function renderSpreads(experiments, summary, { id, width = 640 }) {
@@ -410,7 +410,7 @@ export function renderSpreads(experiments, summary, { id, width = 640 }) {
   return panels([spreads, ratio], width);
 }
 
-/* ------------------------------------------------------------ Fig. 6, distributions */
+/* ------------------------------------------------------------ Fig. 8, distributions */
 
 /* Edge labels at round values of a histogram's axis. */
 function edgeLabels(h) {
@@ -446,7 +446,7 @@ export function renderDistributions(blocks, { id, width = 640, m }) {
   return panels(parts, width);
 }
 
-/* ------------------------------------------------------------ Fig. 7, precision */
+/* ------------------------------------------------------------ Fig. 9, precision */
 
 /** At fixed n, the error of the averages falls as 1/√m and the spread of one hacker does not move. */
 export function renderPrecision(precision, { id, width = 640 }) {
@@ -483,7 +483,7 @@ export function renderPrecision(precision, { id, width = 640 }) {
   );
 }
 
-/* ------------------------------------------------------------ Fig. 8, coverage */
+/* ------------------------------------------------------------ Fig. 10, coverage */
 
 /** The coverage of the two 95% intervals against n, with Wilson intervals. */
 export function renderCoverage(experiments, summary, { id, width = 640, m }) {
@@ -524,7 +524,7 @@ export function renderCoverage(experiments, summary, { id, width = 640, m }) {
   );
 }
 
-/* ------------------------------------------------------------ Fig. 9, scatter */
+/* ------------------------------------------------------------ Fig. 11, scatter */
 
 /** (x̄ₙ, s²ₙ) across hackers, with the best linear predictor of s²ₙ from x̄ₙ. */
 export function renderScatter(blocks, law, { id, width = 640 }) {
@@ -575,7 +575,7 @@ export const expectedCount = (v) => (v < 0.001 ? '< 0.001' : v >= 100 ? int(v) :
 const digitsFor = (se) => Math.max(0, Math.min(5, 1 - Math.floor(Math.log10(se))));
 const withError = (v, se) => `${fmt(v, digitsFor(se))} ± ${fmt(se, digitsFor(se))}`;
 
-/** Table 1: the averages across hackers against μ and σ², with exact standard errors and z-scores. */
+/** Table 5: the averages across hackers against μ and σ², with exact standard errors and z-scores. */
 export function renderAveragesTable(experiments) {
   return table(
     'data-table--sampling',
@@ -587,7 +587,7 @@ export function renderAveragesTable(experiments) {
   );
 }
 
-/** Table 2: the spreads across hackers against the exact values, and the ratio to normal theory. */
+/** Table 6: the spreads across hackers against the exact values, and the ratio to normal theory. */
 export function renderSpreadTable(experiments) {
   return table(
     'data-table--sampling',
@@ -598,7 +598,7 @@ export function renderSpreadTable(experiments) {
   );
 }
 
-/** Table 3: the coverage of the two intervals, on which side they miss, and the hackers with every score 0. */
+/** Table 7: the coverage of the two intervals, on which side they miss, and the hackers with every score 0. */
 export function renderCoverageTable(experiments) {
   const interval = (c) => `${fmt(c.rate, 3)}${sub(`${fmt(c.low, 3)} to ${fmt(c.high, 3)}`)}`;
   return table(

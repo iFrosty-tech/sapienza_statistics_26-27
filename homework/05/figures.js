@@ -1,5 +1,7 @@
 /**
- * Build-time figure provider of homework 05 (called by src/build/site-plugin.js).
+ * Build-time figure provider of homework 4 (called by src/build/site-plugin.js),
+ * whose two exercises share this page. This file holds exercise 1 and adds to it
+ * the figures of exercise 2, from homework/05/figures-sampling.js.
  *
  * Runs the numerical study of src/lib/welford-stability.js, works the trace of
  * the recurrences of src/lib/welford.js on the data set of the page, cuts the
@@ -43,6 +45,7 @@ import { ALGORITHMS, UNIT_ROUNDOFF, runStabilityStudy } from '../../src/lib/welf
 import { kappaText, renderErrorTable, renderErrors, renderFormsTable, renderListing, renderSlopesTable, renderTraceTable } from '../../src/lib/welford-charts.js';
 import { DEFAULT_SEQUENCE, planeDomain, recurrenceForms, stepsOf } from '../../src/hw05/model.js';
 import { ledgerSvg, planeSvg } from '../../src/hw05/scene.js';
+import provideSampling from './figures-sampling.js';
 
 /** Every number the page quotes follows from these parameters. */
 export const PARAMS = Object.freeze({
@@ -113,8 +116,8 @@ function formRows(values) {
   const ss = values.reduce((s, x) => s + (x - mean) ** 2, 0);
   return [
     { equation: 3, quantity: String.raw`\bar{x}_k`, form: String.raw`\bar{x}_{k-1} + (x_k - \bar{x}_{k-1})/k`, value: forms.mean[last], definition: mean },
-    { equation: 10, quantity: 'SS_k', form: String.raw`SS_{k-1} + (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k)`, value: forms.ssProduct[last], definition: ss },
-    { equation: 12, quantity: 'SS_k', form: String.raw`SS_{k-1} + \frac{k-1}{k}(x_k - \bar{x}_{k-1})^2`, value: forms.ssSquare[last], definition: ss },
+    { equation: 10, quantity: String.raw`\mathrm{SS}_k`, form: String.raw`\mathrm{SS}_{k-1} + (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k)`, value: forms.ssProduct[last], definition: ss },
+    { equation: 12, quantity: String.raw`\mathrm{SS}_k`, form: String.raw`\mathrm{SS}_{k-1} + \frac{k-1}{k}(x_k - \bar{x}_{k-1})^2`, value: forms.ssSquare[last], definition: ss },
     { equation: 14, quantity: 's_k^2', form: String.raw`\frac{k-2}{k-1}s_{k-1}^2 + (x_k - \bar{x}_{k-1})^2/k`, value: forms.varianceScaled[last], definition: ss / (n - 1) },
     { equation: 15, quantity: 's_k^2', form: String.raw`s_{k-1}^2 + [(x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) - s_{k-1}^2]/(k-1)`, value: forms.varianceMirror[last], definition: ss / (n - 1) },
     { equation: 16, quantity: String.raw`\hat{\sigma}_k^2`, form: String.raw`\hat{\sigma}_{k-1}^2 + [(x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) - \hat{\sigma}_{k-1}^2]/k`, value: forms.populationMirror[last], definition: ss / n },
@@ -150,7 +153,7 @@ function renderGeometry(steps, stepsShown, width) {
 const pointAt = (study, shift) => study.points.find((p) => p.shift === shift);
 
 /**
- * Every figure, table and token of the page.
+ * Every figure, table and token of exercise 1.
  * @param {ReturnType<typeof runStabilityStudy>} results
  * @param {{ params?: object, ms: number, computedAt: string, cacheKey: string, source: string }} meta
  *   `source` is the text of src/lib/welford.js
@@ -267,11 +270,28 @@ export function buildFigures(results, { params = PARAMS, ms, computedAt, cacheKe
 }
 
 /**
+ * The figures and tokens of the two studies of the page. A key may appear twice
+ * only with one value, as the master seed does; any other overlap would silently
+ * print one study's result in place of the other's.
+ * @typedef {{ html: Record<string, string>, tokens: Record<string, string> }} Figures
+ * @param {Figures} first
+ * @param {Figures} second
+ * @returns {Figures}
+ */
+export function mergeFigures(first, second) {
+  const clashing = (a, b) => Object.keys(b).filter((key) => key in a && a[key] !== b[key]);
+  const clashes = [...clashing(first.html, second.html), ...clashing(first.tokens, second.tokens)];
+  if (clashes.length > 0) throw new Error(`[hw05] both exercises provide ${clashes.join(', ')}.`);
+  return { html: { ...first.html, ...second.html }, tokens: { ...first.tokens, ...second.tokens } };
+}
+
+/**
  * @param {{ base: string, site: object, entry: object, isBuild: boolean, root: string }} context
  * @returns {Promise<{ html: Record<string, string>, tokens: Record<string, string> }>}
  */
 export default async function provide({ root }) {
   const { key: cacheKey, results, ms, computedAt } = loadOrCompute(root);
   const source = readFileSync(resolve(root, 'src/lib/welford.js'), 'utf8');
-  return buildFigures(results, { params: PARAMS, ms, computedAt, cacheKey, source });
+  const exercise1 = buildFigures(results, { params: PARAMS, ms, computedAt, cacheKey, source });
+  return mergeFigures(exercise1, await provideSampling({ root }));
 }

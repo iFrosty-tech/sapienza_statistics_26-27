@@ -14,7 +14,7 @@ import { deriveSeed } from '../lib/kg-study.js';
 import { createRandom } from '../lib/random.js';
 import { createAccumulator, push, sampleVariance } from '../lib/welford.js';
 
-/** The data set of the worked trace (Table 1 of the page). */
+/** The data set of the worked trace (Table 2 of the page). */
 export const DEFAULT_SEQUENCE = Object.freeze([2, 4, 4, 4, 5, 5, 7, 9]);
 export const MIN_VALUES = 2;
 export const MAX_VALUES = 16;

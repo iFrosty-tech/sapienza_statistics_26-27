@@ -323,7 +323,7 @@ function scatterBlock({ row, means, variances }, size) {
   };
 }
 
-/* The sample of Fig. 1: its atom, ten bins on (0, 10] and its moments. */
+/* The sample of Fig. 3: its atom, ten bins on (0, 10] and its moments. */
 function lawSampleStudy(params) {
   const random = hackerStream(params.seed, 'law');
   const size = params.lawSample;
