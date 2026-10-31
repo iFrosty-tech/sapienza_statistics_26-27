@@ -67,4 +67,26 @@ export default [
     published: '2026-10-27',
     status: 'published',
   },
+  {
+    number: 5,
+    label: 'Homework 4 · Exercise 1',
+    shortLabel: '4.1',
+    title: 'Welford’s recurrences: the sum of squares and the variance in one pass',
+    abstract:
+      'The recurrences of Welford for the sum of squares and the variance are derived in the manner of Knuth’s recurrence for the mean, written in three lines of code and set against the textbook formula on ill-conditioned data.',
+    topics: ['Recurrence relations', 'Sample variance', 'Numerical stability', 'Streaming algorithms'],
+    published: '2026-10-31',
+    status: 'upcoming',
+  },
+  {
+    number: 6,
+    label: 'Homework 4 · Exercise 2',
+    shortLabel: '4.2',
+    title: 'Sampling mean and variance: m hackers, n systems and scores between 0 and 10',
+    abstract:
+      'Each of m hackers receives a score on each of n systems, and Welford’s recurrences give the sample mean and variance of every trajectory. Their averages are compared with the theoretical mean and variance for increasing n.',
+    topics: ['Sampling distributions', 'Unbiased estimation', 'Monte Carlo simulation', 'Statistical inference'],
+    published: '2026-10-31',
+    status: 'upcoming',
+  },
 ];
