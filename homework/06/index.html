@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw06.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> The score law</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> The experiment</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> The averages against the theory</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Why the averages agree</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Repeating for different n</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Inference</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Discussion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p><strong>Ex. 2 – Sampling Mean and Variance</strong></p>
+              <p>
+                Extend the previous homework by assigning each penetration attempt a score between 0 and 10, drawn from a
+                fixed probability distribution of your choice. Let the theoretical mean and variance of this distribution be
+                μ and σ², respectively.
+              </p>
+              <p>
+                Assume there are m hackers, each attempting to penetrate n systems. Each hacker receives one score for each
+                system, resulting in a trajectory of n scores.
+              </p>
+              <p>
+                For each hacker, use Welford’s recurrence formulas to compute the sampling mean and sampling variance of their
+                n scores.
+              </p>
+              <p>
+                Across the m hackers, compute the average of the sampling means and the average of the sampling variances.
+                Compare these two averages with the theoretical mean μ and variance σ², respectively.
+              </p>
+              <p>
+                What conclusions can you draw from these comparisons? Why are these results useful in inferential statistics?
+                Repeat the experiment for different values of n. How does increasing the number of systems attempted by each
+                hacker affect the variability of the sampling means and sampling variances?
+              </p>
+            </blockquote>
+            <p id="def-sampling">
+              Throughout this page, the <em>sampling mean</em> and the <em>sampling variance</em> of the assignment are the
+              sample mean <span data-tex>\bar{x}_n</span> and the sample variance
+              <span class="math-tie"><span data-tex>s_n^2 = \mathrm{SS}_n/(n - 1)</span>,</span> where
+              <span data-tex>\mathrm{SS}_n</span> is the corrected sum of squares of the <span data-tex>n</span> scores of one
+              hacker; the variance therefore needs <span class="math-tie"><span data-tex>n \ge 2</span>.</span>
+            </p>
+            <p>
+              The law of the scores is the free choice of the exercise, and §2 makes it so that nothing on this page can owe
+              its result to normality. §3 runs the experiment, with every estimate obtained through Welford's recurrences, and
+              §4 compares the two averages with <span data-tex>\mu</span> and <span class="math-tie"><span data-tex>\sigma^2</span>.</span> §5 proves
+              why they agree, §6 repeats the experiment for {{fig.params.nCount}} values of <span data-tex>n</span> from 2 to
+              {{fig.params.nMax}}, §7 turns the results into inference about a single hacker, and §8 gathers the answers. In
+              short: the average of the sampling means stays on <span data-tex>\mu</span> and the average of the sampling
+              variances on <span data-tex>\sigma^2</span> at every <span class="math-tie"><span data-tex>n</span>,</span> even
+              <span class="math-tie"><span data-tex>n = 2</span>,</span> because both estimators are unbiased; the spread of
+              both across hackers shrinks as <span class="math-tie"><span data-tex>1/\sqrt{n}</span>;</span> and the 95%
+              interval for <span data-tex>\mu</span> reaches its nominal level as <span data-tex>n</span> grows, whereas the
+              usual interval for <span data-tex>\sigma^2</span> never does, stalling near {{fig.cover.chiLimit}} however many
+              systems are attempted.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> The score law</h2>
+            <h3 id="s2-1">2.1 From a penetration attempt to a score</h3>
+            <p>
+              <a href="{{base}}homework/04/">Homework 3</a> modelled one penetration attempt by a Bernoulli increment
+              <span class="math-tie"><span data-tex>B</span>,</span> equal to 1 if the attempt succeeds, with
+              <span class="math-tie"><span data-tex>p = 0.3</span>.</span> The extension asked for here replaces the bare
+              outcome by a score between 0 and 10. A failed attempt scores 0; a successful one scores the depth
+              <span data-tex>Y</span> it reached, which is uniform on the interval from 0 to 10 and independent of the outcome:
+            </p>
+            <div class="equation" id="eq-law">
+              <div data-tex-display>
+                \begin{gathered}
+                X = B\,Y, \\
+                B \sim \mathrm{Bernoulli}(0.3), \quad Y \sim \mathrm{Uniform}(0, 10], \quad B \perp Y .
+                \end{gathered}
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              This law is chosen for three reasons. It extends the previous homework literally: <span data-tex>X &gt; 0</span>
+              exactly when the attempt of homework 3 succeeds, with the same <span class="math-tie"><span data-tex>p</span>.</span> All
+              its moments are available in closed form, so every comparison below is made against an exact value and not
+              against another simulation. And it is far from normal, with a spike at 0 and a long flat tail, so that nothing
+              below can be an artefact of normality. The range from 0 to 10 echoes the base score of the Common Vulnerability
+              Scoring System [<a href="#ref-5">5</a>], which rates the severity of a vulnerability from 0.0 to 10.0; the score
+              of (1) is not a CVSS score, and it borrows only the scale.
+            </p>
+
+            <h3 id="s2-2">2.2 The distribution</h3>
+            <p>
+              The law of (1) is neither discrete nor continuous. It has an atom of <span data-tex>1 - p</span> at 0 and a
+              constant density <span data-tex>p/10</span> on <span class="math-tie"><span data-tex>(0, 10]</span>,</span> so that
+            </p>
+            <div class="equation" id="eq-cdf">
+              <div data-tex-display>
+                F(x) = \Pr\{X \le x\} =
+                \begin{cases}
+                  0, &amp; x &lt; 0, \\
+                  0.7 + 0.03\,x, &amp; 0 \le x &lt; 10, \\
+                  1, &amp; x \ge 10.
+                \end{cases}
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              Scores are simulated by inversion, with exactly one uniform <span data-tex>U</span> per score:
+              <span data-tex>X = 0</span> when <span class="math-tie"><span data-tex>U \le 0.7</span>,</span> and
+              <span data-tex>X = (U - 0.7)/0.03</span> otherwise. Figure 1 sets (2) against a sample of
+              {{fig.sample.size}} scores, of which {{fig.sample.zeros}} are 0.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=law --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The score law against a simulated sample
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Left, the distribution function (2), with its jump of 0.7 at 0, and the empirical distribution function
+                  at the whole numbers. Right, the scores above 0 in ten bins of width 1, against the expected count under
+                  the flat density.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Scores</dt><dd>{{fig.sample.size}}</dd></div>
+                  <div><dt>Share of zeros</dt><dd>{{fig.sample.atomShare}}</dd></div>
+                  <div><dt>Sample mean</dt><dd>{{fig.sample.mean}}</dd></div>
+                  <div><dt>Sample variance</dt><dd>{{fig.sample.variance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, stream {{fig.params.seeds.law}}.</p>
+              </figcaption>
+            </figure>
+
+            <h3 id="s2-3">2.3 Exact moments</h3>
+            <p>
+              Since <span data-tex>B</span> and <span data-tex>Y</span> are independent and
+              <span data-tex>B^k = B</span> for <span class="math-tie"><span data-tex>k \ge 1</span>,</span> the raw moments of
+              (1) are
+            </p>
+            <div class="equation" id="eq-raw">
+              <div data-tex-display>
+                \mathbb{E}[X^k] = \mathbb{E}[B]\,\mathbb{E}[Y^k] = \frac{p\,10^k}{k + 1}, \qquad k \ge 1 ,
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              which gives <span class="math-tie"><span data-tex>3/2</span>,</span> <span class="math-tie"><span data-tex>10</span>,</span> <span data-tex>75</span> and
+              <span data-tex>600</span> for <span class="math-tie"><span data-tex>k = 1, \dots, 4</span>.</span> Expanding the
+              central moments <span data-tex>\mu_k = \mathbb{E}[(X - \mu)^k]</span> in these,
+            </p>
+            <div class="equation" id="eq-central">
+              <div data-tex-display>
+                \begin{aligned}
+                \mu &amp;= \tfrac{3}{2}, \\
+                \sigma^2 &amp;= 10 - \mu^2 = \tfrac{31}{4}, \\
+                \mu_3 &amp;= 75 - 3\mu \cdot 10 + 2\mu^3 = \tfrac{147}{4}, \\
+                \mu_4 &amp;= 600 - 4\mu \cdot 75 + 6\mu^2 \cdot 10 - 3\mu^4 = \tfrac{4317}{16} .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              Thus <span data-tex>\mu</span> = {{fig.law.mu}}, <span data-tex>\sigma^2</span> = {{fig.law.sigma2}},
+              <span data-tex>\mu_3</span> = {{fig.law.mu3}} and <span data-tex>\mu_4</span> = {{fig.law.mu4}}. The skewness
+              <span data-tex>\mu_3/\sigma^3</span> is {{fig.law.skewness}} and the kurtosis
+              <span data-tex>\kappa = \mu_4/\sigma^4</span> is {{fig.law.kurtosis}}, against 0 and 3 for a normal law: the
+              score is markedly right-skewed and heavy in the fourth moment, and both facts matter in §7.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The experiment</h2>
+            <h3 id="s3-1">3.1 m hackers, n systems</h3>
+            <p>
+              Hacker <span data-tex>j</span> attempts <span data-tex>n</span> systems in turn and receives the score
+              <span data-tex>X_i^{(j)}</span> on system <span class="math-tie"><span data-tex>i</span>;</span> the scores are
+              independent across systems and hackers and follow (1). Each hacker's trajectory of <span data-tex>n</span> scores
+              goes through the recurrences derived in <a href="{{base}}homework/05/">Exercise 1</a> [<a href="#ref-9">9</a>],
+              which from <span data-tex>\bar{x}_0 = 0</span> and <span data-tex>\mathrm{SS}_0 = 0</span> read
+            </p>
+            <div class="equation" id="eq-welford">
+              <div data-tex-display>
+                \begin{aligned}
+                \bar{x}_k &amp;= \bar{x}_{k-1} + \frac{x_k - \bar{x}_{k-1}}{k}, \\
+                \mathrm{SS}_k &amp;= \mathrm{SS}_{k-1} + (x_k - \bar{x}_{k-1})(x_k - \bar{x}_k) ,
+                \end{aligned}
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              and leave <span data-tex>\bar{x}_n^{(j)}</span> and
+              <span class="math-tie"><span data-tex>s_n^{2\,(j)} = \mathrm{SS}_n^{(j)}/(n - 1)</span>.</span> No hacker's scores are
+              stored: three numbers of state are enough, and the same function performs every update on this page, in the
+              study as in the live panel. For each <span data-tex>n</span> of §6 this is an independent experiment of
+              {{fig.params.m}} hackers.
+            </p>
+
+            <h3 id="s3-2">3.2 The whole path of an estimate</h3>
+            <p>
+              Because (5) holds at every step, a trajectory of <span data-tex>n</span> scores yields not one estimate but a
+              path of them: what the hacker's sample would report after <span data-tex>k</span> systems, for every
+              <span class="math-tie"><span data-tex>k \le n</span>.</span> Figure 2 draws these paths for {{fig.params.trajM}}
+              hackers over {{fig.params.trajN}} systems, against the exact mean and standard deviation at each
+              <span data-tex>k</span> given in §5.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=trajectories --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Running sampling means and variances of a few hackers
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Each thin line is one hacker on a logarithmic axis of <span class="math-tie"><span data-tex>k</span>;</span> the
+                  shaded band is the theoretical value plus or minus two exact standard deviations, cut at 0, and the red
+                  points are the estimates after the last system. Both start erratically: <span data-tex>s_k^2</span> stays at
+                  0 until the first score above 0, and then leaps.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Hackers</dt><dd>{{fig.params.trajM}}</dd></div>
+                  <div><dt>Systems</dt><dd>{{fig.params.trajN}}</dd></div>
+                  <div><dt><span data-tex>\bar{x}</span> in band at the end</dt><dd>{{fig.traj.insideMean}}</dd></div>
+                  <div><dt><span data-tex>s^2</span> in band at the end</dt><dd>{{fig.traj.insideVariance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, stream {{fig.params.seeds.trajectories}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              Panel 1 repeats the experiment live for any <span data-tex>n</span> and <span class="math-tie"><span data-tex>m</span>.</span>
+              The running paths are those of a few hackers, while the histograms beside them and the table underneath hold all
+              <span data-tex>m</span> of them. Both vertical axes are fixed, so that moving <span data-tex>n</span> changes the
+              spread and not its scale, and Play advances every hacker through the recurrences one system at a time.
+            </p>
+            <div class="demo" data-demo="sampling" data-seed="{{fig.params.seed}}">
+              <p class="demo__fallback">
+                Panel 1 (interactive, not available in print or without scripting) simulates <span data-tex>m</span> hackers
+                over <span data-tex>n</span> systems in the browser and shows their running estimates, the histograms of the
+                sampling means and variances, and the two averages. In the study, at n = 100 with {{fig.params.m}} hackers, the
+                average of the sampling means was {{fig.avg.n100.mean}} against {{fig.law.mu}} and the average of the sampling variances
+                {{fig.avg.n100.variance}} against {{fig.law.sigma2}} (Table 1), with spreads across hackers of {{fig.spread.n100.sdMean}} and
+                {{fig.spread.n100.sdVariance}} (Table 2).
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> The averages against the theory</h2>
+            <h3 id="s4-1">4.1 The comparison</h3>
+            <p>
+              Across the <span data-tex>m</span> hackers the assignment asks for the two averages
+            </p>
+            <div class="equation" id="eq-averages">
+              <div data-tex-display>
+                A_n = \frac{1}{m} \sum_{j=1}^{m} \bar{x}_n^{(j)}, \qquad
+                B_n = \frac{1}{m} \sum_{j=1}^{m} s_n^{2\,(j)} .
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              An average of <span data-tex>m</span> independent estimates has a standard error of
+              <span class="math-tie"><span data-tex>\sqrt{\mathrm{Var}(\cdot)/m}</span>,</span> and both variances are known
+              exactly from §5, so each comparison can be read as a z-score,
+              <span data-tex>(A_n - \mu)/\sqrt{\sigma^2/(mn)}</span> and
+              <span class="math-tie"><span data-tex>(B_n - \sigma^2)/\sqrt{\mathrm{Var}(s_n^2)/m}</span>.</span> Table 1 lists them
+              for every <span class="math-tie"><span data-tex>n</span>,</span> and Figure 3 plots them.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>The averages over {{fig.params.m}} hackers against
+                <span data-tex>\mu</span> = {{fig.law.mu}} and <span data-tex>\sigma^2</span> = {{fig.law.sigma2}}, each with
+                its exact standard error and z-score, and the average of <span data-tex>\mathrm{SS}_n/n</span> against
+                <span class="math-tie"><span data-tex>\sigma^2(n - 1)/n</span>.</span>
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=averages --></div>
+            </figure>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas"><!-- @figure id=zScores --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Deviations of the two averages, in standard errors
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The z-scores of Table 1 against <span class="math-tie"><span data-tex>n</span>;</span> the band marks two exact
+                  standard errors on each side. Each value of <span data-tex>n</span> is an independent experiment.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>z-scores</dt><dd>{{fig.avg.zCount}}</dd></div>
+                  <div><dt>|z| above 2</dt><dd>{{fig.avg.zAboveTwo}}</dd></div>
+                  <div><dt>Expected if calibrated</dt><dd>{{fig.avg.zExpected}}</dd></div>
+                  <div><dt>Largest |z|</dt><dd>{{fig.avg.zMax}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; {{fig.params.m}} hackers at each n.</p>
+              </figcaption>
+            </figure>
+            <p>
+              The averages stay on their theoretical values at every <span class="math-tie"><span data-tex>n</span>,</span> from a
+              hacker with two scores to one with {{fig.params.nMax}}. Of the {{fig.avg.zCount}} z-scores,
+              {{fig.avg.zAboveTwo}} exceed 2 in absolute value: {{fig.avg.zList}}. If the averages were exactly unbiased, and
+              the z-scores close to normal, about {{fig.avg.zExpected}} would be expected to do so, so this count is what an
+              honest experiment yields and not a discrepancy. The seed was fixed before the first run and has not been changed
+              since. The two exceedances are of opposite sign and sit at unrelated values of
+              <span class="math-tie"><span data-tex>n</span>;</span> the z-score of <span data-tex>B_n</span> at the same
+              <span data-tex>n</span> moves with that of <span data-tex>A_n</span> because the two estimators are correlated
+              (§7.4).
+            </p>
+
+            <h3 id="s4-2">4.2 Why the divisor is n − 1</h3>
+            <p>
+              The recurrences give <span class="math-tie"><span data-tex>\mathrm{SS}_n</span>,</span> and the obvious estimator
+              would divide it by <span class="math-tie"><span data-tex>n</span>.</span> The last two columns of Table 1 show what
+              that estimator does: its average does not settle on <span data-tex>\sigma^2</span> but on
+              <span class="math-tie"><span data-tex>\sigma^2(n - 1)/n</span>.</span> At n = 2 it reports
+              {{fig.avg.n2.ssOverN}} where the variance is {{fig.law.sigma2}}, {{fig.avg.n2.shortfall}} too low; at n = 10 the
+              shortfall is still {{fig.avg.n10.shortfall}}. Figure 4 shows this against <span class="math-tie"><span data-tex>n</span>:</span>
+              averaging more hackers only pins the wrong value more precisely, because the error is a bias, not noise.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas"><!-- @figure id=bias --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>The two estimators of the variance, averaged over the hackers
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Red points, the average of <span class="math-tie"><span data-tex>s_n^2 = \mathrm{SS}_n/(n - 1)</span>;</span> open rings, the average of
+                  <span class="math-tie"><span data-tex>\mathrm{SS}_n/n</span>,</span> against <span data-tex>\sigma^2</span> (dashed) and
+                  <span data-tex>\sigma^2(n - 1)/n</span> (solid).
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>SS/n at n = 2</dt><dd>{{fig.avg.n2.ssOverN}}</dd></div>
+                  <div><dt><span data-tex>s^2</span> at n = 2</dt><dd>{{fig.avg.n2.variance}}</dd></div>
+                  <div><dt>SS/n at n = 10</dt><dd>{{fig.avg.n10.ssOverN}}</dd></div>
+                  <div><dt><span data-tex>s^2</span> at n = 10</dt><dd>{{fig.avg.n10.variance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; {{fig.params.m}} hackers at each n.</p>
+              </figcaption>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Why the averages agree</h2>
+            <p>
+              The results of §4 hold for any law with enough moments, and the proofs below use nothing about (1) beyond
+              independence and identical distribution. They are standard [<a href="#ref-2">2</a>, Ch. 5; <a href="#ref-3">3</a>], and they are given here because they explain every column of Table 1.
+            </p>
+            <h3 id="s5-1">5.1 The sampling mean</h3>
+            <p>By linearity of the expectation, and by independence for the variance,</p>
+            <div class="equation" id="eq-mean">
+              <div data-tex-display>
+                \begin{aligned}
+                \mathbb{E}[\bar{x}_n] &amp;= \frac{1}{n} \sum_{i=1}^{n} \mathbb{E}[X_i] = \mu, \\
+                \mathrm{Var}(\bar{x}_n) &amp;= \frac{1}{n^2} \sum_{i=1}^{n} \mathrm{Var}(X_i) = \frac{\sigma^2}{n} .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+
+            <h3 id="s5-2">5.2 The sampling variance</h3>
+            <p>
+              Adding and subtracting <span data-tex>\mu</span> inside the sum of squares, and using
+              <span class="math-tie"><span data-tex>\sum_i (X_i - \bar{x}_n) = 0</span>,</span>
+            </p>
+            <div class="equation" id="eq-ss">
+              <div data-tex-display>
+                \mathrm{SS}_n = \sum_{i=1}^{n} (X_i - \bar{x}_n)^2 = \sum_{i=1}^{n} (X_i - \mu)^2 - n(\bar{x}_n - \mu)^2 .
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              The first term has expectation <span data-tex>n\sigma^2</span> and the second, by (7),
+              <span class="math-tie"><span data-tex>n \cdot \sigma^2/n = \sigma^2</span>.</span> Hence
+            </p>
+            <div class="equation" id="eq-unbiased">
+              <div data-tex-display>
+                \begin{gathered}
+                \mathbb{E}[\mathrm{SS}_n] = (n - 1)\,\sigma^2, \qquad \mathbb{E}[s_n^2] = \sigma^2, \\
+                \mathbb{E}[\mathrm{SS}_n/n] = \frac{n - 1}{n}\,\sigma^2 .
+                \end{gathered}
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>
+              Deviations are measured from <span data-tex>\bar{x}_n</span> and not from the unknown
+              <span class="math-tie"><span data-tex>\mu</span>,</span> and <span data-tex>\bar{x}_n</span> is the point that makes
+              them smallest. That is the whole of the bias in §4.2, and it costs exactly one
+              <span data-tex>\sigma^2</span> out of <span class="math-tie"><span data-tex>n\sigma^2</span>.</span>
+            </p>
+
+            <h3 id="s5-3">5.3 The variance of the sampling variance</h3>
+            <p>
+              The spreads of §6 need the second moment of <span class="math-tie"><span data-tex>s_n^2</span>.</span> The shortest route
+              writes the sample variance as an average over pairs,
+            </p>
+            <div class="equation" id="eq-pairs">
+              <div data-tex-display>
+                s_n^2 = \binom{n}{2}^{\!-1} \sum_{i &lt; j} \frac{(X_i - X_j)^2}{2} ,
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              which is a U-statistic with kernel <span class="math-tie"><span data-tex>h(x, y) = (x - y)^2/2</span>.</span> Hoeffding's
+              formula for such a statistic [<a href="#ref-6">6</a>] gives
+            </p>
+            <div class="equation">
+              <div data-tex-display>
+                \mathrm{Var}(s_n^2) = \frac{4(n - 2)\,\zeta_1 + 2\,\zeta_2}{n(n - 1)} ,
+              </div>
+            </div>
+            <p>
+              with <span data-tex>\zeta_1 = \mathrm{Var}(\mathbb{E}[h(X_1, X_2) \mid X_1])</span> and
+              <span class="math-tie"><span data-tex>\zeta_2 = \mathrm{Var}(h(X_1, X_2))</span>.</span> Here
+              <span class="math-tie"><span data-tex>\mathbb{E}[h \mid X_1] = ((X_1 - \mu)^2 + \sigma^2)/2</span>,</span> so
+              <span class="math-tie"><span data-tex>\zeta_1 = (\mu_4 - \sigma^4)/4</span>,</span> and expanding
+              <span data-tex>(X_1 - X_2)^4</span> gives <span class="math-tie"><span data-tex>\zeta_2 = (\mu_4 + \sigma^4)/2</span>.</span>
+              Substituting and simplifying,
+            </p>
+            <div class="equation" id="eq-varvar">
+              <div data-tex-display>
+                \mathrm{Var}(s_n^2) = \frac{1}{n} \left( \mu_4 - \frac{n - 3}{n - 1}\,\sigma^4 \right) ,
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>
+              the classical result [<a href="#ref-3">3</a>]. It depends on the law only through
+              <span data-tex>\sigma^2</span> and <span class="math-tie"><span data-tex>\mu_4</span>.</span> For normal scores
+              <span data-tex>\mu_4 = 3\sigma^4</span> and (11) reduces to the familiar
+              <span class="math-tie"><span data-tex>2\sigma^4/(n - 1)</span>.</span>
+            </p>
+
+            <h3 id="s5-4">5.4 The two estimators together</h3>
+            <p>
+              Taking <span data-tex>\mu = 0</span> without loss of generality, (10) expresses
+              <span data-tex>s_n^2</span> through pairs, and only a pair that contains system <span data-tex>i</span> can be
+              correlated with <span class="math-tie"><span data-tex>X_i</span>.</span> For such a pair
+              <span class="math-tie"><span data-tex>\mathrm{Cov}(X_1, (X_1 - X_2)^2) = \mu_3</span>,</span> and counting the
+              <span data-tex>n - 1</span> pairs that contain each index gives
+            </p>
+            <div class="equation" id="eq-cov">
+              <div data-tex-display>
+                \begin{aligned}
+                \mathrm{Cov}(\bar{x}_n, s_n^2) &amp;= \frac{\mu_3}{n}, \\
+                \mathrm{Corr}(\bar{x}_n, s_n^2) &amp;= \frac{\mu_3}{\sqrt{\sigma^2 \bigl(\mu_4 - \frac{n - 3}{n - 1}\sigma^4\bigr)}} .
+                \end{aligned}
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              The covariance vanishes for a symmetric law. For the law (1) it does not, and the correlation tends to
+              <span data-tex>\mu_3/\sqrt{\sigma^2(\mu_4 - \sigma^4)}</span> = {{fig.scatter.limit}} as
+              <span data-tex>n</span> grows.
+            </p>
+
+            <h3 id="s5-5">5.5 What the comparisons show</h3>
+            <p>
+              The first conclusion is that <span data-tex>\bar{x}_n</span> and <span data-tex>s_n^2</span> are unbiased, and this
+              is what the averages of Table 1 display: an estimator is unbiased when the mean of its sampling distribution
+              equals the quantity it estimates, and an average over many hackers is a direct estimate of that mean. The second
+              is that unbiasedness holds at every <span class="math-tie"><span data-tex>n</span>,</span> not only in the limit, and for
+              this strongly non-normal law as much as for any other: neither the central limit theorem nor normality is used in
+              (7) or (9). The third is that it is a property of the divisor: <span class="math-tie"><span data-tex>\mathrm{SS}_n/n</span>,</span> computed from
+              the same recurrences, is biased, and no number of hackers repairs it. The fourth is a caution: unbiasedness says
+              nothing about a single hacker. At n = 2 the averages are right while the individual estimates are almost useless;
+              how far one hacker's estimate can stray is the subject of §6.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Repeating for different n</h2>
+            <h3 id="s6-1">6.1 The spreads across hackers</h3>
+            <p>
+              Each <span data-tex>n</span> of {{fig.params.nGrid}} is a fresh experiment of {{fig.params.m}} hackers with its own
+              random stream, so no estimate at one <span data-tex>n</span> is a continuation of another. The averages did not
+              move with <span data-tex>n</span> (§4); what moves is the spread of the estimates across hackers, measured here by
+              their standard deviation.
+            </p>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>The standard deviation across {{fig.params.m}} hackers of the
+                sampling means and of the sampling variances, against the exact values of (7) and (11), and the ratio of the
+                exact <span data-tex>\mathrm{Var}(s_n^2)</span> to its normal-theory value.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=spreadTable --></div>
+            </figure>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas"><!-- @figure id=spreads --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>How the spreads fall with n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Left, the standard deviations of Table 2 on log–log axes, with the exact curves. Right, the exact ratio of
+                  <span data-tex>\mathrm{Var}(s_n^2)</span> to <span class="math-tie"><span data-tex>2\sigma^4/(n - 1)</span>,</span> and the
+                  same ratio with the simulated variance; it tends to
+                  <span class="math-tie"><span data-tex>(\kappa - 1)/2</span>.</span>
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Slope, SD of <span data-tex>\bar{x}</span></dt><dd>{{fig.spread.slopeMean}}</dd></div>
+                  <div><dt>Exact slope</dt><dd>{{fig.spread.slopeExactMean}}</dd></div>
+                  <div><dt>Slope, SD of <span data-tex>s^2</span></dt><dd>{{fig.spread.slopeVariance}}</dd></div>
+                  <div><dt>Exact slope</dt><dd>{{fig.spread.slopeExactVariance}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; least-squares slopes over the {{fig.params.nCount}} values of n.</p>
+              </figcaption>
+            </figure>
+            <p>
+              Both spreads fall as <span class="math-tie"><span data-tex>1/\sqrt{n}</span>.</span> For the mean, (7) gives
+              <span data-tex>\mathrm{SD}(\bar{x}_n) = \sigma/\sqrt{n}</span> exactly, a slope of precisely
+              <span data-tex>-1/2</span> on the log–log plot; the fitted slope is {{fig.spread.slopeMean}}. For the variance,
+              (11) gives <span data-tex>\mathrm{SD}(s_n^2) \approx \sqrt{(\mu_4 - \sigma^4)/n}</span> for large
+              <span class="math-tie"><span data-tex>n</span>,</span> the same rate with a constant of {{fig.law.sdConstant}}. The fitted
+              slope over the whole grid is {{fig.spread.slopeVariance}}, and the exact curve of (11) has the same
+              {{fig.spread.slopeExactVariance}}: the small excess over <span data-tex>-1/2</span> comes from the factor
+              <span data-tex>(n - 3)/(n - 1)</span> at the smallest values of <span class="math-tie"><span data-tex>n</span>,</span> not
+              from a different rate. Multiplying the number of systems by 100 therefore divides both spreads by about 10: from
+              n = 10 to n = 1,000, the spread of the means falls from {{fig.spread.n10.sdMean}} to
+              {{fig.spread.n1000.sdMean}} and that of the variances from {{fig.spread.n10.sdVariance}} to
+              {{fig.spread.n1000.sdVariance}}.
+            </p>
+            <p>
+              The two estimators obey the same rate but not the same constant, and they answer to different properties of the
+              law. The spread of <span data-tex>\bar{x}_n</span> is governed by the variance
+              <span class="math-tie"><span data-tex>\sigma^2</span>,</span> the spread of <span data-tex>s_n^2</span> by the fourth moment,
+              that is, by the kurtosis. Writing (11) in terms of <span class="math-tie"><span data-tex>\kappa</span>,</span> the right panel of Figure 5 shows
+              what this costs: the true variance of <span data-tex>s_n^2</span> exceeds its normal-theory value at every
+              <span class="math-tie"><span data-tex>n</span>,</span> and the ratio climbs to
+              <span data-tex>(\kappa - 1)/2</span> = {{fig.spread.ratioLimit}}. It does not fall back to 1 however many systems
+              are attempted, and §7.3 draws the consequence.
+            </p>
+
+            <h3 id="s6-2">6.2 The sampling distributions</h3>
+            <p>
+              Figure 6 shows the whole law of the two estimators at n = {{fig.params.distributionN}}, against the normal
+              approximations <span data-tex>N(\mu, \sigma^2/n)</span> and
+              <span class="math-tie"><span data-tex>N(\sigma^2, \mathrm{Var}(s_n^2))</span>.</span>
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig6-title">
+              <div class="chart-figure__canvas"><!-- @figure id=distributions --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>Sampling distributions of the two estimators at increasing n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Bars, the {{fig.params.m}} hackers; stepped line, the counts expected in each bin under the normal
+                  approximation with the exact mean and variance. Every axis has its own scale.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>Share at 0, n = 5</dt><dd>{{fig.dist.n5.atomShare}}</dd></div>
+                  <div><dt><span data-tex>0.7^5</span></dt><dd>{{fig.dist.n5.atomExact}}</dd></div>
+                  <div><dt>Skewness of <span class="math-tie"><span data-tex>\bar{x}</span>,</span> n = 5</dt><dd>{{fig.dist.n5.skewMean}}</dd></div>
+                  <div><dt>Skewness of <span class="math-tie"><span data-tex>\bar{x}</span>,</span> n = 500</dt><dd>{{fig.dist.n500.skewMean}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; streams {{fig.params.seeds.n5}}, {{fig.params.seeds.n50}} and {{fig.params.seeds.n500}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              At n = 5 neither law resembles a normal one. A share {{fig.dist.n5.atomShare}} of the hackers scored 0 on every
+              system (the exact value is <span class="math-tie"><span data-tex>0.7^5</span>,</span> or {{fig.dist.n5.atomExact}}) and they
+              pile up at <span data-tex>\bar{x}_n = 0</span> and <span class="math-tie"><span data-tex>s_n^2 = 0</span>,</span> the atom of
+              the score law seen through the estimators. As <span data-tex>n</span> grows the central limit theorem takes over,
+              and by n = 500 both histograms sit close to their normal curves. The skewness of <span data-tex>\bar{x}_n</span> is the
+              skewness of the score divided by <span class="math-tie"><span data-tex>\sqrt{n}</span>,</span> {{fig.dist.n5.skewMean}} at
+              n = 5 and {{fig.dist.n500.skewMean}} at n = 500. The sampling variance turns out to be less skewed still, with
+              {{fig.dist.n5.skewVariance}} and {{fig.dist.n500.skewVariance}} measured across the hackers at the same n, the second within sampling
+              error of 0. That is a coincidence of this law, whose moments nearly cancel the leading term of the third cumulant of
+              <span class="math-tie"><span data-tex>s_n^2</span>,</span> and not a general rule: for normal scores
+              <span data-tex>\bar{x}_n</span> has no skewness at all and <span data-tex>s_n^2</span> has some.
+            </p>
+
+            <h3 id="s6-3">6.3 Hackers against systems</h3>
+            <p>
+              The two indices of the experiment are easily confused, and they do different things. The number of systems
+              <span data-tex>n</span> sets how much each hacker knows. The number of hackers <span data-tex>m</span> sets how
+              well the experiment measures what a hacker would know. Figure 7 fixes n = {{fig.precision.n}} and cuts a long run of
+              {{fig.params.precisionHackers}} hackers into groups of <span data-tex>m</span> to show the difference.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas"><!-- @figure id=precision --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>The number of hackers buys precision of the averages only
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Red points, the root mean square error of the average of a group of <span data-tex>m</span> hackers, against
+                  the exact standard error; open rings, the spread of a single hacker's estimate inside such a group, against
+                  its exact value.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>RMS error, m = 10</dt><dd>{{fig.precision.m10.rmsMean}}</dd></div>
+                  <div><dt>RMS error, m = 1,000</dt><dd>{{fig.precision.m1000.rmsMean}}</dd></div>
+                  <div><dt>Spread, m = 10</dt><dd>{{fig.precision.m10.spreadMean}}</dd></div>
+                  <div><dt>Spread, m = 1,000</dt><dd>{{fig.precision.m1000.spreadMean}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}, stream {{fig.params.seeds.precision}}; n = {{fig.precision.n}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              The error of the two averages falls as <span class="math-tie"><span data-tex>1/\sqrt{m}</span>,</span> from
+              {{fig.precision.m10.rmsMean}} at m = 10 to {{fig.precision.m1000.rmsMean}} at m = 1,000 for the sampling mean, with fitted
+              slopes of {{fig.precision.slopeMean}} and {{fig.precision.slopeVariance}}. The fit runs a little steeper than
+              <span data-tex>-1/2</span> because the largest groups are few ({{fig.precision.m10000.groups}} groups at m = 10,000),
+              and the last points are themselves noisy. The spread of one hacker's estimate stays where it is:
+              {{fig.precision.m10.spreadMean}} at m = 10, {{fig.precision.m1000.spreadMean}} at m = 1,000, within 1% of its exact value of
+              {{fig.precision.exactSdMean}}. More hackers tell us more exactly what a hacker with
+              {{fig.precision.n}} scores can expect; they do not make that hacker any better informed. Only
+              <span data-tex>n</span> does that.
+            </p>
+            <p>
+              The direct answer to the last question of the assignment follows. Increasing the number of systems attempted by
+              each hacker reduces the variability of both the sampling means and the sampling variances, each in proportion to
+              <span class="math-tie"><span data-tex>1/\sqrt{n}</span>,</span> leaves their centres where they are, and brings their laws
+              closer to the normal law. The spread of the sampling means depends on the variance of the scores and the spread of
+              the sampling variances on their kurtosis. In absolute terms the sampling variance is much the noisier estimate;
+              relative to what each one estimates, the two happen to be about equally precise for this law, since at n = 1,000
+              the spreads are {{fig.spread.n1000.sdVariance}} out of {{fig.law.sigma2}} and {{fig.spread.n1000.sdMean}} out of
+              {{fig.law.mu}}, or {{fig.spread.n1000.relVariance}} and {{fig.spread.n1000.relMean}}. Both are slow: a tenfold
+              reduction takes a hundredfold effort.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Inference</h2>
+            <h3 id="s7-1">7.1 One hacker, and the thought experiment behind it</h3>
+            <p>
+              The experiment above has a privileged position: it can repeat the sample {{fig.params.m}} times. Nobody who
+              studies real attackers can. In practice there is one sample, and inferential statistics is the discipline of
+              saying something about <span data-tex>\mu</span> and <span data-tex>\sigma^2</span> from it. The
+              <span data-tex>m</span> hackers are the frequentist thought experiment that gives such statements their meaning:
+              the sampling distribution of an estimator is what we would see across many repetitions, and a claim about one
+              sample is a claim about the procedure that produced it. The results of §4–§6 are useful because they describe
+              that sampling distribution, and because they can be used from one sample alone.
+            </p>
+            <p>
+              A single hacker's trajectory supplies a point estimate <span data-tex>\bar{x}_n</span> of
+              <span class="math-tie"><span data-tex>\mu</span>,</span> unbiased by (7), and also an estimate of its own precision. The standard error
+              <span data-tex>\sigma/\sqrt{n}</span> involves the unknown <span class="math-tie"><span data-tex>\sigma</span>,</span> but
+              <span class="math-tie"><span data-tex>s_n^2</span>,</span> unbiased by (9) and consistent by (11), can stand in for
+              <span class="math-tie"><span data-tex>\sigma^2</span>.</span> The sample therefore reports both a value and how far to trust
+              it, <span class="math-tie"><span data-tex>\bar{x}_n \pm s_n/\sqrt{n}</span>,</span> and the two numbers come out of the same
+              three-line recurrence. What licenses the substitution is the consistency of
+              <span class="math-tie"><span data-tex>s_n^2</span>,</span> not its unbiasedness: <span data-tex>s_n^2/n</span> is unbiased
+              for <span class="math-tie"><span data-tex>\mathrm{Var}(\bar{x}_n)</span>,</span> yet its square root underestimates
+              <span data-tex>\sigma/\sqrt{n}</span> on average, by Jensen's inequality, and the biased
+              <span data-tex>\mathrm{SS}_n/n</span> would serve as well for large <span class="math-tie"><span data-tex>n</span>.</span>
+            </p>
+
+            <h3 id="s7-2">7.2 The t-interval for the mean</h3>
+            <p>
+              The central limit theorem gives
+              <span data-tex>\sqrt{n}(\bar{x}_n - \mu)/\sigma \to N(0, 1)</span> in distribution, and
+              <span data-tex>s_n \to \sigma</span> in probability, by (11) here and by the law of large numbers for any law of
+              finite variance, so Slutsky's theorem
+              [<a href="#ref-4">4</a>] gives the same limit with the estimated standard deviation:
+            </p>
+            <div class="equation" id="eq-t">
+              <div data-tex-display>
+                T_n = \frac{\sqrt{n}\,(\bar{x}_n - \mu)}{s_n} \xrightarrow{\;d\;} N(0, 1) .
+              </div>
+              <span class="equation__no">(13)</span>
+            </div>
+            <p>
+              Any finite-variance law qualifies, and normality of the scores is not needed. The 95% interval
+              <span class="math-tie"><span data-tex>\bar{x}_n \pm t_{n-1;\,0.975}\, s_n/\sqrt{n}</span>,</span> with the quantile of
+              Student's distribution [<a href="#ref-8">8</a>], is exact for normal scores and, by (13), asymptotically
+              correct for these. Figure 8 and Table 3 measure how soon: the share of hackers whose interval contains
+              <span data-tex>\mu</span> is {{fig.cover.n5.tRate}} at n = 5, {{fig.cover.n20.tRate}} at n = 20,
+              {{fig.cover.n100.tRate}} at n = 100 and {{fig.cover.n5000.tRate}} at n = 5,000.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig8-title">
+              <div class="chart-figure__canvas"><!-- @figure id=coverage --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig8-title">
+                  <span class="pplot__fig-no">Figure 8.</span>Coverage of the two 95% intervals against n
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  The share of {{fig.params.m}} hackers whose interval contains the true value, with Wilson 95% intervals
+                  [<a href="#ref-10">10</a>]. The solid line <span data-tex>1 - 0.7^n</span> is the share of hackers with any score
+                  above 0: a hacker with every score 0 has <span data-tex>s_n^2 = 0</span> and an interval reduced to the point
+                  0, which contains neither value and is counted as a miss.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>t at n = 5</dt><dd>{{fig.cover.n5.tRate}}</dd></div>
+                  <div><dt>t at n = 5,000</dt><dd>{{fig.cover.n5000.tRate}}</dd></div>
+                  <div><dt>χ² at n = 5,000</dt><dd>{{fig.cover.n5000.chiRate}}</dd></div>
+                  <div><dt>Limit of χ²</dt><dd>{{fig.cover.chiLimit}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; {{fig.params.m}} hackers at each n.</p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>Coverage of the two 95% intervals with Wilson intervals, the number
+                of intervals lying wholly below or above the true value, and the hackers with every score 0 against the
+                expected <span class="math-tie"><span data-tex>0.7^n m</span>.</span>
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=coverageTable --></div>
+            </figure>
+            <p>
+              At the smallest <span data-tex>n</span> the hackers with no success dominate: at n = 2 they make up
+              {{fig.cover.n2.degenerate}} of the {{fig.params.m}} hackers, and the coverage of {{fig.cover.n2.tRate}} sits
+              just under the ceiling of {{fig.cover.n2.ceiling}} they impose. Their probability falls fast, to
+              {{fig.cover.n20.zeroProbability}} at n = 20, and from then on what remains of the shortfall has a subtler cause
+              (§7.4).
+            </p>
+
+            <h3 id="s7-3">7.3 The χ² interval for the variance</h3>
+            <p>
+              For normal scores <span data-tex>(n - 1)s_n^2/\sigma^2</span> has a <span data-tex>\chi^2_{n-1}</span> law, which gives the
+              textbook interval
+            </p>
+            <div class="equation" id="eq-chi">
+              <div data-tex-display>
+                \left[ \frac{(n - 1)\,s_n^2}{\chi^2_{n-1;\,0.975}}, \; \frac{(n - 1)\,s_n^2}{\chi^2_{n-1;\,0.025}} \right] .
+              </div>
+              <span class="equation__no">(14)</span>
+            </div>
+            <p>
+              No analogue of (13) comes to its rescue here. By the central limit theorem <span data-tex>s_n^2</span> is
+              asymptotically normal, but with the variance of (11), of order
+              <span class="math-tie"><span data-tex>\sigma^4(\kappa - 1)/n</span>,</span> while the half-width of (14) is calibrated for
+              the normal value <span class="math-tie"><span data-tex>\sigma^4 \cdot 2/n</span>.</span> The interval therefore stays too
+              short by the fixed factor <span class="math-tie"><span data-tex>\sqrt{2/(\kappa - 1)}</span>,</span> and its coverage tends
+              not to 95% but to
+            </p>
+            <div class="equation" id="eq-limit">
+              <div data-tex-display>
+                2\,\Phi\!\left(1.96\,\sqrt{\frac{2}{\kappa - 1}}\right) - 1 .
+              </div>
+              <span class="equation__no">(15)</span>
+            </div>
+            <p>
+              For <span data-tex>\kappa</span> = {{fig.law.kurtosis}} this limit is {{fig.cover.chiLimit}}. The simulation confirms it:
+              at n = {{fig.cover.largestN}} the coverage is {{fig.cover.n5000.chiRate}}, with a Wilson interval from
+              {{fig.cover.n5000.chiLow}} to {{fig.cover.n5000.chiHigh}}, which differs from (15) by {{fig.cover.chiZ}} standard errors, and the
+              average over all <span data-tex>n</span> from {{fig.cover.tailFrom}} upwards is {{fig.cover.chiLargeMean}}. More
+              data do not help: this is the sensitivity to non-normality that Box [<a href="#ref-1">1</a>] set out, and the
+              reason why the two intervals of this section behave so differently. A central limit theorem protects the mean
+              because the interval uses it directly; the interval for the variance leans on the exact <span data-tex>\chi^2</span>
+              law, which is a property of normal samples and which no amount of averaging supplies.
+            </p>
+
+            <h3 id="s7-4">7.4 Why the t-interval is slow: the two estimators are tied</h3>
+            <p>
+              For normal scores <span data-tex>\bar{x}_n</span> and <span data-tex>s_n^2</span> are independent, and independence
+              characterises the normal law [<a href="#ref-7">7</a>]. For the law (1) they are far from independent: by (12) their
+              correlation tends to {{fig.scatter.limit}}. A hacker with few successes has both a low mean and a low variance,
+              since nearly all of the spread of the scores comes from the successes themselves; Figure 9 shows the resulting
+              cloud, and at n = 10 the hackers with few successes draw visible arcs in it.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig9-title">
+              <div class="chart-figure__canvas"><!-- @figure id=scatter --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig9-title">
+                  <span class="pplot__fig-no">Figure 9.</span>Sampling mean and sampling variance across hackers
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  {{fig.params.scatterPoints}} hackers at each <span class="math-tie"><span data-tex>n</span>;</span> the correlations use all
+                  {{fig.params.m}}. The line is the best linear predictor of <span data-tex>s_n^2</span> from
+                  <span class="math-tie"><span data-tex>\bar{x}_n</span>,</span> through <span data-tex>(\mu, \sigma^2)</span> with
+                  slope <span data-tex>\mu_3/\sigma^2</span> = {{fig.law.slope}} at every <span class="math-tie"><span data-tex>n</span>.</span>
+                  Under normality the cloud would have no tilt at all.
+                </p>
+                <dl class="pplot__stats pplot__stats--math">
+                  <div><dt>r, n = 10</dt><dd>{{fig.scatter.n10.r}}</dd></div>
+                  <div><dt>Exact, n = 10</dt><dd>{{fig.scatter.n10.exact}}</dd></div>
+                  <div><dt>r, n = 200</dt><dd>{{fig.scatter.n200.r}}</dd></div>
+                  <div><dt>Exact, n = 200</dt><dd>{{fig.scatter.n200.exact}}</dd></div>
+                </dl>
+                <p class="pplot__seed">Seed {{fig.params.seed}}; streams {{fig.params.seeds.n10}} and {{fig.params.seeds.n200}}.</p>
+              </figcaption>
+            </figure>
+            <p>
+              This dependence explains how the t-interval fails at moderate <span class="math-tie"><span data-tex>n</span>.</span> When
+              <span data-tex>\bar{x}_n</span> happens to be low, <span data-tex>s_n</span> tends to be low with it, so the interval
+              is short exactly when it needs to be long, and it stops short of <span data-tex>\mu</span> from below. When
+              <span data-tex>\bar{x}_n</span> is high the interval is long and easily reaches back. The misses are therefore
+              lopsided: at n = 20, {{fig.cover.n20.tBelow}} intervals lie wholly below <span data-tex>\mu</span> against
+              {{fig.cover.n20.tAbove}} above it, so that {{fig.cover.n20.tBelowShare}} of the misses are on one side, although the
+              nominal 5% is meant to be shared equally. At n = 5,000 the split is {{fig.cover.n5000.tBelow}} to
+              {{fig.cover.n5000.tAbove}}, and the coverage has reached its nominal level. The practical lesson is that (13) is a
+              statement about large <span class="math-tie"><span data-tex>n</span>,</span> and that for a skewed score, "large" is a matter
+              of how skewed: the same 95% label covers {{fig.cover.n10.tRate}} of the hackers at n = 10.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Discussion</h2>
+            <p>
+              <em>What the comparisons show.</em> Across the hackers, the average of the sampling means agrees with
+              <span data-tex>\mu</span> and the average of the sampling variances with <span class="math-tie"><span data-tex>\sigma^2</span>,</span>
+              within the sampling error of the experiment, at every <span data-tex>n</span> and for a law that is nowhere near
+              normal: <span data-tex>\bar{x}_n</span> and <span data-tex>s_n^2</span> are unbiased (§4, §5). The divisor
+              <span data-tex>n - 1</span> is what makes the second true, and <span data-tex>\mathrm{SS}_n/n</span> would fall short
+              by the factor <span class="math-tie"><span data-tex>(n - 1)/n</span>.</span>
+            </p>
+            <p>
+              <em>Why it matters for inference.</em> Unbiasedness and the exact variances describe the sampling distribution of an
+              estimator, which is the object that gives a statement drawn from one sample its meaning. The consistency of
+              <span data-tex>s_n^2</span> lets one hacker report an estimate and its own standard error, and through the central
+              limit theorem and Slutsky's theorem it yields an interval for <span data-tex>\mu</span> with the stated coverage for
+              large <span class="math-tie"><span data-tex>n</span>,</span> for any law of finite variance.
+              The argument also has its limits: the coverage of the usual interval for
+              <span data-tex>\sigma^2</span> settles near {{fig.cover.chiLimit}}, not 95%, because it rests on normality itself and
+              not on a limit theorem (§7).
+            </p>
+            <p>
+              <em>What n does.</em> Increasing the number of systems shrinks the variability of both estimators as
+              <span class="math-tie"><span data-tex>1/\sqrt{n}</span>,</span> keeps their centres fixed and makes their laws more nearly
+              normal. The number of hackers does none of this: <span data-tex>m</span> sharpens our picture of the sampling
+              distribution, not the estimates of any hacker (§6).
+            </p>
+            <p>
+              <em>What the model leaves out.</em> The conclusions rest on the assumptions of the assignment. The scores are
+              independent across systems, whereas a hacker who breaches one system of a network learns something that helps on
+              the next, and a vulnerability is often shared by many systems; positive dependence inflates the variance of
+              <span data-tex>\bar{x}_n</span> beyond <span class="math-tie"><span data-tex>\sigma^2/n</span>,</span> while
+              <span data-tex>s_n^2/n</span> goes on reporting the smaller value. All hackers also share one <span class="math-tie"><span data-tex>p</span>,</span> so
+              the study has no skilled and unskilled attackers: with hackers of different ability the spread of
+              <span data-tex>\bar{x}_n</span> across hackers would not shrink to 0 with <span data-tex>n</span> but to the spread of
+              their abilities, and the average over hackers would estimate the mean ability, not the ability of any one of them.
+              The depth of a success is uniform by choice, and a heavier tail would slow every convergence measured here.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure, table and statistic on this page is computed when the page is built, from the parameters and seeds
+              of Table A1, and can be recomputed by anyone from the repository: <code>npm test</code> runs the test suite, which
+              covers the score law, the two quantile functions, the study, the figures and the interactive panel, and
+              <code>npm run build</code> rebuilds the page. The study draws {{fig.params.draws}} pseudo-random numbers and takes
+              about {{fig.params.computeSeconds}} seconds (last computed {{fig.params.computedAt}}); its results are cached under
+              <code>node_modules/.cache/hw06/</code> with the key <code>{{fig.params.cacheKey}}</code>, a hash of the parameters,
+              of the source of every module involved and of the figure provider itself, so that a change to any of them
+              recomputes everything.
+            </p>
+            <p>
+              Each run has its own stream of a seeded Mulberry32 generator, whose seed is the master seed {{fig.params.seed}}
+              combined by exclusive or with the 32-bit FNV-1a hash of a label: <code>hackers:n100</code> gives
+              {{fig.params.seeds.n100}} for the experiment at n = 100, and every other <span data-tex>n</span> has its own label,
+              so that no experiment reuses another's scores. Within an experiment hackers read the stream one after another. One
+              uniform makes one score, by inversion of (2). Student's quantile is computed by bisection on the regularised
+              incomplete beta function and the <span data-tex>\chi^2</span> quantile by bisection on the regularised incomplete
+              gamma function; both reproduce printed tables. The generator is statistical, not cryptographic. The interactive
+              panel starts from the master seed and reads one stream system by system, so that it can advance all hackers
+              together.
+            </p>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the study, with the figures and tables that use
+                them.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/welford.js">src/lib/welford.js</a>: the recurrences (5), the only implementation on the page.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/score-law.js">src/lib/score-law.js</a>: the law (1), its distribution function and quantile, the moments (4) and the exact functions of n (7), (11), (12) and (15).</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/sampling-study.js">src/lib/sampling-study.js</a>: the experiments of §3–§7, with Student's and the <span data-tex>\chi^2</span> quantiles.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/sampling-charts.js">src/lib/sampling-charts.js</a>: the figures and tables.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/hw06/model.js">src/hw06/model.js</a> and <a href="{{site.repoUrl}}/blob/main/src/hw06/sampling-demo.js">src/hw06/sampling-demo.js</a>: the interactive panel.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/06/figures.js">homework/06/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the chapter in which the
+              cited statement is found where it applies. The specification read online carries the date on which it was read.
+            </p>
+            <ol>
+              <li id="ref-1">Box, G. E. P. (1953). <cite>Non-normality and tests on variances</cite>. Biometrika, 40(3–4), pp. 318–335. <a class="ref-link" href="https://doi.org/10.1093/biomet/40.3-4.318">https://doi.org/10.1093/biomet/40.3-4.318</a></li>
+              <li id="ref-2">Casella, G. and Berger, R. L. (2002). <cite>Statistical Inference</cite>. 2nd edn, Duxbury, Pacific Grove, CA.</li>
+              <li id="ref-3">Cramér, H. (1946). <cite>Mathematical Methods of Statistics</cite>. Princeton University Press, Princeton. <a class="ref-link" href="https://doi.org/10.1515/9781400883868">https://doi.org/10.1515/9781400883868</a></li>
+              <li id="ref-4">Durrett, R. (2019). <cite>Probability: Theory and Examples</cite>. 5th edn, Cambridge University Press, Cambridge. <a class="ref-link" href="https://doi.org/10.1017/9781108591034">https://doi.org/10.1017/9781108591034</a></li>
+              <li id="ref-5">FIRST (2024). <cite>Common Vulnerability Scoring System version 4.0: Specification Document</cite>. Version 1.2, Forum of Incident Response and Security Teams. <a class="ref-link" href="https://www.first.org/cvss/v4-0/specification-document">https://www.first.org/cvss/v4-0/specification-document</a> (accessed 31 October 2026)</li>
+              <li id="ref-6">Hoeffding, W. (1948). <cite>A class of statistics with asymptotically normal distribution</cite>. The Annals of Mathematical Statistics, 19(3), pp. 293–325. <a class="ref-link" href="https://doi.org/10.1214/aoms/1177730196">https://doi.org/10.1214/aoms/1177730196</a></li>
+              <li id="ref-7">Lukacs, E. (1942). <cite>A characterization of the normal distribution</cite>. The Annals of Mathematical Statistics, 13(1), pp. 91–93. <a class="ref-link" href="https://doi.org/10.1214/aoms/1177731647">https://doi.org/10.1214/aoms/1177731647</a></li>
+              <li id="ref-8">Student (1908). <cite>The probable error of a mean</cite>. Biometrika, 6(1), pp. 1–25. <a class="ref-link" href="https://doi.org/10.2307/2331554">https://doi.org/10.2307/2331554</a></li>
+              <li id="ref-9">Welford, B. P. (1962). <cite>Note on a method for calculating corrected sums of squares and products</cite>. Technometrics, 4(3), pp. 419–420. <a class="ref-link" href="https://doi.org/10.1080/00401706.1962.10490022">https://doi.org/10.1080/00401706.1962.10490022</a></li>
+              <li id="ref-10">Wilson, E. B. (1927). <cite>Probable inference, the law of succession, and statistical inference</cite>. Journal of the American Statistical Association, 22(158), pp. 209–212. <a class="ref-link" href="https://doi.org/10.1080/01621459.1927.10502953">https://doi.org/10.1080/01621459.1927.10502953</a></li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

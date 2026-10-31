@@ -67,4 +67,26 @@ export default [
     published: '2026-10-27',
     status: 'published',
   },
+  {
+    number: 5,
+    label: 'Homework 4 · Exercise 1',
+    shortLabel: '4.1',
+    title: 'Welford’s recurrences: the sum of squares and the variance in one pass',
+    abstract:
+      'Welford’s recurrences for the corrected sum of squares and the sample variance are derived step by step in the manner of Knuth’s recurrence for the mean, implemented in three lines of code and read geometrically: each observation adds the area of a rectangle to the sum of squares. Measured against the exact sum of squares, computed in rational arithmetic, the textbook formula loses every digit on ill-conditioned data and can return a negative value, whereas the error of the recurrence grows only in proportion to the condition number, in agreement with the published bounds. One pass, constant memory and running estimates, rather than rounding, are what recommend it for well-conditioned scores.',
+    topics: ['Recurrence relations', 'Sample variance', 'Numerical stability', 'Streaming algorithms'],
+    published: '2026-10-31',
+    status: 'published',
+  },
+  {
+    number: 6,
+    label: 'Homework 4 · Exercise 2',
+    shortLabel: '4.2',
+    title: 'Sampling mean and variance: m hackers, n systems and scores between 0 and 10',
+    abstract:
+      'Each of m hackers receives a score between 0 and 10 on each of n systems, under a law that extends the Bernoulli increment of homework 3 and is far from normal. Welford’s recurrences give the sampling mean and variance of every trajectory, and their averages agree with the theoretical mean and variance at every n, because both estimators are unbiased, while the sum of squares divided by n is not. The spread of both estimators across hackers falls as 1/√n, the number of hackers buys precision of the averages only, and the 95% t-interval for the mean reaches its nominal level as n grows, whereas the χ² interval for the variance stalls near 0.86, because it rests on normality and not on a limit theorem.',
+    topics: ['Sampling distributions', 'Unbiased estimation', 'Monte Carlo simulation', 'Statistical inference'],
+    published: '2026-10-31',
+    status: 'published',
+  },
 ];

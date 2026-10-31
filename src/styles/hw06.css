@@ -1,0 +1,22 @@
+/* Homework 06: sampling mean and variance. The frame of the panel, its controls, keys and
+   readouts come from hw04.css; this adds the two drawings of the panel, one per estimate. */
+
+.smp-figures {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The boxes have their height before anything is drawn: no layout shift when the panel mounts. */
+.smp-canvas {
+  position: relative;
+  min-width: 0;
+  height: clamp(14rem, 9.5rem + 12vw, 18rem);
+  background: var(--paper);
+}
+
+/* The heads of the readout wrap, so that its six numeric columns fit a phone. */
+.smp-readout thead th {
+  white-space: normal;
+  vertical-align: bottom;
+}

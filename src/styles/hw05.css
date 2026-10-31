@@ -1,0 +1,190 @@
+/* Homework 05: Welford's recurrences, in the vocabulary of the probability paper. Figure frames, data
+   tables and the panel frame come from hw01.css and hw04.css; this file adds the listing, the marked
+   result and the layout of Panel 1. */
+
+/* ---------- The result of §3 ---------- */
+
+/* The recurrence the page derives: ruled above and below, as the total of a column. */
+.equation--key {
+  padding-block: var(--space-2);
+  border-block: var(--hair) solid var(--ink);
+}
+
+/* ---------- The listing ---------- */
+
+.listing-figure {
+  margin: var(--space-6) 0;
+}
+
+.listing-figure > figcaption {
+  margin-bottom: var(--space-3);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.listing {
+  margin: 0;
+  padding: var(--space-3) 0;
+  overflow-x: auto;
+  border-block: var(--rule) solid var(--ink);
+  background: var(--paper);
+  font-family: var(--font-code);
+  font-size: 0.86em;
+  line-height: 1.7;
+}
+
+.listing:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.listing code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+.listing__line {
+  display: block;
+  padding-inline: 0 var(--space-4);
+  white-space: pre;
+}
+
+.listing__no {
+  display: inline-block;
+  width: 3rem;
+  margin-right: var(--space-3);
+  padding-right: var(--space-2);
+  border-right: var(--hair) solid var(--ruling);
+  text-align: right;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums lining-nums;
+  user-select: none;
+}
+
+/* The three lines of core logic: a filled band and heavier type; green stays the paper's. */
+.listing__line[data-core='true'] {
+  background: var(--paper-deep);
+  font-weight: 700;
+}
+
+.listing__gap {
+  display: block;
+  height: var(--space-3);
+}
+
+/* ---------- Panel 1 ---------- */
+
+.stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    'plane side'
+    'ledger ledger';
+  gap: var(--space-4) var(--space-5);
+  min-width: 0;
+}
+
+.stepper__plane {
+  grid-area: plane;
+  min-width: 0;
+  /* The box has its height before the drawing arrives, so that mounting shifts nothing. */
+  aspect-ratio: 1;
+}
+
+.stepper__side {
+  grid-area: side;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stepper__ledger {
+  grid-area: ledger;
+  min-width: 0;
+  min-height: 3.5rem;
+}
+
+.demo-panel .stepper__stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.stepper__stats > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.stepper__equation {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--hair) solid var(--ruling);
+  font-family: var(--font-form);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums lining-nums;
+  overflow-wrap: anywhere;
+}
+
+.stepper__sequence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: end;
+  min-width: 0;
+}
+
+.stepper__draw {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* A control at the end of its range stays in the tab order: it reads as disabled, and does nothing. */
+.demo-panel .form-button[aria-disabled='true'] {
+  border-style: dashed;
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.demo-panel .form-button[aria-disabled='true']:hover {
+  background: var(--paper);
+  color: var(--ink-faint);
+}
+
+@media (max-width: 40rem) {
+  .stepper {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'plane'
+      'side'
+      'ledger';
+  }
+
+  .stepper__plane {
+    max-width: 24rem;
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .stepper__sequence {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .stepper__sequence .text-field,
+  .stepper__sequence .sim-seed__note {
+    grid-column: 1 / -1;
+  }
+}
+
+@media print {
+  .listing {
+    overflow: visible;
+    font-size: 0.8125rem;
+  }
+}
