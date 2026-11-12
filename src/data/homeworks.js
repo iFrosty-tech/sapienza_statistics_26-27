@@ -89,4 +89,15 @@ export default [
     published: '2026-10-31',
     status: 'published',
   },
+  {
+    number: 7,
+    label: 'Homework 5',
+    shortLabel: '5',
+    title: 'Riemann and Lebesgue integration, and the numerical computation of the normal distribution function',
+    abstract:
+      'The integral of seven functions is computed in the two ways in which it is defined, by Riemann sums over a partition of the domain and by Lebesgue sums over the preimages of a partition of the range, and the two are compared in accuracy, rate of convergence and cost. On smooth functions the midpoint rule converges as n⁻² and the Lebesgue sum as N⁻¹, on step functions the Lebesgue sum is exact, and on 1/√x only the midpoint and Lebesgue sums converge; the Dirichlet and Thomae functions separate Riemann integrability from Lebesgue integrability. The standard normal distribution function, which Liouville’s theorem shows to have no elementary expression, is then computed by quadrature, series, a continued fraction and the error function, and checked against a table from the web and against a reference of 80 digits.',
+    topics: ['Riemann and Lebesgue integrals', 'Numerical integration', 'Special functions', 'Normal distribution'],
+    published: '2026-11-12',
+    status: 'published',
+  },
 ];

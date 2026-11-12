@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw07.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Two ways to cut up an integral</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> The functions</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> The two approximation schemes</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Results on Riemann-integrable functions</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Pathological functions</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Exercise 1: discussion</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Why Φ is not elementary</a></li>
+            <li><a href="#s9"><span class="toc__sec">§9</span> The error function</a></li>
+            <li><a href="#s10"><span class="toc__sec">§10</span> Numerical methods for Φ</a></li>
+            <li><a href="#s11"><span class="toc__sec">§11</span> Accuracy and efficiency</a></li>
+            <li><a href="#s12"><span class="toc__sec">§12</span> Conclusion</a></li>
+            <li><a href="#reproducibility"><span class="toc__sec">App.</span> Reproducibility</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>This homework has two exercises, and both are answered on this page. The assignment reads, verbatim:</p>
+            <blockquote class="assignment">
+              <p>Es 1 – Riemann and Lebesgue Integration</p>
+              <p>
+                Choose a collection of interesting functions f1, f2, ... and compute their integrals numerically. Approximate
+                the integrals using approaches inspired by both the Riemann definition (partitioning the domain into
+                subintervals) and the Lebesgue definition (partitioning the range of function values into measurable subsets
+                and considering their preimages in the domain). Compare the two numerical approaches in terms of accuracy,
+                convergence, and computational efficiency. For functions that are Riemann-integrable, compare the numerical
+                results and discuss whether the two approaches converge to the same value. Include examples of functions for
+                which the two approaches behave differently, if possible.
+              </p>
+              <p>Examples:</p>
+              <p>
+                f(x) = sin(x), x in [0, pi]<br />
+                f(x) = x^2, x in [0, 1]<br />
+                f(x) = 1 if x &lt; 0.5, 3 if x &gt;= 0.5, x in [0, 1]<br />
+                f(x) = |x - 0.5|, x in [0, 1]<br />
+                f(x) = 1 / sqrt(x), x in (0, 1]<br />
+                f(x) = 1 if x &lt; 0.5, 0 if x &gt;= 0.5, x in [0, 1]<br />
+                f(x) = sin(x) / x, x in [0, pi]
+              </p>
+              <p>"Pathological" functions:</p>
+              <p>
+                f(x) = 1 if x is rational, 0 if x is irrational, x in [0, 1] (Dirichlet function)<br />
+                f(x) = 1/q if x = p/q in lowest terms, 0 if x is irrational, x in [0, 1] (Thomae's function)<br />
+                ...
+              </p>
+              <p>Es 2 – Numerical Computation of the Normal CDF</p>
+              <p>
+                Develop an efficient numerical method to compute the cumulative distribution function (CDF) of the standard
+                normal distribution. Implement the method and evaluate the CDF at several points, comparing the results with a
+                trusted numerical reference found on the web. Investigate the numerical efficiency and accuracy of your
+                implementation. Explain why the normal CDF cannot be expressed in terms of elementary functions, discussing the
+                mathematical result behind this fact (Liouville's theorem).
+              </p>
+              <p>
+                Explain how the introduction of special functions, such as the error function (erf), provides an exact
+                analytical representation of the CDF, and why numerical methods are still necessary for its practical
+                computation. Explore possible numerical approaches, such as numerical integration, series expansions, or
+                approximations based on the error function.
+                <a class="ref-link" href="https://faculty.etsu.edu/gardnerr/4047/notes-Hogg-McKean-Craig/Hogg-McKean-Craig-3-4.pdf">https://faculty.etsu.edu/gardnerr/4047/notes-Hogg-McKean-Craig/Hogg-McKean-Craig-3-4.pdf</a>
+              </p>
+              <p>examples of approaches:</p>
+              <p>
+                - Numerical integration: using the trapezoidal rule or Simpson's rule.<br />
+                - Series expansion: using the power series expansion of the error function.<br />
+                - Error function (erf): using the mathematical relationship between the normal CDF and the error function.<br />
+                ...
+              </p>
+            </blockquote>
+            <p>
+              Exercise 1 (§2 to §7) computes the integral of seven functions in the two ways in which it is defined. The
+              Riemann sum cuts the domain into pieces and multiplies the value of the function at a point of each piece by its
+              length; the Lebesgue sum cuts the range into levels and multiplies each level by the length of the set where the
+              function reaches it. Both are implemented in <code>src/lib/integration.js</code>, where the second needs the
+              measure of the preimage of every level, which is the whole difficulty of the approach. At
+              <span class="math-tie"><span data-tex>n = N</span> = {{fig.params.tableN}}</span> the midpoint sum of
+              <span data-tex>\sin x</span> is off by {{fig.int.sin.mid}} and the Lebesgue sum by {{fig.int.sin.lebesgue}}, but
+              on the step function of the assignment the Lebesgue sum is exact and every Riemann sum is off by about
+              <span class="math-tie"><span data-tex>1/n</span>,</span> and on <span data-tex>1/\sqrt{x}</span> the left sum does not exist. The Dirichlet
+              function, which has no Riemann integral, has a Lebesgue integral equal to 0 (§6).
+            </p>
+            <p>
+              Exercise 2 (§8 to §11) computes the distribution function of the standard normal law. Liouville's theorem
+              explains why no closed form exists (§8), the error function names the integral without evaluating it (§9), and
+              four families of methods evaluate it (§10): quadrature, power series, a continued fraction and approximations. They
+              are checked at {{fig.web.count}} points against a table of the error function found on the web, to its nine
+              decimals, and against a reference of 80 digits, in accuracy, in the relative accuracy of the tail and in cost
+              (§11). Every number on the page is computed when the page is built, from the parameters listed in the appendix.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Two ways to cut up an integral</h2>
+            <h3 id="s2-1">2.1 Riemann: partition the domain</h3>
+            <p>
+              Riemann [<a href="#ref-6">6</a>] cuts the domain. A partition of <span data-tex>[a, b]</span> into <span data-tex>n</span> pieces
+              <span class="math-tie"><span data-tex>a = x_0 &lt; x_1 &lt; \dots &lt; x_n = b</span>,</span> with a tag
+              <span data-tex>t_k \in [x_{k-1}, x_k]</span> in each piece, gives the Riemann sum
+            </p>
+            <div class="equation" id="eq-riemann">
+              <div data-tex-display>
+                S(P, t) = \sum_{k=1}^{n} f(t_k)\,(x_k - x_{k-1}) .
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              The function is Riemann integrable when <span data-tex>S(P, t)</span> tends to one number as the longest piece
+              shrinks, whatever the tags. Equivalently, the lower and upper Darboux sums, built from the infimum and the
+              supremum of <span data-tex>f</span> on each piece, have the same limit. A bounded function is Riemann integrable
+              exactly when the set where it is discontinuous has Lebesgue measure zero [<a href="#ref-8">8</a>, Thm. 11.33], and
+              the integral is then also the Lebesgue integral. The sums used below have equal pieces, and the tag at the left
+              end, at the middle or at the right end.
+            </p>
+
+            <h3 id="s2-2">2.2 Lebesgue: partition the range</h3>
+            <p>
+              Lebesgue [<a href="#ref-4">4</a>] cuts the range instead. For <span data-tex>f \ge 0</span> measurable, the
+              integral is the supremum of the integrals of the simple functions below <span class="math-tie"><span data-tex>f</span>,</span> and the
+              integral of a simple function is the sum of its values times the measures of the sets where it takes them. Take
+              <span data-tex>N</span> levels <span data-tex>y_k = m + kh</span> from the infimum
+              <span data-tex>m</span> of <span data-tex>f</span> in steps of <span class="math-tie"><span data-tex>h</span>,</span> and the preimages
+              <span class="math-tie"><span data-tex>E_k = \{x : y_k \le f(x) &lt; y_{k+1}\}</span>.</span> The Lebesgue sum is
+            </p>
+            <div class="equation" id="eq-lebesgue">
+              <div data-tex-display>
+                L_N = \sum_{k=0}^{N-1} y_k\, \mu(E_k) + y_N\,\mu\{f \ge y_N\} .
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <p>
+              It is the integral of the largest function on the grid of levels that lies below <span class="math-tie"><span data-tex>f</span>,</span> so
+              <span class="math-tie"><span data-tex>L_N \le \int f</span>,</span> and since <span data-tex>f - \varphi &lt; h</span> everywhere for that
+              function <span class="math-tie"><span data-tex>\varphi</span>,</span> the error is below <span data-tex>h\,(b - a)</span> however rough
+              <span data-tex>f</span> is. The measures <span data-tex>\mu(E_k)</span> are differences of the distribution
+              function <span class="math-tie"><span data-tex>G(c) = \mu\{x : f(x) \ge c\}</span>,</span> and summing (2) by parts turns it into
+            </p>
+            <div class="equation" id="eq-layer">
+              <div data-tex-display>
+                L_N = m\,(b - a) + h \sum_{k=1}^{N} G(y_k) .
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              The Lebesgue sum is therefore a Riemann sum with right-hand tags, on the axis of the range, of the decreasing
+              function <span class="math-tie"><span data-tex>G</span>,</span> and the integral is <span class="math-tie"><span data-tex>m\,(b - a) + \int_m^{\infty} G(c)\,dc</span>.</span>
+              Two consequences are measured below. The error of (3) is that of a right-hand sum of a monotone function, about
+              <span data-tex>h\,(b - a)/2</span> when <span data-tex>G</span> is smooth, so the Lebesgue sum converges as
+              <span data-tex>N^{-1}</span> whatever the smoothness of <span class="math-tie"><span data-tex>f</span>.</span> And when <span data-tex>f</span>
+              takes finitely many values, <span data-tex>G</span> is a step function whose jumps lie on the levels, and the sum
+              is exact.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The functions</h2>
+            <p>
+              The seven functions of the assignment are integrated, and the two pathological functions of §6 are added.
+              Table 1 gives their exact integrals, which are the reference of every error below. The integral of
+              <span data-tex>\sin x / x</span> is the sine integral <span class="math-tie"><span data-tex>\mathrm{Si}(\pi)</span>,</span> a special function,
+              taken to double precision; the others are elementary.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>The functions of the study and their integrals. The function
+                <span data-tex>1/\sqrt{x}</span> is unbounded at 0, so its Riemann integral is improper; at
+                <span data-tex>x = 0</span> the function <span data-tex>\sin x / x</span> is defined as 1.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=functions --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> The two approximation schemes</h2>
+            <p>
+              <em>Riemann.</em> The sum (1) is computed over <span data-tex>n</span> equal pieces with the tag at the left end,
+              at the middle or at the right end, in <span data-tex>n</span> evaluations of <span class="math-tie"><span data-tex>f</span>.</span>
+            </p>
+            <p>
+              <em>Lebesgue.</em> The sum (2) is computed over <span data-tex>N</span> levels, in <span data-tex>N + 1</span>
+              evaluations of <span class="math-tie"><span data-tex>G</span>.</span> Every function carries its superlevel set
+              <span data-tex>\{f \ge c\}</span> as a union of intervals, found by inverting it:
+              <span data-tex>[\arcsin c,\ \pi - \arcsin c]</span> for <span class="math-tie"><span data-tex>\sin x</span>,</span>
+              <span data-tex>[\sqrt{c},\ 1]</span> for <span class="math-tie"><span data-tex>x^2</span>,</span>
+              <span data-tex>[0,\ 1/2 - c] \cup [1/2 + c,\ 1]</span> for <span class="math-tie"><span data-tex>|x - 1/2|</span>,</span>
+              <span data-tex>(0,\ c^{-2}]</span> for <span class="math-tie"><span data-tex>1/\sqrt{x}</span>,</span> and
+              <span data-tex>[1/2,\ 1]</span> for the first step function between its two values. For
+              <span class="math-tie"><span data-tex>\sin x / x</span>,</span> which decreases from 1 to 0 on <span class="math-tie"><span data-tex>[0, \pi]</span>,</span> the interval is
+              <span data-tex>[0, x_c]</span> with <span data-tex>x_c</span> found by 60 bisections, each a new evaluation of
+              the function: {{fig.bisections}} of them at <span class="math-tie"><span data-tex>N</span> = {{fig.params.tableN}}</span>.
+              The function <span data-tex>1/\sqrt{x}</span> has no supremum, so the levels stop at
+              <span data-tex>T = \sqrt{N}</span> and the sum carries the tail <span class="math-tie"><span data-tex>T\,\mu\{f \ge T\}</span>;</span> the
+              step <span data-tex>h = T/N</span> falls as the grid is refined and the omitted tail
+              <span data-tex>1/T</span> falls as it is extended, and <span data-tex>\sqrt{N}</span> balances the two.
+            </p>
+            <p>
+              <em>When the measure is not known.</em> A program that cannot invert <span data-tex>f</span> can still estimate
+              <span data-tex>\mu(E_k)</span> by drawing points of <span data-tex>[a, b]</span> and counting how many fall in
+              each level. This is a Monte Carlo estimate, and Table 4 measures it: {{fig.params.sampledPoints}} points and
+              {{fig.params.sampledLevels}} levels.
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=partitions --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The area under a function cut by its domain and by its range
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Left, a Riemann sum: rectangles over equal pieces of the domain. Right, a Lebesgue sum: the simple function
+                  that rounds the function down to the grid of levels, drawn over the preimage of each level, which is two
+                  intervals for <span data-tex>\sin x</span> and one for the step. The dashed lines are the levels. Four levels
+                  for the step function are enough, because it has two values.
+                </p>
+              </figcaption>
+            </figure>
+            <div class="demo" data-demo="sums">
+              <p class="demo__fallback">
+                Panel 1 is interactive and needs scripting. It draws a Riemann sum and a Lebesgue sum of one of the seven
+                functions of Table 1, for 2 to 100 pieces and levels, with the tags of the Riemann sum at the left, the middle
+                or the right, and shows both sums against the exact integral. At <span data-tex>n = N</span> = {{fig.params.tableN}} the
+                errors on <span data-tex>\sin x</span> are {{fig.int.sin.left}} for the left sum, {{fig.int.sin.mid}} for the
+                midpoint sum and {{fig.int.sin.lebesgue}} for the Lebesgue sum; Table 2 prints these for every function.
+              </p>
+            </div>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Results on Riemann-integrable functions</h2>
+            <p>
+              The seven functions are Riemann integrable, as an improper integral for
+              <span class="math-tie"><span data-tex>1/\sqrt{x}</span>,</span> so both sums must tend to the exact value, and Table 2 shows that they do. The
+              pieces and the levels are taken equal in number, from {{fig.params.gridFrom}} to {{fig.params.gridTo}}, in
+              {{fig.params.gridCount}} odd values spaced four to the decade. Table 2 prints the errors at
+              <span class="math-tie"><span data-tex>n = N</span> = {{fig.params.tableN}}.</span> The number is odd so that the jump
+              at <span data-tex>1/2</span> of the two step functions falls inside a piece: at an even <span data-tex>n</span> it
+              falls on a grid point, and the left and midpoint sums of a step function are exact by luck of alignment.
+            </p>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>The absolute error of each sum at <span data-tex>n = N</span> = {{fig.params.tableN}}.
+                The left sum of <span data-tex>1/\sqrt{x}</span> is infinite, because the function is infinite at 0; the
+                Lebesgue sum of a step function is exact.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=errorTable --></div>
+            </figure>
+            <h3 id="s5-1">5.1 Accuracy and convergence</h3>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=convergence --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>The error of the sums against the number of pieces and levels
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Absolute error on logarithmic axes. The square is the left sum, the triangle the midpoint sum and the red
+                  point the Lebesgue sum; the dashed lines are the laws <span data-tex>n^{-1}</span> and
+                  <span data-tex>n^{-2}</span> (<span data-tex>n^{-1/2}</span> for <span class="math-tie"><span data-tex>1/\sqrt{x}</span>)</span>. A sum
+                  that is exact to the roundoff is drawn on the bottom edge. The left sum of <span data-tex>1/\sqrt{x}</span>
+                  is absent, being infinite.
+                </p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>The exponent <span data-tex>p</span> of the error
+                <span class="math-tie"><span data-tex>\approx C\,n^{-p}</span>,</span> fitted by least squares on the points of Figure 2 with
+                <span data-tex>n \ge 30</span> and an error above <span class="math-tie"><span data-tex>10^{-15}</span>.</span>
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=rateTable --></div>
+            </figure>
+            <ul>
+              <li>
+                <strong>Smooth functions.</strong> The midpoint sum converges with exponent {{fig.rate.square.mid}} on
+                <span data-tex>x^2</span> and {{fig.rate.sinc.mid}} on <span class="math-tie"><span data-tex>\sin x / x</span>,</span> the left and right sums
+                with exponent {{fig.rate.square.left}}, and the Lebesgue sum with {{fig.rate.square.lebesgue}}. At
+                <span data-tex>n = N</span> = {{fig.params.tableN}} the Lebesgue error on <span data-tex>\sin x</span> is
+                {{fig.ratio.sin}} times the midpoint error. The left and right sums of
+                <span data-tex>\sin x</span> and of <span data-tex>|x - 1/2|</span> also have exponent
+                {{fig.rate.sin.left}}, because the function takes the same value at the two ends, so that the two sums
+                coincide and equal the trapezoidal rule, whose first-order error terms cancel.
+              </li>
+              <li>
+                <strong>Jumps.</strong> Every Riemann sum of a step function converges with exponent {{fig.rate.step.left}}, because
+                the one piece that contains the jump is wrong by a fraction of the jump, and the error is of the order of
+                <span data-tex>1/n</span> whatever the rule. The Lebesgue sum is {{fig.rate.step.lebesgue}}: the function takes two
+                values, the measure of each preimage is known, and the sum is the integral.
+              </li>
+              <li>
+                <strong>Unbounded function.</strong> The left sum is infinite at every <span class="math-tie"><span data-tex>n</span>.</span> The midpoint and
+                right sums converge, slowly: with exponent {{fig.rate.inverseRoot.mid}} and {{fig.rate.inverseRoot.right}}, an error of
+                {{fig.int.inverseRoot.mid}} at <span data-tex>n</span> = {{fig.params.tableN}}. The Lebesgue sum with the truncation
+                of §4 converges with exponent {{fig.rate.inverseRoot.lebesgue}}, the same order, because its error is
+                <span data-tex>h + 1/T</span> with both terms of order <span class="math-tie"><span data-tex>N^{-1/2}</span>.</span>
+              </li>
+              <li>
+                <strong>Both sums reach the same value.</strong> For every function the two errors go to 0, and so the two sums
+                differ by less than either. At <span data-tex>n = N</span> = {{fig.params.tableN}} the Lebesgue sum of
+                <span data-tex>\sin x</span> is {{fig.int.sin.lebesgueValue}}, against an exact value of
+                {{fig.int.sin.exact}}.
+              </li>
+            </ul>
+            <h3 id="s5-2">5.2 Computational efficiency</h3>
+            <p>
+              Both sums have a cost proportional to the number of terms, but the terms are not the same. A Riemann term is one
+              evaluation of <span class="math-tie"><span data-tex>f</span>.</span> A Lebesgue term is one evaluation of <span class="math-tie"><span data-tex>G</span>,</span> which is
+              cheap when the superlevel set has a closed form and expensive when it must be found: for
+              <span data-tex>\sin x / x</span> each is 60 evaluations of the function. Table 4 times the two sums at
+              <span class="math-tie"><span data-tex>n = N</span> = {{fig.params.timingN}},</span> and prints the error of the Lebesgue
+              sum when the preimages are estimated by sampling instead of known.
+            </p>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>The cost of the sums at <span data-tex>n = N</span> = {{fig.params.timingN}}, as the
+                best of three runs on the machine that built the page, which sets the scale but not the ratios. The last column is
+                the error of the Lebesgue sum when the measure of each preimage is estimated from {{fig.params.sampledPoints}}
+                random points and {{fig.params.sampledLevels}} levels, seed {{fig.seed.sampled}} for the first function and one stream
+                per function.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=costTable --></div>
+            </figure>
+            <p>
+              Even with a closed form the Lebesgue sum takes {{fig.time.sin.ratio}} times as long as the midpoint sum on
+              <span data-tex>\sin x</span> ({{fig.time.sin.lebesgue}} ms against {{fig.time.sin.riemann}} ms), because it builds the
+              levels and the intervals it sums; for <span data-tex>\sin x / x</span> it takes {{fig.time.sinc.ratio}} times as long,
+              because of the bisections. And it buys less accuracy per term. To reach an error of
+              <span data-tex>10^{-6}</span> on <span data-tex>\sin x</span> the midpoint rule needs about a thousand pieces and the
+              Lebesgue sum more than a million levels, by the exponents of Table 3. With sampled preimages the Lebesgue sum is a Monte
+              Carlo method: its error combines the bias <span data-tex>h\,(b - a)/2</span> of the levels with the noise of the count,
+              which falls as <span data-tex>M^{-1/2}</span> in the number of points; on
+              {{fig.params.sampledPoints}} points the error is of the order of <span data-tex>10^{-3}</span> on the bounded functions of
+              Table 4, and larger on <span class="math-tie"><span data-tex>1/\sqrt{x}</span>,</span> where the truncation at <span data-tex>\sqrt{N}</span> dominates.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Pathological functions</h2>
+            <p>
+              <strong>The Dirichlet function</strong> <span class="math-tie"><span data-tex>\mathbf{1}_{\mathbb{Q}}</span>,</span> which is 1 on the rationals and 0
+              on the irrationals of <span class="math-tie"><span data-tex>[0, 1]</span>.</span> Every piece of every partition contains both a rational and an
+              irrational number, so the tags can be chosen at will: all rational gives a Riemann sum of 1, all irrational gives 0,
+              and alternating gives {{fig.dir.alternating}} at <span data-tex>n = 10^4</span> (Figure 3). The upper Darboux sum is 1
+              and the lower is 0 at every <span class="math-tie"><span data-tex>n</span>,</span> so the function is not Riemann integrable. It is discontinuous at
+              every point, which is consistent with the criterion of §2.1. But the rationals are countable, and a countable set has
+              measure zero: cover the <span data-tex>k</span>-th of them by an interval of length
+              <span class="math-tie"><span data-tex>\varepsilon / 2^{k}</span>.</span> The level 0 contributes 0 whatever its preimage, and the level 1 has the
+              rationals as its preimage, of measure 0, so every Lebesgue sum is 0 and the Lebesgue integral is 0. The function is 0 almost
+              everywhere.
+            </p>
+            <p>
+              A program cannot evaluate this function: every double is a rational number, so <span data-tex>f</span> of any
+              floating-point value is 1. The sums here are computed from the tags' class, rational at <span data-tex>k/n</span> or
+              irrational, and not by evaluating the function.
+            </p>
+            <p>
+              <strong>Thomae's function</strong> [<a href="#ref-9">9</a>] is <span data-tex>1/q</span> at <span data-tex>p/q</span> in lowest terms and 0 at
+              the irrationals, and its integral exists in both senses. It is continuous at every irrational and discontinuous at
+              every rational, a set of measure zero, so it is Riemann integrable by the criterion of §2.1. The lower Darboux sum is
+              0, because every piece contains an irrational number. The upper Darboux sum is
+              <span data-tex>\frac1n \sum_k 1/q_k</span> with <span data-tex>q_k</span> the smallest denominator of a fraction in the
+              <span data-tex>k</span>-th piece, and it falls with measured exponent {{fig.thomae.slope}}, close to
+              <span class="math-tie"><span data-tex>1/2</span>,</span> from {{fig.thomae.n10.upper}} at <span data-tex>n = 10</span> to
+              {{fig.thomae.n10000.upper}} at <span data-tex>n = 10^4</span> (Table 5), so the integral is 0. With rational tags at the
+              right ends <span data-tex>k/n</span> the sum is <span class="math-tie"><span data-tex>n^{-2}\sum_k \gcd(k, n)</span>,</span> which is at most
+              <span class="math-tie"><span data-tex>d(n)/n</span>,</span> with <span data-tex>d(n)</span> the number of divisors of <span class="math-tie"><span data-tex>n</span>,</span> because
+              <span class="math-tie"><span data-tex>\sum_k \gcd(k, n) = \sum_{d \mid n} d\,\varphi(n/d) \le n\,d(n)</span>.</span>
+            </p>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas"><!-- @figure id=pathological --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Riemann sums of the Dirichlet and Thomae functions
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Left, the Dirichlet function: the Riemann sum takes the value that the choice of tags dictates, 1, about
+                  one half or 0, at every <span class="math-tie"><span data-tex>n</span>,</span> so it does not converge. Right, Thomae's function on logarithmic
+                  axes: the upper Darboux sum and the sum with rational tags both fall, the first as about
+                  <span class="math-tie"><span data-tex>n^{-1/2}</span>.</span> The lower sum is 0 and cannot be drawn on a logarithmic axis.
+                </p>
+              </figcaption>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>Sums of Thomae's function over <span data-tex>n</span> equal pieces,
+                exactly, in integer arithmetic.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=thomaeTable --></div>
+            </figure>
+            <p>
+              The Lebesgue view is simpler. For every <span data-tex>c &gt; 0</span> the set
+              <span data-tex>\{f \ge c\}</span> contains only fractions of denominator at most <span class="math-tie"><span data-tex>1/c</span>,</span> and there are
+              finitely many (Table 6), so it has measure 0, and every Lebesgue sum is 0. The Dirichlet function is the pointwise limit
+              of the indicators of the finite sets <span class="math-tie"><span data-tex>\{q_1, \dots, q_k\}</span>,</span> each of which is Riemann integrable with
+              integral 0, and the limit is not: Riemann integrability is not preserved by pointwise limits, while Lebesgue
+              integrability is preserved under the monotone and dominated convergence theorems.
+            </p>
+            <figure class="table-figure" aria-labelledby="table6-caption">
+              <figcaption id="table6-caption">
+                <span class="table-figure__no">Table 6.</span>The superlevel sets of Thomae's function: how many points of
+                <span data-tex>[0, 1]</span> have <span class="math-tie"><span data-tex>f \ge 1/m</span>.</span> The count is
+                <span class="math-tie"><span data-tex>1 + \sum_{q \le m} \varphi(q)</span>,</span> with <span data-tex>\varphi</span> Euler's totient.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table6-caption"><!-- @figure id=levelTable --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Exercise 1: discussion</h2>
+            <p>
+              <em>Do the two approaches reach the same value?</em> For the seven Riemann-integrable functions, yes: both errors
+              fall to 0 and the Lebesgue integral of a Riemann-integrable function is its Riemann integral. The functions
+              <span data-tex>1/\sqrt{x}</span> and <span data-tex>\sin x / x</span> are included because they are the cases where
+              the sums need care, the first at an infinite value and the second at the point <span class="math-tie"><span data-tex>0/0</span>.</span>
+            </p>
+            <p>
+              <em>Where do they behave differently?</em> In rate: the Riemann midpoint rule is second order on smooth functions and
+              the Lebesgue sum first order on every function. In exactness: the Lebesgue sum is exact for functions with finitely many
+              values and the Riemann sum is not. In domain: the Riemann sum needs <span data-tex>f</span> to be bounded with discontinuities
+              of measure zero, and the Lebesgue sum needs only <span data-tex>f</span> measurable, which is why the Dirichlet function
+              has an integral in the second sense and not in the first.
+            </p>
+            <p>
+              <em>Which is better in practice?</em> The Riemann sum, nearly always. It needs only values of the function, it has
+              better rates on smooth functions, and it costs one evaluation per term. The Lebesgue sum needs the measure of
+              the preimages, which is a root-finding problem for a monotone function and has no general answer for a rough one; when
+              the measure is estimated, the sum is a Monte Carlo method. Its value is conceptual: it explains what the integral is
+              when the function is too irregular for a partition of the domain, and by (3) it shows that integrating over the range
+              is integrating the distribution function of the values.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Why Φ is not elementary</h2>
+            <p>
+              The standard normal density is <span class="math-tie"><span data-tex>\varphi(t) = e^{-t^2/2}/\sqrt{2\pi}</span>,</span> and its distribution function
+            </p>
+            <div class="equation" id="eq-phi">
+              <div data-tex-display>
+                \Phi(x) = \int_{-\infty}^{x} \varphi(t)\,dt = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{x} e^{-t^2/2}\,dt .
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              exists for every <span class="math-tie"><span data-tex>x</span>.</span> That the total mass is 1, that is,
+              <span class="math-tie"><span data-tex>\int_{-\infty}^{\infty} e^{-t^2/2}\,dt = \sqrt{2\pi}</span>,</span> follows from the square of the integral in
+              polar coordinates [<a href="#ref-3">3</a>]; so the integral over the whole line is known exactly, and what has no
+              closed form is the integral up to a variable limit.
+            </p>
+            <p>
+              <em>Elementary</em> has a precise meaning: a function built from the rational functions by finitely many compositions
+              and by taking exponentials, logarithms and roots of algebraic equations. Every elementary function has an elementary
+              derivative, and the question is which have an elementary antiderivative. Liouville's theorem, in the form that
+              Rosenlicht gave it [<a href="#ref-7">7</a>], answers it for the integrands that matter here:
+            </p>
+            <blockquote>
+              <p>
+                Let <span data-tex>f</span> and <span data-tex>g</span> be rational functions, with <span data-tex>g</span> not
+                constant. Then <span data-tex>\int f(x)\,e^{g(x)}\,dx</span> is elementary if and only if there is a rational function
+                <span data-tex>R</span> with <span class="math-tie"><span data-tex>R' + g'R = f</span>,</span> and then the integral is
+                <span class="math-tie"><span data-tex>R(x)\,e^{g(x)}</span>.</span>
+              </p>
+            </blockquote>
+            <p>
+              The "if" is the product rule, <span class="math-tie"><span data-tex>(R\,e^{g})' = (R' + g'R)\,e^{g}</span>.</span> The "only if", which is the
+              content of the theorem, says that an elementary antiderivative cannot be more complicated than this one. For the
+              normal density take <span data-tex>f = 1</span> and <span class="math-tie"><span data-tex>g(t) = -t^2/2</span>,</span> so that
+              <span class="math-tie"><span data-tex>g' = -t</span>,</span> and the criterion asks for a rational <span data-tex>R</span> with
+            </p>
+            <div class="equation" id="eq-riccati">
+              <div data-tex-display>
+                R'(t) - t\,R(t) = 1 .
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>There is none, in two steps.</p>
+            <ul>
+              <li>
+                Suppose <span data-tex>R</span> has a pole of order <span data-tex>m \ge 1</span> at a point <span class="math-tie"><span data-tex>a</span>.</span>
+                Then <span data-tex>R'</span> has a pole of order <span data-tex>m + 1</span> there, while <span data-tex>tR</span> has a
+                pole of order at most <span class="math-tie"><span data-tex>m</span>,</span> so <span data-tex>R' - tR</span> has a pole of order
+                <span data-tex>m + 1</span> and cannot equal 1. So <span data-tex>R</span> is a polynomial.
+              </li>
+              <li>
+                Suppose <span data-tex>R</span> is a polynomial of degree <span class="math-tie"><span data-tex>d \ge 0</span>,</span> with leading coefficient
+                <span class="math-tie"><span data-tex>c \ne 0</span>.</span> Then <span data-tex>tR</span> has degree <span data-tex>d + 1</span> and
+                <span data-tex>R'</span> has degree below <span class="math-tie"><span data-tex>d</span>,</span> so <span data-tex>R' - tR</span> has degree
+                <span data-tex>d + 1 \ge 1</span> and leading coefficient <span class="math-tie"><span data-tex>-c</span>,</span> and cannot equal 1; and
+                <span data-tex>R = 0</span> gives 0.
+              </li>
+            </ul>
+            <p>
+              So <span data-tex>\int e^{-t^2/2}\,dt</span> is not elementary, and neither is <span class="math-tie"><span data-tex>\Phi</span>,</span> which differs
+              from it by a constant and a factor. The statement concerns the vocabulary of closed forms, not computability:
+              <span data-tex>\Phi</span> is an entire function, equal to its power series everywhere, and has a continued fraction
+              and quadrature rules, which §10 uses.
+            </p>
+          </section>
+
+          <!-- ===================================================== §9 -->
+          <section class="hw-section" id="s9" aria-labelledby="s9-title">
+            <h2 id="s9-title"><a class="section-anchor" href="#s9" aria-label="Section 9, link to this section">§9</a> The error function</h2>
+            <p>
+              Since no elementary function does the job, a new function is defined as the integral. The error function is
+            </p>
+            <div class="equation" id="eq-erf">
+              <div data-tex-display>
+                \mathrm{erf}(z) = \frac{2}{\sqrt{\pi}} \int_{0}^{z} e^{-s^2}\,ds ,
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              and the substitution <span data-tex>s = t/\sqrt{2}</span> in (4), with the symmetry of the density about 0, gives
+            </p>
+            <div class="equation equation--key" id="eq-phi-erf">
+              <div data-tex-display>
+                \Phi(x) = \frac{1}{2}\left[ 1 + \mathrm{erf}\!\left(\frac{x}{\sqrt{2}}\right) \right] = \frac{1}{2}\,\mathrm{erfc}\!\left(-\frac{x}{\sqrt{2}}\right) ,
+                \qquad \mathrm{erfc}(z) = 1 - \mathrm{erf}(z) .
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <p>
+              This is an exact analytical representation of <span class="math-tie"><span data-tex>\Phi</span>:</span> the normal law has no new difficulty beyond
+              that of one function of one variable, which is tabulated, studied and implemented in libraries. The C99 standard
+              library has <code>erf</code> and <code>erfc</code>, and the <code>Math</code> object of JavaScript has neither (Node 24). But (7) is a
+              definition, not a procedure. It does not say how to obtain the 17 digits of a double, and it does not even say how to
+              obtain the first. For that a numerical method is still necessary, and there is a second reason to work with
+              <span data-tex>\mathrm{erfc}</span> and not with <span class="math-tie"><span data-tex>1 - \mathrm{erf}</span>:</span> for large <span data-tex>z</span> the
+              subtraction cancels, and the tail probabilities a statistician needs are the small numbers that it destroys. A classical
+              implementation, which many libraries follow, uses rational Chebyshev approximations on a few intervals [<a href="#ref-2">2</a>]; §10 builds simpler
+              methods from the four ways to evaluate an integral that the assignment names.
+            </p>
+          </section>
+
+          <!-- ==================================================== §10 -->
+          <section class="hw-section" id="s10" aria-labelledby="s10-title">
+            <h2 id="s10-title"><a class="section-anchor" href="#s10" aria-label="Section 10, link to this section">§10</a> Numerical methods for Φ</h2>
+            <p>
+              All the methods compute <span data-tex>\Phi(x)</span> for <span data-tex>x \ge 0</span> and use
+              <span data-tex>\Phi(-x) = 1 - \Phi(x)</span> otherwise; the lower tail <span data-tex>Q(x) = \Phi(-x)</span> is the quantity
+              whose relative accuracy matters.
+            </p>
+            <h3 id="s10-1">10.1 Numerical integration</h3>
+            <p>
+              Since <span class="math-tie"><span data-tex>\Phi(x) = \tfrac12 + \int_0^x \varphi(t)\,dt</span>,</span> the trapezoidal and Simpson rules with
+              <span data-tex>n</span> panels of width <span data-tex>h = x/n</span> apply directly. The trapezoidal rule has the error
+            </p>
+            <div class="equation" id="eq-trapezoid">
+              <div data-tex-display>
+                -\frac{h^2}{12}\left[\varphi'(x) - \varphi'(0)\right] + O(h^4),
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              by the Euler–Maclaurin formula: the integral minus the trapezoidal sum, of order <span class="math-tie"><span data-tex>h^2</span>,</span> and Simpson's rule has an error of order
+              <span class="math-tie"><span data-tex>h^4</span>.</span> The integral of the density needs no singular treatment, and the rules need nothing but
+              evaluations of <span class="math-tie"><span data-tex>\varphi</span>,</span> but a small error needs many of them (§11).
+            </p>
+            <h3 id="s10-2">10.2 Series</h3>
+            <p>
+              The series of the error function comes from integrating the series of <span data-tex>e^{-s^2}</span> term by term:
+            </p>
+            <div class="equation" id="eq-erf-series">
+              <div data-tex-display>
+                \mathrm{erf}(z) = \frac{2}{\sqrt{\pi}} \sum_{k=0}^{\infty} \frac{(-1)^k\, z^{2k+1}}{k!\,(2k+1)} .
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>
+              It converges for every <span data-tex>z</span> but its terms alternate and, for large <span class="math-tie"><span data-tex>z</span>,</span> grow to about
+              <span data-tex>e^{z^2}</span> before they fall, so the sum is a small difference of large numbers. There is a series with
+              no cancellation inside it. Let
+              <span class="math-tie"><span data-tex>u(x) = [\Phi(x) - \tfrac12]/\varphi(x)</span>.</span> Since <span class="math-tie"><span data-tex>\varphi' = -x\varphi</span>,</span>
+            </p>
+            <div class="equation" id="eq-ode">
+              <div data-tex-display>
+                u'(x) = 1 + x\,u(x), \qquad u(0) = 0,
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              and the coefficients of <span data-tex>u = \sum a_k x^k</span> satisfy <span data-tex>a_1 = 1</span> and
+              <span data-tex>(k + 1)\,a_{k+1} = a_{k-1}</span> for <span class="math-tie"><span data-tex>k \ge 1</span>,</span> so that
+              <span data-tex>a_{2k+1} = 1/(2k + 1)!!</span> and the even coefficients vanish:
+            </p>
+            <div class="equation equation--key" id="eq-maclaurin">
+              <div data-tex-display>
+                \Phi(x) = \frac{1}{2} + \varphi(x) \sum_{k=0}^{\infty} \frac{x^{2k+1}}{1 \cdot 3 \cdot 5 \cdots (2k+1)} .
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>
+              Every term is positive for <span data-tex>x &gt; 0</span> and each is the previous one times
+              <span class="math-tie"><span data-tex>x^2/(2k + 1)</span>,</span> one multiplication and one division per term. The series still ends in a subtraction
+              when used for the lower tail, <span class="math-tie"><span data-tex>Q(x) = \tfrac12 - \varphi(x)\sum\cdots</span>,</span> which loses digits for large
+              <span data-tex>x</span> (§11).
+            </p>
+            <h3 id="s10-3">10.3 A continued fraction for the tail</h3>
+            <p>
+              For <span data-tex>x &gt; 0</span> the tail has the continued fraction of Laplace [<a href="#ref-1">1</a>, §26.2],
+            </p>
+            <div class="equation" id="eq-fraction">
+              <div data-tex-display>
+                Q(x) = \frac{\varphi(x)}{x + \cfrac{1}{x + \cfrac{2}{x + \cfrac{3}{x + \cdots}}}} ,
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              which converges for every <span data-tex>x &gt; 0</span> but fast only for large <span class="math-tie"><span data-tex>x</span>.</span> It is evaluated by
+              the modified Lentz method, which stops when the correction falls below the roundoff, and it has no cancellation at all:
+              the tail is computed directly, with a small relative error however small it is.
+            </p>
+            <h3 id="s10-4">10.4 Approximations and the hybrid method</h3>
+            <p>
+              Two classical approximations are included. Formula 26.2.17 of Abramowitz and Stegun [<a href="#ref-1">1</a>] is
+              <span data-tex>Q(x) \approx \varphi(x)\,(b_1 t + b_2 t^2 + \dots + b_5 t^5)</span> with
+              <span class="math-tie"><span data-tex>t = 1/(1 + 0.2316419\,x)</span>,</span> an absolute error below
+              <span class="math-tie"><span data-tex>7.5 \times 10^{-8}</span>,</span> in five multiplications and one exponential. The Chebyshev fit of the
+              complementary error function of Numerical Recipes [<a href="#ref-5">5</a>], already used by the probability plots of
+              this site, has a fractional error below <span data-tex>1.2 \times 10^{-7}</span> everywhere. Finally the
+              <em>hybrid</em> method takes the best of each: the series (11), summed at <span data-tex>-|x|</span> so that it returns the
+              tail, for <span data-tex>|x| &lt;</span> {{fig.params.cutoff}}, and the fraction (12) beyond. It is in
+              <code>src/lib/normal-cdf.js</code>.
+            </p>
+            <div class="demo" data-demo="cdf">
+              <p class="demo__fallback">
+                Panel 2 is interactive and needs scripting. It draws the standard normal density with the area
+                <span data-tex>\Phi(x)</span> shaded and the trapezoids of the numerical integral from 0 to
+                <span class="math-tie"><span data-tex>x</span>,</span> for any <span data-tex>x</span> from −8 to 8 and 2 to 256 panels, and lists the value of
+                each method with its relative error in the lower tail against the reference of 80 digits. Table 8 prints these errors
+                at six points, and Figures 4 and 5 show how they behave.
+              </p>
+            </div>
+          </section>
+
+          <!-- ==================================================== §11 -->
+          <section class="hw-section" id="s11" aria-labelledby="s11-title">
+            <h2 id="s11-title"><a class="section-anchor" href="#s11" aria-label="Section 11, link to this section">§11</a> Accuracy and efficiency</h2>
+            <h3 id="s11-1">11.1 Against a reference found on the web</h3>
+            <p>
+              The reference is the table of the error function of the "Error function" article of Wikipedia [<a href="#ref-10">10</a>],
+              which prints <span data-tex>\mathrm{erf}\,z</span> and <span data-tex>1 - \mathrm{erf}\,z</span> to nine decimals at
+              {{fig.web.count}} points. By (7) the hybrid method gives <span class="math-tie"><span data-tex>\mathrm{erf}\,z = 2\Phi(z\sqrt{2}) - 1</span>,</span> and
+              Table 7 compares them. The largest difference is {{fig.web.maxDiff}}, at <span data-tex>z</span> = {{fig.web.worstZ}}, and
+              the bound for a value rounded to nine decimals is {{fig.web.bound}}, half a unit of the ninth: every difference is the
+              rounding of the table, and the largest difference in the complement is {{fig.web.maxDiffErfc}}. A table cannot test beyond
+              its own digits, so the reference of 80 digits of the next section is also compared with the web values, and differs from
+              them by at most {{fig.web.maxReference}}; the hybrid method differs from the 80-digit values by at most
+              {{fig.web.maxHere}}.
+            </p>
+            <figure class="table-figure" aria-labelledby="table7-caption">
+              <figcaption id="table7-caption">
+                <span class="table-figure__no">Table 7.</span>The error function from the web table against the hybrid method, through
+                <span class="math-tie"><span data-tex>\mathrm{erf}\,z = 2\Phi(z\sqrt{2}) - 1</span>.</span> The web values are rounded to nine decimals.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table7-caption"><!-- @figure id=webTable --></div>
+            </figure>
+            <h3 id="s11-2">11.2 Against a reference of 80 digits</h3>
+            <p>
+              A table of nine decimals says nothing about the last six digits of a double, or about a tail of
+              <span class="math-tie"><span data-tex>10^{-16}</span>.</span> The reference of this study is the series (11) summed in integer arithmetic
+              (<code>BigInt</code>) with 80 decimal digits, at the exact binary value of the double <span class="math-tie"><span data-tex>x</span>,</span> with
+              <span data-tex>\pi</span> from Machin's formula and the exponential from its Taylor series; it is valid for
+              <span class="math-tie"><span data-tex>|x| \le 12</span>.</span> Table 8 gives the relative error of the lower tail
+              <span data-tex>\Phi(-x)</span> of every method. The quadrature rules use {{fig.params.trapezoidPanels}} panels, the same
+              for every <span class="math-tie"><span data-tex>x</span>.</span>
+            </p>
+            <figure class="table-figure" aria-labelledby="table8-caption">
+              <figcaption id="table8-caption">
+                <span class="table-figure__no">Table 8.</span>The relative error of <span data-tex>\Phi(-x)</span> against the 80-digit
+                reference, for every method.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table8-caption"><!-- @figure id=accuracyTable --></div>
+            </figure>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas"><!-- @figure id=profile --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>The relative error of the lower tail against <span data-tex>x</span>
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Relative error of <span data-tex>\Phi(-x)</span> for six methods at 40 points from 1/4 to 10, on a logarithmic
+                  axis. A relative error of 1 means no correct digit, and larger errors are drawn at 10. The dashed line is the unit roundoff
+                  <span class="math-tie"><span data-tex>u = 2^{-53}</span>;</span> a tail computed with no error at all is drawn on the bottom edge.
+                </p>
+              </figcaption>
+            </figure>
+            <ul>
+              <li>
+                <strong>Series lose the tail.</strong> The error-function series (9) has a relative error above
+                <span data-tex>10^{-10}</span> from <span data-tex>x</span> = {{fig.profile.erfTaylorTen}} and no correct digit from
+                <span data-tex>x</span> = {{fig.profile.erfTaylorLost}}: its terms grow to about <span data-tex>e^{x^2/2}</span> and cancel, and its
+                absolute error grows with them, to {{fig.cost.x5.erfTaylorError}} at <span class="math-tie"><span data-tex>x = 5</span>.</span> The series (11) has no cancellation
+                among its terms but ends in the subtraction <span class="math-tie"><span data-tex>\tfrac12 - \varphi\,S</span>;</span> its relative error exceeds
+                <span data-tex>10^{-10}</span> from <span data-tex>x</span> = {{fig.profile.maclaurinTen}} and it has no correct digit from
+                <span data-tex>x</span> = {{fig.profile.maclaurinLost}}, although its absolute error stays at the roundoff, which is what a tail probability
+                of <span data-tex>10^{-15}</span> cannot afford.
+              </li>
+              <li>
+                <strong>The two approximations are not equivalent.</strong> Abramowitz and Stegun bound the absolute error, and the
+                relative error of the tail reaches {{fig.profile.approximationMax}} on the grid. Numerical Recipes bounds
+                the fractional error, and its relative error never exceeds {{fig.profile.recipesMax}}: for tail probabilities the second is
+                the better design, with the same few operations.
+              </li>
+              <li>
+                <strong>The fraction and the hybrid method stay near the roundoff.</strong> The hybrid method has a relative error of at most
+                {{fig.profile.hybridMax}} on the 40 points, the continued fraction alone at most {{fig.profile.cfMax}}, reached near 0, where it needs the most terms.
+              </li>
+            </ul>
+            <figure class="chart-figure chart-figure--formulas" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas"><!-- @figure id=quadrature --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>The error of the trapezoid and Simpson rules against the number of panels
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Absolute error of <span data-tex>\Phi(x)</span> at <span data-tex>x = 1</span> and <span class="math-tie"><span data-tex>x = 3</span>,</span> on
+                  logarithmic axes, with the laws <span data-tex>n^{-2}</span> and <span data-tex>n^{-4}</span> as dashed lines. The fitted
+                  exponents are {{fig.quad.x1.trapezoidSlope}} and {{fig.quad.x1.simpsonSlope}} at <span class="math-tie"><span data-tex>x = 1</span>,</span> and
+                  {{fig.quad.x3.trapezoidSlope}} and {{fig.quad.x3.simpsonSlope}} at <span class="math-tie"><span data-tex>x = 3</span>,</span> in agreement with (8). Simpson's rule
+                  reaches the roundoff, drawn on the bottom edge, at {{fig.quad.x1.floorAt}} panels for
+                  <span class="math-tie"><span data-tex>x = 1</span>.</span>
+                </p>
+              </figcaption>
+            </figure>
+            <h3 id="s11-3">11.3 Efficiency</h3>
+            <p>
+              Table 9 counts the cost of bringing the absolute error of <span data-tex>\Phi(x)</span> below {{fig.params.tolerance}}: panels for
+              the quadrature rules and terms for the others. At <span data-tex>x = 1</span> the trapezoidal rule needs
+              {{fig.cost.x1.trapezoid}} panels and Simpson's rule {{fig.cost.x1.simpson}}, against {{fig.cost.x1.maclaurin}} terms of the series
+              (11) and {{fig.cost.x1.erfTaylor}} of the series (9). Quadrature is the least efficient: the trapezoidal rule needs four orders of
+              magnitude more evaluations than the series and Simpson's rule one and a half, since their error falls as a power of the number of
+              panels while the error of the series falls faster than any power. The continued fraction is the opposite:
+              {{fig.cost.x1.cf}} terms at <span class="math-tie"><span data-tex>x = 1</span>,</span> {{fig.cost.x5.cf}} at <span class="math-tie"><span data-tex>x = 5</span>.</span> This is why the hybrid method
+              uses each where it converges fast. The approximations have a fixed cost and a fixed error, {{fig.cost.x1.approximation}} at
+              <span data-tex>x = 1</span> for the formula of Abramowitz and Stegun, which no further work reduces.
+            </p>
+            <figure class="table-figure" aria-labelledby="table9-caption">
+              <figcaption id="table9-caption">
+                <span class="table-figure__no">Table 9.</span>The cost of an absolute error below {{fig.params.tolerance}} in
+                <span class="math-tie"><span data-tex>\Phi(x)</span>,</span> and the time of one call, measured on the machine that built the page, at eight points between 0.3 and
+                4.4. The erf series at <span data-tex>x = 5</span> and the approximation at every <span data-tex>x</span> are given with their error.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table9-caption"><!-- @figure id=cdfCostTable --></div>
+            </figure>
+            <p>
+              The hybrid method takes {{fig.ns.hybrid}} ns per call, the approximations {{fig.ns.approximation}} and {{fig.ns.recipes}} ns, the
+              series about {{fig.ns.maclaurin}} ns, a trapezoid of {{fig.params.trapezoidPanels}} panels {{fig.ns.trapezoid}} ns and the reference
+              of 80 digits {{fig.ns.referenceMicro}} µs, {{fig.ns.ratio}} times the hybrid method. The continued fraction alone averages
+              {{fig.ns.continuedFraction}} ns at the points of the benchmark, which are mostly in the region where it converges slowly. The
+              reference is for validation, not for use.
+            </p>
+          </section>
+
+          <!-- ==================================================== §12 -->
+          <section class="hw-section" id="s12" aria-labelledby="s12-title">
+            <h2 id="s12-title"><a class="section-anchor" href="#s12" aria-label="Section 12, link to this section">§12</a> Conclusion</h2>
+            <p>
+              <strong>Exercise 1.</strong> The Riemann and Lebesgue sums reach the same value on every Riemann-integrable function of the
+              study. The Riemann midpoint sum is second order on smooth functions and first order on jumps, and the left sum fails on a
+              function with an infinite value, which the midpoint and the Lebesgue sums handle; the Lebesgue sum is first order whatever the
+              function and exact on functions with finitely many values, but it needs the measure of the preimages, which costs more than the
+              function does. The Dirichlet function is the example in which the approaches differ in kind: no Riemann integral, and a Lebesgue
+              integral of 0.
+            </p>
+            <p>
+              <strong>Exercise 2.</strong> The normal distribution function has no elementary expression, because the equation
+              <span data-tex>R' - tR = 1</span> of Liouville's criterion has no rational solution; the error function names it exactly, and
+              numerical methods are still needed to evaluate it. The series (11) and the continued fraction (12), joined at
+              <span data-tex>|x|</span> = {{fig.params.cutoff}}, give a relative error of the tail of at most {{fig.profile.hybridMax}} in about
+              {{fig.ns.hybrid}} ns, which agrees with a table of the web to its nine decimals and with a reference of 80 digits to the roundoff.
+              Quadrature needs thousands of evaluations for the same error, and the alternating series loses every digit in the tail.
+            </p>
+          </section>
+
+          <!-- =========================================== Reproducibility -->
+          <section class="hw-section" id="reproducibility" aria-labelledby="reproducibility-title">
+            <h2 id="reproducibility-title"><a class="section-anchor" href="#reproducibility" aria-label="Appendix, link to this section">App.</a> Reproducibility</h2>
+            <p>
+              Every figure, table and number on this page is computed when the page is built, from the parameters of Table A1, and can be
+              recomputed by anyone from the repository: <code>npm test</code> runs the test suite, which checks the sums against their exact
+              values, the exactness of the Lebesgue sum on step functions, the integer sums of the Dirichlet and Thomae functions, each method of
+              §10 against the 80-digit reference, and the reference against the values of the web table, and <code>npm run build</code> rebuilds
+              the page. The study takes about {{fig.params.computeSeconds}} seconds (last computed {{fig.params.computedAt}}); its results are
+              cached under <code>node_modules/.cache/hw07/</code> with the key <code>{{fig.params.cacheKey}}</code>, a hash of the parameters, of the
+              source of every module involved and of the figure provider itself, so that a change to any of them recomputes everything.
+            </p>
+            <p>
+              The sums of §5 are deterministic. The one random part is the Lebesgue sum with sampled preimages of Table 4, which uses a seeded
+              Mulberry32 generator, whose seed is the master seed {{fig.params.seed}} combined by exclusive or with the 32-bit FNV-1a hash of a
+              label (<code>sampled:</code> and the key of the function). The generator is statistical, not cryptographic. The times of Tables 4 and 9
+              are measured when the cache is filled, on that machine, and stay fixed until it is refilled; they set the scale, and the ratios
+              between methods are what the text relies on.
+            </p>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the study, with the figures and tables that use them.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+            <ul>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/integration.js">src/lib/integration.js</a>: the functions with their superlevel sets, the Riemann and Lebesgue sums, the sampled preimages and the integer sums of the Dirichlet and Thomae functions.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/normal-cdf.js">src/lib/normal-cdf.js</a>: the methods of §10 and the 80-digit reference.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/hw07-study.js">src/lib/hw07-study.js</a>: the study of both exercises and the values of the web table.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/src/lib/integration-charts.js">src/lib/integration-charts.js</a>, <a href="{{site.repoUrl}}/blob/main/src/hw07/scene.js">src/hw07/scene.js</a>, <a href="{{site.repoUrl}}/blob/main/src/hw07/sums-demo.js">src/hw07/sums-demo.js</a> and <a href="{{site.repoUrl}}/blob/main/src/hw07/cdf-demo.js">src/hw07/cdf-demo.js</a>: the plots, the drawings of the sums and the two panels.</li>
+              <li><a href="{{site.repoUrl}}/blob/main/homework/07/figures.js">homework/07/figures.js</a>: the parameters, seeds and sizes of every figure on this page.</li>
+            </ul>
+          </section>
+
+          <!-- ================================================= References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <p class="references__note">
+              Entries are ordered alphabetically by first author and cited in the text by number, with the section or theorem in which the cited
+              statement is found where it applies. Entries 3 and 10 were consulted directly for this page. The metadata of entries 2 and 7 were
+              checked against the publishers' listings. The other entries are standard references, cited for the result named in the text and
+              not read in full for this page.
+            </p>
+            <ol>
+              <li id="ref-1">Abramowitz, M. and Stegun, I. A. (eds.) (1964). <cite>Handbook of Mathematical Functions with Formulas, Graphs, and Mathematical Tables</cite>. National Bureau of Standards, Applied Mathematics Series 55, Washington, DC. Chapter 7 (error function) and §26.2 (normal probability function).</li>
+              <li id="ref-2">Cody, W. J. (1969). <cite>Rational Chebyshev approximations for the error function</cite>. Mathematics of Computation, 23(107), pp. 631–637. <a class="ref-link" href="https://doi.org/10.1090/S0025-5718-1969-0247736-4">https://doi.org/10.1090/S0025-5718-1969-0247736-4</a></li>
+              <li id="ref-3">Gardner, R. B. <cite>Section 3.4. The normal distribution</cite>. Course notes for Hogg, McKean and Craig, <cite>Introduction to Mathematical Statistics</cite>, East Tennessee State University. <a class="ref-link" href="https://faculty.etsu.edu/gardnerr/4047/notes-Hogg-McKean-Craig/Hogg-McKean-Craig-3-4.pdf">https://faculty.etsu.edu/gardnerr/4047/notes-Hogg-McKean-Craig/Hogg-McKean-Craig-3-4.pdf</a></li>
+              <li id="ref-4">Lebesgue, H. (1902). <cite>Intégrale, longueur, aire</cite>. Annali di Matematica Pura ed Applicata, 7(1), pp. 231–359.</li>
+              <li id="ref-5">Press, W. H., Teukolsky, S. A., Vetterling, W. T. and Flannery, B. P. (1992). <cite>Numerical Recipes in C: The Art of Scientific Computing</cite>. 2nd edn, Cambridge University Press. The Chebyshev fit of the complementary error function.</li>
+              <li id="ref-6">Riemann, B. (1868). <cite>Über die Darstellbarkeit einer Function durch eine trigonometrische Reihe</cite>. Abhandlungen der Königlichen Gesellschaft der Wissenschaften zu Göttingen, 13, pp. 87–132.</li>
+              <li id="ref-7">Rosenlicht, M. (1972). <cite>Integration in finite terms</cite>. The American Mathematical Monthly, 79(9), pp. 963–972. <a class="ref-link" href="https://doi.org/10.2307/2318066">https://doi.org/10.2307/2318066</a></li>
+              <li id="ref-8">Rudin, W. (1976). <cite>Principles of Mathematical Analysis</cite>. 3rd edn, McGraw-Hill, New York. Theorem 11.33.</li>
+              <li id="ref-9">Thomae, J. (1875). <cite>Einleitung in die Theorie der bestimmten Integrale</cite>. Louis Nebert, Halle.</li>
+              <li id="ref-10">Wikipedia contributors. <cite>Error function</cite>. Wikipedia, the free encyclopedia, table of values of erf(x) and 1 − erf(x), consulted 12 November 2026. <a class="ref-link" href="https://en.wikipedia.org/wiki/Error_function">https://en.wikipedia.org/wiki/Error_function</a></li>
+            </ol>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>

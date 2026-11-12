@@ -1,0 +1,39 @@
+/* Homework 07: the two interactive panels. The frame of a panel, its controls and its readouts come from
+   hw04.css; this adds the drawings of Panel 1 (the two sums side by side) and of Panel 2 (the density). */
+
+.rl-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.rl-figures figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.rl-figures figcaption {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-form);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 40rem) {
+  .rl-figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The readout of a panel is a table of numbers whose heads wrap, so that its columns fit a phone. */
+.rl-readout thead th {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.cdf-figure {
+  min-width: 0;
+  max-width: 34rem;
+}
