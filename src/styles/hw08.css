@@ -1,0 +1,19 @@
+/*
+ * Homework 6: the contingency tables. The margins of a table are set off by a
+ * rule, as in a printed cross-tabulation, and the cell table keeps its text
+ * column to the left.
+ */
+
+.data-table--independence tbody tr.data-table__total > * {
+  border-top: 1px solid var(--rule-strong, currentColor);
+  font-weight: 600;
+}
+
+.data-table--independence tbody td:last-child:not(:only-child),
+.data-table--independence thead th:last-child:not(:first-child) {
+  border-inline-start: 1px solid var(--rule, rgb(0 0 0 / 0.15));
+}
+
+.data-table--cells tbody td:first-of-type {
+  text-align: left;
+}

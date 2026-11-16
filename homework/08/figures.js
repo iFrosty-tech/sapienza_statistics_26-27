@@ -1,5 +1,5 @@
 /**
- * Build-time figure provider of homework 5, statistical independence (called by
+ * Build-time figure provider of homework 6, statistical independence (called by
  * src/build/site-plugin.js).
  *
  * The contingency table is constructed from a sample of 2,201 records (X, F), the
@@ -8,7 +8,7 @@
  * under independence, Pearson's statistic with its p-value and Cramér's V, and a
  * permutation test in which the labels of F are shuffled PARAMS.replicates times.
  *
- * Figure ids (<!-- @figure id=… --> markers of homework/07/index.html)
+ * Figure ids (<!-- @figure id=… --> markers of homework/08/index.html)
  *   observed     Table 1, the contingency table of class by outcome, with its margins
  *   joint        Table 2, the joint and marginal relative frequencies
  *   byClass      Table 3, the outcome within each class
