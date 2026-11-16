@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw07.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Independence</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> The data and the contingency table</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> Joint, marginal and conditional frequencies</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> Expected frequencies and the χ² statistic</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> A permutation check</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Interpretation</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Association and causality</a></li>
+            <li><a href="#s9"><span class="toc__sec">§9</span> Conclusion</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+            <li><a href="#appendix"><span class="toc__sec">App.</span> Parameters</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>
+              The assignment asks, for a bivariate data set <span data-tex>(X, F)</span> of two categorical variables, for four things.
+              First, to construct the contingency table by program and to compute its marginal and conditional frequencies. Second, to compute
+              the frequencies that the table would show if the two variables were independent, and from them Pearson's
+              <span data-tex>\chi^2</span> statistic, with its p-value as an option. Third, to recall what independence means in probability and
+              in statistics. Fourth, to interpret the result, deciding whether the variables are statistically independent or dependent, and to
+              distinguish statistical association from causality.
+            </p>
+            <p>
+              The data set is the passenger list of the <i>Titanic</i>: <span data-tex>X</span> is the travel class of each of the
+              {{fig.data.n}} people aboard (first, second, third, or crew) and <span data-tex>F</span> is the outcome (died or survived). The
+              question is whether the chance of surviving the sinking was the same in every class. It is a natural data set for the
+              exercise, because the answer is not obvious from the margins and because the story behind it invites a causal reading that the
+              statistics cannot support alone.
+            </p>
+            <p>
+              Every table, figure and number on this page is computed when the site is built, by
+              <code>src/lib/independence.js</code> from a sample of {{fig.data.n}} records, one per person; nothing is typed in by hand.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Independence</h2>
+            <h3>In probability</h3>
+            <p>
+              Two events <span data-tex>A</span> and <span data-tex>B</span> are independent when knowing that one occurred does not change the
+              probability of the other:
+            </p>
+            <div class="equation" id="eq-1">
+              <div data-tex-display>
+                P(A \cap B) = P(A)\,P(B), \qquad \text{equivalently} \qquad P(A \mid B) = P(A) \quad (P(B) \gt 0).
+              </div>
+              <span class="equation__no">(1)</span>
+            </div>
+            <p>
+              Two discrete random variables <span data-tex>X</span> and <span data-tex>F</span> are independent when every pair of events
+              <span data-tex>\{X = x_i\}</span> and <span data-tex>\{F = f_j\}</span> is independent, that is, when the joint distribution is the
+              product of the marginal distributions at every point:
+            </p>
+            <div class="equation" id="eq-2">
+              <div data-tex-display>
+                P(X = x_i,\, F = f_j) = P(X = x_i)\,P(F = f_j) \qquad \text{for all } i, j.
+              </div>
+              <span class="equation__no">(2)</span>
+            </div>
+            <h3>In statistics</h3>
+            <p>
+              A sample of <span data-tex>n</span> pairs gives the counts <span data-tex>n_{ij}</span> of the pairs equal to
+              <span data-tex>(x_i, f_j)</span>, with row totals <span data-tex>n_{i\cdot}</span> and column totals
+              <span data-tex>n_{\cdot j}</span>. The joint relative frequency is <span data-tex>f_{ij} = n_{ij}/n</span>, the marginal
+              frequencies are <span data-tex>f_{i\cdot} = n_{i\cdot}/n</span> and <span data-tex>f_{\cdot j} = n_{\cdot j}/n</span>, and the
+              conditional frequency of <span data-tex>F = f_j</span> within <span data-tex>X = x_i</span> is
+              <span data-tex>f_{j \mid i} = n_{ij}/n_{i\cdot}</span>. Independence in the sample would mean the empirical version of (2),
+              <span data-tex>f_{ij} = f_{i\cdot} f_{\cdot j}</span>, or, equivalently, that the conditional distribution of
+              <span data-tex>F</span> is the same in every row and equal to the marginal one:
+            </p>
+            <div class="equation" id="eq-3">
+              <div data-tex-display>
+                f_{j \mid i} = \frac{n_{ij}}{n_{i\cdot}} = f_{\cdot j} \quad \text{for all } i, j
+                \qquad \Longleftrightarrow \qquad
+                n_{ij} = E_{ij} := \frac{n_{i\cdot}\, n_{\cdot j}}{n}.
+              </div>
+              <span class="equation__no">(3)</span>
+            </div>
+            <p>
+              The numbers <span data-tex>E_{ij}</span> are the <i>expected frequencies</i> under independence. Sample counts never match them
+              exactly, even when the variables are independent, because of sampling variation; the question is whether the departures are
+              larger than that variation would produce. Pearson's statistic measures them, scaling each squared departure by the count it is
+              expected to be:
+            </p>
+            <div class="equation" id="eq-4">
+              <div data-tex-display>
+                \chi^2 = \sum_{i=1}^{r} \sum_{j=1}^{c} \frac{(n_{ij} - E_{ij})^2}{E_{ij}}.
+              </div>
+              <span class="equation__no">(4)</span>
+            </div>
+            <p>
+              Under the null hypothesis <span data-tex>H_0</span> that <span data-tex>X</span> and <span data-tex>F</span> are independent, and
+              when the expected counts are not small (a customary rule asks for <span data-tex>E_{ij} \ge 5</span>), the statistic is
+              approximately <span data-tex>\chi^2</span>-distributed with <span data-tex>(r-1)(c-1)</span> degrees of freedom, because the
+              margins fix <span data-tex>r + c - 1</span> of the <span data-tex>rc</span> cells. The p-value is the probability, under
+              <span data-tex>H_0</span>, of a statistic at least as large as the one observed; a small p-value is evidence against (2). Since
+              <span data-tex>\chi^2</span> grows with <span data-tex>n</span> for a fixed pattern of association, its size alone does not
+              measure how strong the association is. Cramér's coefficient does,
+            </p>
+            <div class="equation" id="eq-5">
+              <div data-tex-display>
+                V = \sqrt{\frac{\chi^2}{n\,(\min(r, c) - 1)}} \in [0, 1],
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              which is 0 for a table that is exactly independent and 1 when each level of one variable determines the other.
+            </p>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> The data and the contingency table</h2>
+            <p>
+              The data are those of Dawson (1995), as distributed with the R package <code>datasets</code>: {{fig.data.n}} people, of whom
+              {{fig.data.survived}} survived and {{fig.data.died}} died. They are published as counts; the program expands them into one record
+              <span data-tex>(x, f)</span> per person and builds the contingency table from those records, so that the table is constructed from
+              a bivariate sample and not copied from the counts. The order of the records carries no information. Table 1 is the result.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>The contingency table of class <span data-tex>(X)</span> by outcome
+                <span data-tex>(F)</span>, with the row totals <span data-tex>n_{i\cdot}</span> and column totals <span data-tex>n_{\cdot j}</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption"><!-- @figure id=observed --></div>
+            </figure>
+            <p>
+              The margins already say something about the sample. The crew ({{fig.class.share.Crew}} of those aboard) and the third class
+              ({{fig.class.share.Third}}) are the two largest groups, and {{fig.data.survivedShare}} of all those aboard survived. That last
+              figure is the benchmark for what follows: if class played no part, each class would survive at about that rate.
+            </p>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> Joint, marginal and conditional frequencies</h2>
+            <p>
+              Table 2 divides every count by <span data-tex>n</span>, which gives the joint frequencies <span data-tex>f_{ij}</span> in the cells
+              and the marginal frequencies <span data-tex>f_{i\cdot}</span> and <span data-tex>f_{\cdot j}</span> in the last column and row.
+            </p>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>Joint relative frequencies <span data-tex>f_{ij}</span> and marginal frequencies.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption"><!-- @figure id=joint --></div>
+            </figure>
+            <p>
+              The joint frequencies mix two things, how large each class is and how it fared, so they are not the best table for asking whether
+              class matters. The conditional frequencies separate them. Table 3 gives the distribution of the outcome within each class, which is
+              the one that answers the question of §1; its last row is the marginal distribution of the outcome, the reference against which each
+              class is compared, as in (3).
+            </p>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>Conditional frequencies of the outcome within each class,
+                <span data-tex>f_{j \mid i} = n_{ij}/n_{i\cdot}</span>. The last row is the marginal distribution <span data-tex>f_{\cdot j}</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=byClass --></div>
+            </figure>
+            <p>
+              The rows differ widely. {{fig.class.rate.First}} of the first class survived, {{fig.class.rate.Second}} of the second,
+              {{fig.class.rate.Third}} of the third and {{fig.class.rate.Crew}} of the crew, against {{fig.data.survivedShare}} overall. Under
+              independence the four rows of Table 3 would be equal to its last row, up to sampling variation. Figure 1 draws the same
+              comparison.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=rates --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>Survival in each class against the overall rate
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  The bars are the percentage of each class that survived (the second column of Table 3); the stepped line is the percentage
+                  in the whole sample, {{fig.data.survivedShare}}, which every bar would reach if class and outcome were independent.
+                </p>
+              </figcaption>
+            </figure>
+            <p>
+              The conditional frequencies can also be taken the other way. Table 4 gives the composition by class within each outcome. It
+              describes who the survivors and the dead were, not how likely each class was to survive, and the two readings should not be
+              confused: the crew make up {{fig.class.share.Crew}} of those aboard and, by Table 4, a larger share of the dead than of the
+              survivors.
+            </p>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>Conditional frequencies of the class within each outcome,
+                <span data-tex>f_{i \mid j} = n_{ij}/n_{\cdot j}</span>. The last column is the marginal distribution <span data-tex>f_{i\cdot}</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=byOutcome --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> Expected frequencies and the χ² statistic</h2>
+            <p>
+              Table 5 gives the frequencies expected under independence, computed from (3) with the margins of Table 1. By construction it has
+              the same row and column totals as Table 1; it differs from it only in how those totals are spread over the cells.
+            </p>
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>Expected frequencies under independence,
+                <span data-tex>E_{ij} = n_{i\cdot} n_{\cdot j}/n</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=expected --></div>
+            </figure>
+            <p>
+              Table 6 sets each observed count against its expected count and gives the contribution of the cell to (4) and its standardised
+              residual <span data-tex>(n_{ij} - E_{ij})/\sqrt{E_{ij}}</span>. The residuals show where the departure from independence lies; a
+              value beyond about <span data-tex>\pm 2</span> is unusual under <span data-tex>H_0</span>, and these are far beyond it.
+            </p>
+            <figure class="table-figure" aria-labelledby="table6-caption">
+              <figcaption id="table6-caption">
+                <span class="table-figure__no">Table 6.</span>Observed and expected counts, contribution of each cell to
+                <span data-tex>\chi^2</span> and standardised residual. The contributions add up to the statistic.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table6-caption"><!-- @figure id=cells --></div>
+            </figure>
+            <p>
+              The sum of the contributions is <span data-tex>\chi^2 =</span> {{fig.class.chi}} on
+              <span data-tex>(4-1)(2-1) =</span> {{fig.class.df}} degrees of freedom. The p-value is {{fig.class.p}}. The condition for using the
+              <span data-tex>\chi^2</span> law is met, since the smallest expected count is {{fig.class.minExpected}}, far above 5. Cramér's
+              coefficient (5) is <span data-tex>V =</span> {{fig.class.v}}.
+            </p>
+            <p>
+              The largest departures are in the first class, with {{fig.class.top.firstObserved}} survivors against
+              {{fig.class.top.firstExpected}} expected (residual {{fig.class.top.firstResidual}}), and {{fig.class.top.secondObserved}} deaths
+              against {{fig.class.top.secondExpected}} expected (residual {{fig.class.top.secondResidual}}). The first class survived far more,
+              and the third class and the crew somewhat less, than independence would predict.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> A permutation check</h2>
+            <p>
+              The p-value of §5 rests on an approximation, and on the idea of a random sample from a larger population, which does not quite
+              describe a ship's passenger list. A permutation test needs neither. If class had nothing to do with the outcome, then which person
+              carried which outcome would be arbitrary, so the {{fig.data.survived}} survivors could be reassigned at random among the
+              {{fig.data.n}} people without changing anything that matters. The program does this {{fig.params.replicates}} times, which keeps
+              the row totals and the column totals fixed and removes any link between class and outcome, and recomputes
+              <span data-tex>\chi^2</span> each time. The p-value is the fraction of these statistics, counting the observed one, that reach
+              the observed value.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=permutation --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>The statistic when the outcome is shuffled
+                  <span class="pplot__provenance">Computed</span><span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  Bars: the number of the {{fig.params.replicates}} permutations whose statistic falls in each bin of width 1. Stepped line: the
+                  count expected from the <span data-tex>\chi^2</span> law with {{fig.class.df}} degrees of freedom. The mean of the permuted
+                  statistics is {{fig.class.permMean}}, the mean of that law, and the largest is {{fig.class.permMax}}. The observed statistic,
+                  {{fig.class.chi}}, lies far to the right of the plotted range, and so do {{fig.class.beyond}} of the permuted ones.
+                </p>
+              </figcaption>
+            </figure>
+            <p>
+              The permuted statistics follow the <span data-tex>\chi^2</span> law closely, which supports the approximation, and none of them
+              comes near the observed value: {{fig.class.permAtLeast}} of the {{fig.params.replicates}} reach {{fig.class.chi}}, so the
+              permutation p-value is {{fig.class.permP}}, the smallest that this many permutations can resolve. The two tests agree.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Interpretation</h2>
+            <p>
+              At any usual level of significance the null hypothesis of independence is rejected: class and outcome are statistically
+              <i>dependent</i>. In terms of (3), the conditional distribution of the outcome is not the same in every class, and the differences
+              in Table 3 are too large to be the work of chance alone.
+            </p>
+            <p>
+              Two cautions apply to how far this goes. The p-value says that the variables are not independent; it does not say that the
+              association is strong, and for a large sample it would reject even a faint one. That is the role of
+              <span data-tex>V</span>, and a comparison helps to read it. Table 7 repeats the whole calculation for the sex of the person aboard,
+              taken from the same list, in a second table with two rows.
+            </p>
+            <figure class="table-figure" aria-labelledby="table7-caption">
+              <figcaption id="table7-caption">
+                <span class="table-figure__no">Table 7.</span>The test of independence for class and for sex against the outcome:
+                statistic, degrees of freedom, p-value, Cramér's <span data-tex>V</span>, smallest expected count and the p-value of a
+                permutation test.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table7-caption"><!-- @figure id=summary --></div>
+            </figure>
+            <p>
+              Both pairs are dependent, but not equally. Sex is the stronger association, with <span data-tex>V =</span> {{fig.sex.v}} against
+              {{fig.class.v}} for class: {{fig.sex.rate.Female}} of the {{fig.sex.n.Female}} women survived against {{fig.sex.rate.Male}} of
+              the {{fig.sex.n.Male}} men. A <span data-tex>V</span> near 0.3 is a moderate association: knowing the class helps to predict the
+              outcome, but leaves most of it unexplained.
+            </p>
+            <p>
+              The second caution concerns the sampling. The {{fig.data.n}} people are the whole population of the ship, not a random sample
+              of it, so the p-value does not describe repeated sampling from a larger population. What the permutation argument of §6 does
+              support is the statement that a separation this large would almost never arise if the outcomes were assigned to people at
+              random.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Association and causality</h2>
+            <p>
+              A test of independence establishes an association: knowing <span data-tex>X</span> changes what we should expect of
+              <span data-tex>F</span>. It does not establish that <span data-tex>X</span> causes <span data-tex>F</span>, for three reasons that
+              this very table illustrates.
+            </p>
+            <ul>
+              <li>
+                <strong>Confounding.</strong> A third variable may drive both. The classes differ in sex and age as well as in price: the crew
+                were almost all men (Dawson, 1995), and Table 7 shows that sex is strongly associated with the outcome, so part of what Table 3
+                attributes to class may be an effect of sex. A causal statement about class would require
+                comparing people of the same sex and age in different classes, that is, a table for each stratum, which the margins used here
+                cannot provide.
+              </li>
+              <li>
+                <strong>Mechanisms.</strong> Even an association that survives such adjustment does not say how it arises. The location of
+                the cabins, the order in which the lifeboats were filled, the instructions given to passengers and the roles of the crew are all
+                plausible routes, and a contingency table of two variables cannot tell them apart.
+              </li>
+              <li>
+                <strong>Direction and aggregation.</strong> The statistic is symmetric in <span data-tex>X</span> and <span data-tex>F</span>:
+                swapping the roles of the variables changes nothing, so the test cannot say which way an effect runs. Moreover an association
+                seen in the aggregate table can weaken, vanish or reverse within the strata of a third variable (Simpson's paradox), so the
+                aggregate association is not a safe guide to what would happen to an individual.
+              </li>
+            </ul>
+            <p>
+              In this case the physical order of events makes the direction clear, since a person's class was fixed before the sinking; but
+              that is knowledge about the setting, not a result of the test.
+            </p>
+          </section>
+
+          <!-- ===================================================== §9 -->
+          <section class="hw-section" id="s9" aria-labelledby="s9-title">
+            <h2 id="s9-title"><a class="section-anchor" href="#s9" aria-label="Section 9, link to this section">§9</a> Conclusion</h2>
+            <p>
+              From the records of the {{fig.data.n}} people aboard, the contingency table of class by outcome was constructed, together with its
+              joint, marginal and conditional frequencies and the frequencies expected under independence. The statistic is
+              <span data-tex>\chi^2 =</span> {{fig.class.chi}} on {{fig.class.df}} degrees of freedom, with p-value {{fig.class.p}}, and a
+              permutation test over {{fig.params.replicates}} shuffles agrees. Class and outcome are therefore statistically dependent: the first
+              class survived at {{fig.class.rate.First}}, the third class and the crew at about a quarter. The association is moderate
+              (<span data-tex>V =</span> {{fig.class.v}}) and weaker than that of sex with the outcome
+              (<span data-tex>V =</span> {{fig.sex.v}}). It is an association, not a demonstration that class caused survival, because sex, age and
+              the circumstances of the sinking are not controlled for.
+            </p>
+          </section>
+
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <ol>
+              <li>Agresti, A. (2013). <cite>Categorical Data Analysis</cite> (3rd ed.). Wiley.</li>
+              <li>Cramér, H. (1946). <cite>Mathematical Methods of Statistics</cite>. Princeton University Press.</li>
+              <li>Dawson, R. J. M. (1995). The “unusual episode” data revisited. <cite>Journal of Statistics Education</cite>, 3(3).</li>
+              <li>Pearson, K. (1900). On the criterion that a given system of deviations from the probable in the case of a correlated system of variables is such that it can be reasonably supposed to have arisen from random sampling. <cite>Philosophical Magazine</cite>, Series 5, 50(302), 157–175.</li>
+            </ol>
+          </section>
+
+          <section class="hw-section" id="appendix" aria-labelledby="appendix-title">
+            <h2 id="appendix-title"><a class="section-anchor" href="#appendix" aria-label="Appendix, link to this section">App.</a> Parameters</h2>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the computation. Every number on the page follows from them and from the data.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
