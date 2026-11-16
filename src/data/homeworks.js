@@ -78,4 +78,15 @@ export default [
     published: '2026-10-31',
     status: 'published',
   },
+  {
+    number: 7,
+    label: 'Homework 5',
+    shortLabel: '5',
+    title: 'Statistical independence: contingency tables, expected frequencies and the χ² test',
+    abstract:
+      'The contingency table of a bivariate sample (X, F) is constructed by program from the records of the 2,201 people aboard the Titanic, with class as X and outcome as F, and its joint, marginal and conditional frequencies are computed. The frequencies expected under independence give Pearson’s χ² statistic and its p-value, confirmed by a permutation test, and Cramér’s V measures the strength of the association, which is set against that of sex. The two variables are statistically dependent. The page recalls what independence means in probability and in statistics, and distinguishes the association found from a causal effect of class on survival.',
+    topics: ['Contingency tables', 'Statistical independence', 'Chi-square test', 'Permutation tests', 'Association and causality'],
+    published: '2026-11-16',
+    status: 'published',
+  },
 ];
