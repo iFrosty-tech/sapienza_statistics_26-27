@@ -1,0 +1,16 @@
+/*
+ * Homework 7: the tables of text and the tables grouped by sequence. A text table keeps its cells to the
+ * left and lets them wrap, and the rows that name a group of the sequences table are set off by a rule.
+ */
+
+.data-table--text td {
+  text-align: left;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.data-table--convergence tbody tr.data-table__total > th[colspan] {
+  text-align: left;
+  font-weight: 600;
+  border-top: 1px solid var(--rule-strong, currentColor);
+}

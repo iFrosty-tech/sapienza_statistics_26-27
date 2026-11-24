@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- @include partials/head-meta.html -->
+    <title>{{hw.label}}: {{hw.title}} · {{site.course}} {{site.academicYear}} · {{site.author}}</title>
+    <meta name="description" content="{{hw.abstract}}" />
+    <script type="module" src="/src/hw09.js"></script>
+  </head>
+  <body class="page page--homework">
+    <!-- @include partials/site-header.html -->
+
+    <main id="main" class="sheet sheet--read">
+      <!-- @include partials/homework-header.html -->
+
+      <div class="read-layout">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title" class="toc__title">Contents</h2>
+          <ol>
+            <li><a href="#s1"><span class="toc__sec">§1</span> Problem statement</a></li>
+            <li><a href="#s2"><span class="toc__sec">§2</span> Four modes of convergence</a></li>
+            <li><a href="#s3"><span class="toc__sec">§3</span> Telling the modes apart</a></li>
+            <li><a href="#s4"><span class="toc__sec">§4</span> The laws of large numbers</a></li>
+            <li><a href="#s5"><span class="toc__sec">§5</span> The central limit theorem</a></li>
+            <li><a href="#s6"><span class="toc__sec">§6</span> Why √n appears</a></li>
+            <li><a href="#s7"><span class="toc__sec">§7</span> Conditional probability and Bayes' theorem</a></li>
+            <li><a href="#s8"><span class="toc__sec">§8</span> Prior, likelihood and posterior</a></li>
+            <li><a href="#s9"><span class="toc__sec">§9</span> Advantages and limitations</a></li>
+            <li><a href="#s10"><span class="toc__sec">§10</span> Conclusion</a></li>
+            <li><a href="#references"><span class="toc__sec">Ref.</span> References</a></li>
+            <li><a href="#appendix"><span class="toc__sec">App.</span> Parameters</a></li>
+          </ol>
+        </nav>
+
+        <article class="prose">
+          <!-- ===================================================== §1 -->
+          <section class="hw-section" id="s1" aria-labelledby="s1-title">
+            <h2 id="s1-title"><a class="section-anchor" href="#s1" aria-label="Section 1, link to this section">§1</a> Problem statement</h2>
+            <p>
+              The assignment has two parts. The first asks for the differences between the main modes of convergence of probability theory
+              (in probability, almost sure, in mean square and in distribution), for the role each plays in the law of large numbers (LLN) and
+              in the central limit theorem (CLT), and for an explanation of why the factor <span data-tex>\sqrt{n}</span> appears so often,
+              in connection with the additivity of variance and with independence. The second asks for conditional probability and Bayes'
+              theorem, for the relation between the prior, the likelihood and the posterior, for the reason why updating plays a central part
+              in Bayesian inference, and for examples of priors and likelihoods with their advantages, limitations and influence on the
+              conclusions.
+            </p>
+            <p>
+              Every statement of theory is accompanied by a computation. Where a probability has a closed form it is computed exactly (a sum of
+              independent exponential variables is a gamma variable, and the posterior of a proportion under a beta prior is a beta law); where
+              it has none it is simulated. Every table, figure and number is produced when the site is built, by
+              <code>src/lib/convergence.js</code> and <code>src/lib/bayes.js</code>, and nothing is typed in by hand.
+            </p>
+          </section>
+
+          <!-- ===================================================== §2 -->
+          <section class="hw-section" id="s2" aria-labelledby="s2-title">
+            <h2 id="s2-title"><a class="section-anchor" href="#s2" aria-label="Section 2, link to this section">§2</a> Four modes of convergence</h2>
+            <p>
+              Let <span data-tex>X_1, X_2, \dots</span> and <span data-tex>X</span> be random variables on one probability space. A sequence of
+              numbers has one meaning of convergence; a sequence of random variables has several, because a variable is a function of the
+              outcome <span data-tex>\omega</span> and the closeness of two functions can be measured in more than one way.
+            </p>
+            <ul>
+              <li>
+                <strong>In probability</strong>, <span data-tex>X_n \xrightarrow{P} X</span>: for every <span data-tex>\varepsilon \gt 0</span>,
+                <div class="equation" id="eq-1">
+                  <div data-tex-display>P\bigl(|X_n - X| \gt \varepsilon\bigr) \to 0 \quad (n \to \infty).</div>
+                  <span class="equation__no">(1)</span>
+                </div>
+                The probability of a deviation of any fixed size vanishes, but at each <span data-tex>n</span> a different set of outcomes may deviate.
+              </li>
+              <li>
+                <strong>Almost surely</strong>, <span data-tex>X_n \xrightarrow{a.s.} X</span>:
+                <div class="equation" id="eq-2">
+                  <div data-tex-display>P\bigl(\omega : X_n(\omega) \to X(\omega)\bigr) = 1.</div>
+                  <span class="equation__no">(2)</span>
+                </div>
+                Individual trajectories converge, as sequences of numbers, for all outcomes except a set of probability zero. It is the
+                strongest of the four in the sense of (5) below, and equivalent to
+                <span data-tex>P(\sup_{k \ge n} |X_k - X| \gt \varepsilon) \to 0</span> for every <span data-tex>\varepsilon</span>: the whole
+                tail of the sequence, and not one term, stays close.
+              </li>
+              <li>
+                <strong>In mean square</strong> (in <span data-tex>L^2</span>), <span data-tex>X_n \xrightarrow{L^2} X</span>:
+                <div class="equation" id="eq-3">
+                  <div data-tex-display>E\bigl[(X_n - X)^2\bigr] \to 0.</div>
+                  <span class="equation__no">(3)</span>
+                </div>
+                The mean squared error vanishes. It is a statement about averages over outcomes and it is sensitive to rare, large deviations.
+              </li>
+              <li>
+                <strong>In distribution</strong>, <span data-tex>X_n \xrightarrow{d} X</span>:
+                <div class="equation" id="eq-4">
+                  <div data-tex-display>F_{X_n}(x) \to F_X(x) \quad \text{at every } x \text{ where } F_X \text{ is continuous.}</div>
+                  <span class="equation__no">(4)</span>
+                </div>
+                Only the laws converge: the variables need not even be defined on the same space, and no closeness of <span data-tex>X_n</span>
+                to <span data-tex>X</span> as functions of <span data-tex>\omega</span> is implied.
+              </li>
+            </ul>
+            <p>The implications between them are</p>
+            <div class="equation" id="eq-5">
+              <div data-tex-display>
+                X_n \xrightarrow{a.s.} X \;\Longrightarrow\; X_n \xrightarrow{P} X \;\Longrightarrow\; X_n \xrightarrow{d} X,
+                \qquad
+                X_n \xrightarrow{L^2} X \;\Longrightarrow\; X_n \xrightarrow{P} X,
+              </div>
+              <span class="equation__no">(5)</span>
+            </div>
+            <p>
+              and no arrow reverses in general. Two partial converses matter: if the limit is a constant <span data-tex>c</span>, convergence in
+              distribution to <span data-tex>c</span> is the same as convergence in probability to <span data-tex>c</span>; and a sequence that
+              converges in probability has a subsequence that converges almost surely. Table 1 collects the four modes with the results in which
+              each is used, which §4 to §6 explain.
+            </p>
+            <figure class="table-figure" aria-labelledby="table1-caption">
+              <figcaption id="table1-caption">
+                <span class="table-figure__no">Table 1.</span>The four modes of convergence: what each controls, and where it is used.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table1-caption">
+                <table class="data-table data-table--hw04 data-table--compact data-table--convergence data-table--text">
+                  <thead>
+                    <tr>
+                      <th scope="col">Mode</th>
+                      <th scope="col">What is controlled</th>
+                      <th scope="col">Where it is used</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Almost sure</th>
+                      <td>Every trajectory, from some point on, apart from a null set of outcomes.</td>
+                      <td>Strong law of large numbers; Glivenko–Cantelli theorem; strong consistency of an estimator.</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">In probability</th>
+                      <td>The chance of a deviation larger than <span data-tex>\varepsilon</span> at the <span data-tex>n</span>th term.</td>
+                      <td>Weak law of large numbers; consistency of an estimator; Slutsky's lemma and the continuous mapping theorem.</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">In mean square</th>
+                      <td>The mean squared error, that is, variance plus squared bias.</td>
+                      <td>Mean of an i.i.d. sample with finite variance; risk of an estimator; Monte Carlo error.</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">In distribution</th>
+                      <td>The law of the term, not the term itself.</td>
+                      <td>Central limit theorem; asymptotic normality of the maximum likelihood estimator; the delta method; the limit of test statistics.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §3 -->
+          <section class="hw-section" id="s3" aria-labelledby="s3-title">
+            <h2 id="s3-title"><a class="section-anchor" href="#s3" aria-label="Section 3, link to this section">§3</a> Telling the modes apart</h2>
+            <p>
+              Three sequences show that the arrows of (5) do not reverse. In the first two, <span data-tex>U_1, U_2, \dots</span> are independent
+              and uniform on <span data-tex>(0, 1)</span>.
+            </p>
+            <ul>
+              <li>
+                The <strong>indicator</strong> sequence <span data-tex>X_n = \mathbf{1}\{U_n \lt 1/n\}</span> takes the value 1 with probability
+                <span data-tex>1/n</span> and 0 otherwise. Then <span data-tex>P(|X_n| \gt \varepsilon) = 1/n \to 0</span> and
+                <span data-tex>E[X_n^2] = 1/n \to 0</span>, so it converges to 0 in probability and in mean square. But
+                <span data-tex>\sum 1/n</span> diverges and the terms are independent, so by the second Borel–Cantelli lemma
+                <span data-tex>X_n = 1</span> for infinitely many <span data-tex>n</span>, with probability one: it does <i>not</i> converge
+                almost surely.
+              </li>
+              <li>
+                The <strong>spike</strong> sequence <span data-tex>X_n = n\,\mathbf{1}\{U_n \lt 1/n^2\}</span> takes the value
+                <span data-tex>n</span> with probability <span data-tex>1/n^2</span>. Now <span data-tex>\sum 1/n^2</span> converges, so by the
+                first Borel–Cantelli lemma only finitely many spikes occur, and <span data-tex>X_n \to 0</span> almost surely. Yet
+                <span data-tex>E[X_n^2] = n^2 \cdot 1/n^2 = 1</span> for every <span data-tex>n</span>: it does <i>not</i> converge in mean
+                square. A rare, huge value is invisible to probability and decisive for a second moment.
+              </li>
+              <li>
+                The <strong>alternating</strong> sequence <span data-tex>X_n = (-1)^n Z</span>, with <span data-tex>Z</span> standard normal, has
+                the standard normal law at every <span data-tex>n</span>, so it converges in distribution to <span data-tex>Z</span>. For odd
+                <span data-tex>n</span>, however, <span data-tex>|X_n - Z| = 2|Z|</span>, and
+                <span data-tex>P(|X_n - Z| \gt \varepsilon) = 2\bigl(1 - \Phi(\varepsilon/2)\bigr)</span> does not depend on
+                <span data-tex>n</span>; at <span data-tex>\varepsilon = 1</span> it is {{fig.seq.alternating.gap}}. There is no convergence in
+                probability.
+              </li>
+            </ul>
+            <figure class="table-figure" aria-labelledby="table2-caption">
+              <figcaption id="table2-caption">
+                <span class="table-figure__no">Table 2.</span>Which modes each sequence satisfies, with the limit in brackets.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table2-caption">
+                <table class="data-table data-table--hw04 data-table--compact data-table--convergence data-table--text">
+                  <thead>
+                    <tr>
+                      <th scope="col">Sequence</th>
+                      <th scope="col">Almost sure</th>
+                      <th scope="col">In probability</th>
+                      <th scope="col">In mean square</th>
+                      <th scope="col">In distribution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><th scope="row">Indicator</th><td>No</td><td>Yes (0)</td><td>Yes (0)</td><td>Yes (0)</td></tr>
+                    <tr><th scope="row">Spike</th><td>Yes (0)</td><td>Yes (0)</td><td>No</td><td>Yes (0)</td></tr>
+                    <tr><th scope="row">Alternating</th><td>No</td><td>No</td><td>No</td><td>Yes (<span data-tex>Z</span>)</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+            <p>
+              The simulation makes the distinction visible. Table 3 gives, for the two independent sequences, the probability that some term
+              among <span data-tex>X_{n+1}, \dots, X_N</span> is nonzero, with <span data-tex>N =</span> {{fig.params.N}}. Because the terms are
+              independent it is a telescoping product, <span data-tex>1 - n/N</span> for the indicator and
+              <span data-tex>1 - n(N+1)/\bigl((n+1)N\bigr)</span> for the spike, and the table compares it with the fraction of
+              {{fig.params.paths}} simulated paths.
+            </p>
+            <figure class="table-figure" aria-labelledby="table3-caption">
+              <figcaption id="table3-caption">
+                <span class="table-figure__no">Table 3.</span>The quantities that separate the modes, exact and simulated.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table3-caption"><!-- @figure id=sequences --></div>
+            </figure>
+            <p>
+              At <span data-tex>n = 100</span> the indicator sequence still has a further 1 ahead in {{fig.seq.indicator.exact100}} of the
+              paths (simulated {{fig.seq.indicator.sim100}}), the spike sequence in {{fig.seq.spike.exact100}} (simulated
+              {{fig.seq.spike.sim100}}); by <span data-tex>n = 1{,}000</span> the latter is {{fig.seq.spike.exact1000}}. Figure 1 draws the whole
+              curve: the spike curve collapses, which is almost sure convergence, while the indicator curve falls only because the horizon
+              <span data-tex>N</span> is finite.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig1-title">
+              <div class="chart-figure__canvas"><!-- @figure id=exceedance --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig1-title">
+                  <span class="pplot__fig-no">Figure 1.</span>The chance of a further nonzero term after <span data-tex>n</span>
+                  <span class="pplot__provenance">Computed</span><span class="pplot__simulated">Simulated</span>
+                </p>
+                <p>
+                  The fraction of {{fig.params.paths}} simulated paths with a nonzero term among the indices <span data-tex>n+1, \dots, N</span>,
+                  for the indicator and the spike sequences. A sequence that converges almost surely must have its curve go to 0 as
+                  <span data-tex>N \to \infty</span> for every fixed <span data-tex>n</span> large enough; the indicator curve does not.
+                </p>
+              </figcaption>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §4 -->
+          <section class="hw-section" id="s4" aria-labelledby="s4-title">
+            <h2 id="s4-title"><a class="section-anchor" href="#s4" aria-label="Section 4, link to this section">§4</a> The laws of large numbers</h2>
+            <p>
+              Let <span data-tex>X_1, X_2, \dots</span> be independent and identically distributed with mean <span data-tex>\mu</span> and let
+              <span data-tex>\bar X_n</span> be their average. The <i>weak</i> law says that <span data-tex>\bar X_n \xrightarrow{P} \mu</span>; the
+              <i>strong</i> law (Kolmogorov) says that <span data-tex>\bar X_n \xrightarrow{a.s.} \mu</span>, and needs only
+              <span data-tex>E|X_1| \lt \infty</span>. They differ exactly as in §2: the weak law bounds the chance of a miss at each
+              <span data-tex>n</span>; the strong law says that a single sequence of experiments, run indefinitely, settles at
+              <span data-tex>\mu</span>, which is the statement that justifies reading a relative frequency as a probability.
+            </p>
+            <p>
+              When the variance <span data-tex>\sigma^2</span> is finite, the weak law has a one-line proof, and it also gives convergence in
+              mean square, because <span data-tex>E[(\bar X_n - \mu)^2] = \sigma^2/n \to 0</span> and Chebyshev's inequality then gives
+            </p>
+            <div class="equation" id="eq-6">
+              <div data-tex-display>
+                P\bigl(|\bar X_n - \mu| \gt \varepsilon\bigr) \le \frac{\sigma^2}{n\,\varepsilon^2}.
+              </div>
+              <span class="equation__no">(6)</span>
+            </div>
+            <p>
+              This is the route by which <span data-tex>L^2</span> convergence implies convergence in probability in (5). The bound is crude.
+              Table 4 compares it, for <span data-tex>\varepsilon =</span> {{fig.params.epsilon}}, with the exact probability for exponential
+              variables (<span data-tex>\mu = \sigma = 1</span>) and with the normal approximation of §5: at <span data-tex>n = 1{,}000</span>
+              the bound is {{fig.lln.chebyshev1000}} and the exact value {{fig.lln.exact1000}}.
+            </p>
+            <figure class="table-figure" aria-labelledby="table4-caption">
+              <figcaption id="table4-caption">
+                <span class="table-figure__no">Table 4.</span>The probability that the sample mean misses <span data-tex>\mu</span> by more than
+                <span data-tex>\varepsilon</span>: Chebyshev's bound, the exact value for exponential variables, the normal approximation and, for
+                comparison, the Cauchy law.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table4-caption"><!-- @figure id=tails --></div>
+            </figure>
+            <p>
+              The last column shows what happens when the mean does not exist. The average of <span data-tex>n</span> independent standard
+              Cauchy variables is itself standard Cauchy, for every <span data-tex>n</span>, so
+              <span data-tex>P(|\bar X_n| \gt \varepsilon) =</span> {{fig.lln.cauchy}} never decreases and the law of large numbers fails.
+              Figures 2 and 3 show five running means of each kind: the exponential paths settle at 1, the Cauchy paths keep making jumps that
+              no further averaging absorbs.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig2-title">
+              <div class="chart-figure__canvas"><!-- @figure id=meansExp --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig2-title">
+                  <span class="pplot__fig-no">Figure 2.</span>Running means of exponential samples
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>Five independent samples of Exponential(1) variables; the line is the mean <span data-tex>\mu = 1</span>.</p>
+              </figcaption>
+            </figure>
+            <figure class="chart-figure" aria-labelledby="fig3-title">
+              <div class="chart-figure__canvas"><!-- @figure id=meansCauchy --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig3-title">
+                  <span class="pplot__fig-no">Figure 3.</span>Running means of Cauchy samples
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Five independent samples of standard Cauchy variables. Values outside the range shown are not drawn; the lines break where
+                  they leave it.
+                </p>
+              </figcaption>
+            </figure>
+            <p>
+              The role of the laws in statistics is <i>consistency</i>: an estimator that is an average (a sample proportion, a sample moment,
+              the empirical distribution function, by the Glivenko–Cantelli theorem) converges to the quantity it estimates, in probability or
+              almost surely. They also license Monte Carlo integration, where an average of simulated values stands for an expectation. They
+              say nothing about the <i>size</i> of the error at a given <span data-tex>n</span>, and that is the task of the next theorem.
+            </p>
+          </section>
+
+          <!-- ===================================================== §5 -->
+          <section class="hw-section" id="s5" aria-labelledby="s5-title">
+            <h2 id="s5-title"><a class="section-anchor" href="#s5" aria-label="Section 5, link to this section">§5</a> The central limit theorem</h2>
+            <p>
+              If <span data-tex>X_1, X_2, \dots</span> are independent and identically distributed with mean <span data-tex>\mu</span> and finite
+              variance <span data-tex>\sigma^2 \gt 0</span>, then
+            </p>
+            <div class="equation" id="eq-7">
+              <div data-tex-display>
+                Z_n = \frac{\sqrt{n}\,(\bar X_n - \mu)}{\sigma} \xrightarrow{d} N(0, 1).
+              </div>
+              <span class="equation__no">(7)</span>
+            </div>
+            <p>
+              The mode is distribution, and it cannot be strengthened. The sequence <span data-tex>Z_n</span> does not converge in probability
+              to anything: <span data-tex>Z_n</span> and <span data-tex>Z_{2n}</span> are strongly correlated, with correlation
+              <span data-tex>1/\sqrt{2}</span>, but they are not close, so the laws settle while the variables keep moving. The CLT refines
+              the LLN: <span data-tex>\bar X_n - \mu</span> goes to 0, and (7) says at what scale, <span data-tex>\sigma/\sqrt{n}</span>, and
+              with what shape, the normal one.
+            </p>
+            <p>
+              Figures 4 and 5 show the standardised mean of exponential variables, a law with skewness 2, for
+              <span data-tex>n =</span> {{fig.params.cltSmall}} and <span data-tex>n =</span> {{fig.params.cltLarge}}. The skewness of
+              <span data-tex>Z_n</span> is <span data-tex>2/\sqrt{n}</span>, which is {{fig.clt.skewSmall}} and {{fig.clt.skewLarge}}: the
+              asymmetry fades, but slowly.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig4-title">
+              <div class="chart-figure__canvas"><!-- @figure id=cltSmall --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig4-title">
+                  <span class="pplot__fig-no">Figure 4.</span>The standardised mean for <span data-tex>n = 3</span>
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>
+                  Bars: {{fig.params.cltReplicates}} simulated values of <span data-tex>Z_n</span>, in bins of width 0.5. Stepped line: the count
+                  expected from the standard normal law. The sum of three exponential variables is far from symmetric.
+                </p>
+              </figcaption>
+            </figure>
+            <figure class="chart-figure" aria-labelledby="fig5-title">
+              <div class="chart-figure__canvas"><!-- @figure id=cltLarge --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig5-title">
+                  <span class="pplot__fig-no">Figure 5.</span>The standardised mean for <span data-tex>n = 30</span>
+                  <span class="pplot__provenance">Simulated</span>
+                </p>
+                <p>The same display for thirty variables: the bars follow the normal curve closely.</p>
+              </figcaption>
+            </figure>
+            <p>
+              The speed of the approximation can be stated exactly. The Berry–Esseen theorem bounds the Kolmogorov distance
+              <span data-tex>D_n = \sup_z |F_n(z) - \Phi(z)|</span> by <span data-tex>C\,\rho/(\sigma^3\sqrt{n})</span>, where
+              <span data-tex>\rho = E|X - \mu|^3</span> and <span data-tex>C \le 0.4748</span> (Shevtsova, 2011). For exponential variables
+              <span data-tex>\rho = 12/e - 2</span>, and the distance can be computed exactly, since <span data-tex>n\bar X_n</span> is a gamma
+              variable. Table 5 shows that <span data-tex>\sqrt{n}\,D_n</span> tends to a constant, {{fig.clt.scaled}} at
+              <span data-tex>n = 1{,}000</span>: the error falls exactly at the rate <span data-tex>1/\sqrt{n}</span>, from {{fig.clt.d1}} at
+              <span data-tex>n = 1</span> to {{fig.clt.d30}} at <span data-tex>n = 30</span> and {{fig.clt.d1000}} at
+              <span data-tex>n = 1{,}000</span>, and the theoretical bound, although it holds, is more than eight times too large.
+            </p>
+            <figure class="table-figure" aria-labelledby="table5-caption">
+              <figcaption id="table5-caption">
+                <span class="table-figure__no">Table 5.</span>The Kolmogorov distance between the standardised sum of exponential variables and the
+                normal law, computed exactly, and the Berry–Esseen bound.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table5-caption"><!-- @figure id=berry --></div>
+            </figure>
+            <p>
+              The CLT underlies the usual tools of inference. Combined with Slutsky's lemma, which allows <span data-tex>\sigma</span> to be
+              replaced by a consistent estimate, it gives the interval <span data-tex>\bar X_n \pm 1.96\,s/\sqrt{n}</span>, the
+              <span data-tex>z</span> and <span data-tex>t</span> tests for a mean, and, through the delta method, the normal limit of smooth
+              functions of means. In the same way the maximum likelihood estimator satisfies
+              <span data-tex>\sqrt{n}(\hat\theta_n - \theta) \xrightarrow{d} N(0, I(\theta)^{-1})</span>, where <span data-tex>I(\theta)</span>
+              is the Fisher information. Each of these results is a statement in distribution, assembled with convergence in probability.
+            </p>
+          </section>
+
+          <!-- ===================================================== §6 -->
+          <section class="hw-section" id="s6" aria-labelledby="s6-title">
+            <h2 id="s6-title"><a class="section-anchor" href="#s6" aria-label="Section 6, link to this section">§6</a> Why √n appears</h2>
+            <p>
+              Let <span data-tex>S_n = X_1 + \dots + X_n</span> with every <span data-tex>X_i</span> of variance <span data-tex>\sigma^2</span>.
+              Expanding the variance of a sum,
+            </p>
+            <div class="equation" id="eq-8">
+              <div data-tex-display>
+                \operatorname{Var}(S_n) = \sum_{i=1}^{n} \operatorname{Var}(X_i) + 2\sum_{i \lt j} \operatorname{Cov}(X_i, X_j) = n\sigma^2
+                \quad \text{when the } X_i \text{ are uncorrelated,}
+              </div>
+              <span class="equation__no">(8)</span>
+            </div>
+            <p>
+              and independence is the usual way of guaranteeing that the covariances vanish. Variances add; standard deviations do not. The
+              spread of the sum is therefore <span data-tex>\sigma\sqrt{n}</span>, not <span data-tex>\sigma n</span>, and the spread of the average is
+              <span data-tex>\sigma/\sqrt{n}</span>. The square root is the signature of the addition of independent variances. It also fixes the
+              only scaling that works. For <span data-tex>n^{-a}(S_n - n\mu)</span>, an exponent <span data-tex>a \lt 1/2</span> gives a spread
+              that grows without bound, <span data-tex>a \gt 1/2</span> one that collapses to 0 (this is the LLN, already at
+              <span data-tex>a = 1</span>), and <span data-tex>a = 1/2</span> alone gives a nondegenerate limit, the normal law of (7).
+            </p>
+            <p>
+              The role of independence shows when it is removed. If every pair has correlation <span data-tex>\rho \gt 0</span>,
+            </p>
+            <div class="equation" id="eq-9">
+              <div data-tex-display>
+                \operatorname{Var}(S_n) = \sigma^2\,n\bigl(1 + (n-1)\rho\bigr) \sim \sigma^2 \rho\, n^2,
+              </div>
+              <span class="equation__no">(9)</span>
+            </div>
+            <p>
+              and the spread is of order <span data-tex>n</span>. Table 6 estimates the standard deviation of the centred sum from
+              {{fig.params.spreadReplicates}} simulated paths in two cases: independent exponential terms and equicorrelated normal terms with
+              <span data-tex>\rho =</span> {{fig.params.rho}}. In the first, <span data-tex>\mathrm{sd}(S_n)/\sqrt{n}</span> stays at 1 (at
+              <span data-tex>n = 1{,}000</span> the standard deviation is {{fig.spread.n1000.independent}} against
+              <span data-tex>\sqrt{1000} =</span> {{fig.spread.n1000.theory}}). In the second it grows with <span data-tex>n</span>, and
+              <span data-tex>\mathrm{sd}(S_n)/n</span> does not vanish: it tends to <span data-tex>\sqrt{\rho} =</span> {{fig.spread.limit}}
+              (simulated {{fig.spread.n1000.dependent}} against {{fig.spread.n1000.dependentTheory}} at <span data-tex>n = 1{,}000</span>). The
+              average then does not converge to <span data-tex>\mu</span> at all, but to a random limit: the common component of the terms is never averaged
+              out. Without independence, neither the LLN nor the CLT holds in its usual form.
+            </p>
+            <figure class="table-figure" aria-labelledby="table6-caption">
+              <figcaption id="table6-caption">
+                <span class="table-figure__no">Table 6.</span>The standard deviation of the centred sum and its rescalings by
+                <span data-tex>\sqrt{n}</span> and by <span data-tex>n</span>, for independent terms and for equicorrelated terms.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table6-caption"><!-- @figure id=spread --></div>
+            </figure>
+            <p>
+              The consequences for inference are practical. The standard error of a mean is <span data-tex>\sigma/\sqrt{n}</span>, so halving
+              it takes four times the data, and an interval ten times shorter takes a hundred times as many. The statistics
+              <span data-tex>\sqrt{n}(\bar X_n - \mu_0)/s</span> and <span data-tex>\sqrt{n}(\hat\theta_n - \theta)</span> carry the factor for the
+              same reason. When observations are positively correlated (repeated measures on the same unit, time series, clusters), the
+              effective sample size shrinks to about <span data-tex>n/(1 + (n-1)\rho)</span>, and a standard error computed as if the data were independent
+              is too small. The rate <span data-tex>\sqrt{n}</span> is also not universal: for variables with infinite variance the right
+              scale is <span data-tex>n^{1/\alpha}</span> with <span data-tex>\alpha \lt 2</span>, and the limit is a stable law, not the normal.
+            </p>
+          </section>
+
+          <!-- ===================================================== §7 -->
+          <section class="hw-section" id="s7" aria-labelledby="s7-title">
+            <h2 id="s7-title"><a class="section-anchor" href="#s7" aria-label="Section 7, link to this section">§7</a> Conditional probability and Bayes' theorem</h2>
+            <p>
+              The conditional probability of <span data-tex>A</span> given <span data-tex>B</span>, with <span data-tex>P(B) \gt 0</span>, is the
+              probability of <span data-tex>A</span> in the world restricted to <span data-tex>B</span>:
+            </p>
+            <div class="equation" id="eq-10">
+              <div data-tex-display>
+                P(A \mid B) = \frac{P(A \cap B)}{P(B)}, \qquad P(A \cap B) = P(A \mid B)\,P(B) = P(B \mid A)\,P(A).
+              </div>
+              <span class="equation__no">(10)</span>
+            </div>
+            <p>
+              If <span data-tex>B_1, \dots, B_k</span> partition the sample space, the law of total probability gives
+              <span data-tex>P(A) = \sum_i P(A \mid B_i)\,P(B_i)</span>, and substituting it into (10) gives Bayes' theorem:
+            </p>
+            <div class="equation" id="eq-11">
+              <div data-tex-display>
+                P(B_i \mid A) = \frac{P(A \mid B_i)\,P(B_i)}{\sum_{j} P(A \mid B_j)\,P(B_j)}.
+              </div>
+              <span class="equation__no">(11)</span>
+            </div>
+            <p>
+              The theorem reverses a conditioning, and the two directions are different quantities: the probability that a person with the
+              disease tests positive is not the probability that a person who tests positive has the disease. Confusing them is the
+              <i>transposed conditional</i> fallacy, and §8 shows its size. In statistics, conditioning is everywhere: the conditional
+              distribution of a response given a covariate, the conditional expectation <span data-tex>E[Y \mid X]</span> that a regression
+              estimates, and the likelihood <span data-tex>L(\theta) = P(\text{data} \mid \theta)</span>, a conditional probability read as
+              a function of the unknown <span data-tex>\theta</span>.
+            </p>
+          </section>
+
+          <!-- ===================================================== §8 -->
+          <section class="hw-section" id="s8" aria-labelledby="s8-title">
+            <h2 id="s8-title"><a class="section-anchor" href="#s8" aria-label="Section 8, link to this section">§8</a> Prior, likelihood and posterior</h2>
+            <p>
+              In Bayesian inference the unknown <span data-tex>\theta</span> is itself described by a probability law. Theorem (11), written for
+              a parameter and data <span data-tex>y</span>, reads
+            </p>
+            <div class="equation" id="eq-12">
+              <div data-tex-display>
+                \underbrace{p(\theta \mid y)}_{\text{posterior}} = \frac{\overbrace{p(y \mid \theta)}^{\text{likelihood}}\;\overbrace{p(\theta)}^{\text{prior}}}{\underbrace{\textstyle\int p(y \mid t)\,p(t)\,dt}_{\text{evidence } p(y)}}
+                \;\propto\; p(y \mid \theta)\,p(\theta).
+              </div>
+              <span class="equation__no">(12)</span>
+            </div>
+            <p>
+              The <strong>prior</strong> <span data-tex>p(\theta)</span> is what is believed before the data, from earlier studies, from theory or
+              from a deliberate attempt to be uninformative. The <strong>likelihood</strong> is the model of how the data arise given
+              <span data-tex>\theta</span>, and it is the only place where the data enter. The <strong>posterior</strong> is the prior reweighted by
+              the likelihood: values of <span data-tex>\theta</span> that made the data likely gain weight and the others lose it. The evidence
+              <span data-tex>p(y)</span> does not depend on <span data-tex>\theta</span>; it only normalises. Updating is central because it is the
+              rule for combining information coherently: the posterior after one batch of data is the prior for the next, and for data that are
+              conditionally independent the final posterior does not depend on the order or the grouping of the batches. It also yields direct
+              probability statements, such as <span data-tex>P(\theta \gt 0.5 \mid y)</span>, which a frequentist procedure does not provide.
+            </p>
+            <h3>Example 1: a diagnostic test</h3>
+            <p>
+              A disease has prevalence <span data-tex>\pi</span>, the prior probability that a person selected at random has it. A test has
+              sensitivity <span data-tex>P(+ \mid D) = 0.95</span> and specificity <span data-tex>P(- \mid \bar D) = 0.95</span>. By (11) the
+              probability of disease after a positive result is
+              <span data-tex>\pi\,0.95 / \bigl(\pi\,0.95 + (1 - \pi)\,0.05\bigr)</span>. At a prevalence of 1% it is {{fig.bayes.d1.afterOne}}:
+              in 100,000 people {{fig.bayes.d1.tp}} are true positives and {{fig.bayes.d1.fp}} are false positives, so most positives are
+              healthy. A second, independent positive test, with the first posterior as the new prior, raises the probability to
+              {{fig.bayes.d1.afterTwo}}. Table 7 shows how strongly the answer depends on the prior: {{fig.bayes.d0.afterOne}} at a
+              prevalence of 0.1%, {{fig.bayes.d50.afterOne}} at 50%.
+            </p>
+            <figure class="table-figure" aria-labelledby="table7-caption">
+              <figcaption id="table7-caption">
+                <span class="table-figure__no">Table 7.</span>The posterior probability of disease after one and after two positive tests, by
+                prevalence, for a test with sensitivity and specificity 0.95; the counts are for 100,000 people.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table7-caption"><!-- @figure id=diagnostic --></div>
+            </figure>
+            <h3>Example 2: a proportion with a beta prior</h3>
+            <p>
+              Let <span data-tex>\theta</span> be an unknown proportion and let <span data-tex>k</span> successes be observed in
+              <span data-tex>n</span> independent trials, so that the likelihood is proportional to
+              <span data-tex>\theta^k(1-\theta)^{n-k}</span>. With the prior <span data-tex>\theta \sim \mathrm{Beta}(a, b)</span>, whose density is
+              proportional to <span data-tex>\theta^{a-1}(1-\theta)^{b-1}</span>, the product (12) has the same form, and
+            </p>
+            <div class="equation" id="eq-13">
+              <div data-tex-display>
+                \theta \mid k \sim \mathrm{Beta}(a + k,\; b + n - k), \qquad
+                E[\theta \mid k] = \frac{a + b}{a + b + n}\cdot\frac{a}{a + b} + \frac{n}{a + b + n}\cdot\frac{k}{n}.
+              </div>
+              <span class="equation__no">(13)</span>
+            </div>
+            <p>
+              A conjugate prior keeps the posterior in the same family, and (13) displays the mechanism: the posterior mean is a weighted
+              average of the prior mean and the sample proportion, with the prior worth <span data-tex>a + b</span> pseudo-observations. We take
+              three priors, the uniform <span data-tex>\mathrm{Beta}(1, 1)</span>, a weakly informative <span data-tex>\mathrm{Beta}(2, 2)</span>
+              and a misleading <span data-tex>\mathrm{Beta}(2, 18)</span> that places the proportion near 0.1, and observe 70% successes. Figure 6 shows
+              the posteriors for 7 successes in 10 trials, Figure 7 for 70 in 100.
+            </p>
+            <figure class="chart-figure" aria-labelledby="fig6-title">
+              <div class="chart-figure__canvas"><!-- @figure id=posteriorSmall --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig6-title">
+                  <span class="pplot__fig-no">Figure 6.</span>Posterior densities for 7 successes in 10 trials
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  Each curve is marked at its mode. Under the uniform prior the posterior is proportional to the likelihood itself. The misleading prior pulls the posterior mean to
+                  {{fig.bayes.n10.misleading}}, against {{fig.bayes.n10.uniform}} under the uniform prior; its weight is
+                  {{fig.bayes.n10.misleadingWeight}}.
+                </p>
+              </figcaption>
+            </figure>
+            <figure class="chart-figure" aria-labelledby="fig7-title">
+              <div class="chart-figure__canvas"><!-- @figure id=posteriorLarge --></div>
+              <figcaption class="pplot__caption">
+                <p class="pplot__caption-title" id="fig7-title">
+                  <span class="pplot__fig-no">Figure 7.</span>Posterior densities for 70 successes in 100 trials
+                  <span class="pplot__provenance">Computed</span>
+                </p>
+                <p>
+                  With ten times the data the posteriors are narrower. The uniform and the weakly informative priors give almost the same curve;
+                  the misleading prior still pulls the posterior mean to {{fig.bayes.n100.misleading}}, against {{fig.bayes.n100.uniform}}, with a weight of
+                  {{fig.bayes.n100.misleadingWeight}}.
+                </p>
+              </figcaption>
+            </figure>
+            <p>
+              Table 8 follows the posterior means as <span data-tex>n</span> grows with the sample proportion fixed. At
+              <span data-tex>n = 1{,}000</span> the misleading prior has a weight of {{fig.bayes.n1000.misleadingWeight}} and the means,
+              {{fig.bayes.n1000.uniform}} and {{fig.bayes.n1000.misleading}}, are almost equal: the data dominate the prior, which is the
+              Bernstein–von Mises phenomenon, and a Bayesian and a frequentist then agree to first order. Table 9 compares the 95%
+              credible intervals, equal-tailed intervals of the posterior that contain <span data-tex>\theta</span> with probability 0.95
+              <i>given the data</i>, with the Wilson confidence interval, whose 95% is a long-run property of the procedure.
+            </p>
+            <figure class="table-figure" aria-labelledby="table8-caption">
+              <figcaption id="table8-caption">
+                <span class="table-figure__no">Table 8.</span>The posterior mean of the proportion under each prior, for 70% successes and growing
+                <span data-tex>n</span>.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table8-caption"><!-- @figure id=influence --></div>
+            </figure>
+            <figure class="table-figure" aria-labelledby="table9-caption">
+              <figcaption id="table9-caption">
+                <span class="table-figure__no">Table 9.</span>The Wilson 95% confidence interval and the 95% credible intervals under each prior.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="table9-caption"><!-- @figure id=intervals --></div>
+            </figure>
+          </section>
+
+          <!-- ===================================================== §9 -->
+          <section class="hw-section" id="s9" aria-labelledby="s9-title">
+            <h2 id="s9-title"><a class="section-anchor" href="#s9" aria-label="Section 9, link to this section">§9</a> Advantages and limitations</h2>
+            <p>The two examples show where the Bayesian approach helps and where it needs care.</p>
+            <ul>
+              <li>
+                <strong>Information is used, and stated.</strong> Prior knowledge, such as a known prevalence, enters the calculation and not
+                just the interpretation. With a sample of 3 successes in 3 trials the maximum likelihood estimate is 1, a certainty that no one
+                would assert, whereas the uniform prior gives {{fig.bayes.laplace}} (Laplace's rule of succession), a value that grows with
+                the evidence.
+              </li>
+              <li>
+                <strong>Small samples and sequential data.</strong> The posterior is exact at every <span data-tex>n</span>, with no
+                asymptotic argument, and it is updated one observation at a time, which suits studies that stop or continue according to what has been seen.
+              </li>
+              <li>
+                <strong>Direct statements.</strong> A credible interval says what a reader wants to know, where the parameter probably lies;
+                a confidence interval says how the procedure behaves in repetition.
+              </li>
+              <li>
+                <strong>The prior is a choice.</strong> Figure 6 and Table 8 show that with little data the conclusion depends on it, and a
+                misleading prior needs hundreds of observations to be overcome. The remedy is a sensitivity analysis: report the posterior under
+                several reasonable priors, as above.
+              </li>
+              <li>
+                <strong>No prior is neutral.</strong> The uniform prior on <span data-tex>\theta</span> is not uniform on
+                <span data-tex>\theta^2</span> or on the odds, and improper priors can give improper posteriors.
+              </li>
+              <li>
+                <strong>Computation and model dependence.</strong> The beta–binomial case is closed-form; most models are not, and need
+                simulation of the posterior. As in any approach, a wrong likelihood gives wrong conclusions however good the prior.
+              </li>
+            </ul>
+          </section>
+
+          <!-- ===================================================== §10 -->
+          <section class="hw-section" id="s10" aria-labelledby="s10-title">
+            <h2 id="s10-title"><a class="section-anchor" href="#s10" aria-label="Section 10, link to this section">§10</a> Conclusion</h2>
+            <p>
+              The four modes are ordered by strength as in (5), and each has its place: the strong law holds almost surely, the weak law in
+              probability (and in mean square when the variance is finite), and the central limit theorem in distribution, the only mode in
+              which a standardised mean can converge. The sequences of §3 show that these are not interchangeable, and the Cauchy law shows that the laws of large numbers
+              need a mean. The factor <span data-tex>\sqrt{n}</span> is the consequence of the additivity of variances of independent terms; with correlation
+              it is replaced by <span data-tex>n</span> and the limit theorems change. Bayes' theorem turns conditional
+              probability into a rule of learning, in which the posterior is the prior reweighted by the likelihood: the answer depends on the
+              prior when data are scarce (Example 1 and Figure 6) and ceases to depend on it as they accumulate (Table 8).
+            </p>
+          </section>
+
+          <!-- ===================================================== References -->
+          <section class="hw-section references" id="references" aria-labelledby="references-title">
+            <h2 id="references-title"><a class="section-anchor" href="#references" aria-label="References, link to this section">Ref.</a> References</h2>
+            <ol>
+              <li>Bayes, T. (1763). An essay towards solving a problem in the doctrine of chances. <cite>Philosophical Transactions of the Royal Society</cite>, 53, 370–418.</li>
+              <li>Billingsley, P. (1995). <cite>Probability and Measure</cite> (3rd ed.). Wiley.</li>
+              <li>Casella, G., &amp; Berger, R. L. (2002). <cite>Statistical Inference</cite> (2nd ed.). Duxbury.</li>
+              <li>Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., &amp; Rubin, D. B. (2013). <cite>Bayesian Data Analysis</cite> (3rd ed.). CRC Press.</li>
+              <li>Shevtsova, I. (2011). On the absolute constants in the Berry–Esseen type inequalities for identically distributed summands. <cite>arXiv</cite>:1111.6554.</li>
+              <li>van der Vaart, A. W. (1998). <cite>Asymptotic Statistics</cite>. Cambridge University Press.</li>
+              <li>Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. <cite>Journal of the American Statistical Association</cite>, 22(158), 209–212.</li>
+            </ol>
+          </section>
+
+          <!-- ===================================================== Appendix -->
+          <section class="hw-section" id="appendix" aria-labelledby="appendix-title">
+            <h2 id="appendix-title"><a class="section-anchor" href="#appendix" aria-label="Appendix, link to this section">App.</a> Parameters</h2>
+            <figure class="table-figure" aria-labelledby="tableA1-caption">
+              <figcaption id="tableA1-caption">
+                <span class="table-figure__no">Table A1.</span>The parameters of the computation. Every number on the page follows from them.
+              </figcaption>
+              <div class="data-table--scroll" tabindex="0" role="region" aria-labelledby="tableA1-caption"><!-- @figure id=parameters --></div>
+            </figure>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- @include partials/site-footer.html -->
+  </body>
+</html>
