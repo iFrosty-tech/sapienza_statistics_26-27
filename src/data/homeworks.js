@@ -111,4 +111,15 @@ export default [
     published: '2026-11-16',
     status: 'published',
   },
+  {
+    number: 9,
+    label: 'Homework 7',
+    shortLabel: '7',
+    title: 'Modes of convergence, the laws of large numbers and the central limit theorem, and Bayesian inference',
+    abstract:
+      'The four modes of convergence of probability theory (almost sure, in probability, in mean square and in distribution) are separated by sequences whose probabilities are computed exactly and checked by simulation, and the role of each is traced in the weak and strong laws of large numbers, the central limit theorem and the consistency and asymptotic normality of estimators. The factor √n is derived from the additivity of the variances of independent terms and shown to fail under correlation, where the spread of a sum grows as n and the mean no longer converges to its expectation. Conditional probability and Bayes’ theorem are then applied to a diagnostic test and to a proportion with a beta prior, showing how the prior, the likelihood and the posterior combine, how strongly the prior matters for small samples, and how little for large ones.',
+    topics: ['Modes of convergence', 'Law of large numbers', 'Central limit theorem', 'Bayes’ theorem', 'Bayesian inference'],
+    published: '2026-11-24',
+    status: 'published',
+  },
 ];
